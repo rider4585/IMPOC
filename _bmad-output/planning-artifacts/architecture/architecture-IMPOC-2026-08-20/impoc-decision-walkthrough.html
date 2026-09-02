@@ -1,0 +1,407 @@
+<title>Calls That Shaped IMPOC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  --ink:#14181C; --ground:#F4F5F3; --surface:#FFFFFF; --sunk:#EAEDEA;
+  --line:#D6DBD7; --line-soft:#E4E8E5;
+  --text:#14181C; --text-2:#4A544D; --text-3:#78837B;
+  --madder:#9E2B25; --madder-soft:#F3E3E1;
+  --indigo:#26456E; --indigo-soft:#E1E7F0;
+  --brass:#A8874B; --brass-soft:#F4EDDF;
+  --ok:#2F6B4F; --ok-soft:#E0EDE6;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --body:'Public Sans',system-ui,-apple-system,Segoe UI,sans-serif;
+  --disp:'Bitter',Georgia,serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ink:#E8EBE9; --ground:#101315; --surface:#171B1E; --sunk:#1D2225;
+    --line:#2C3337; --line-soft:#232A2D;
+    --text:#E8EBE9; --text-2:#A3AEA7; --text-3:#78837B;
+    --madder:#D9736B; --madder-soft:#2E1E1D;
+    --indigo:#8FAED6; --indigo-soft:#1A2430;
+    --brass:#C9A967; --brass-soft:#2A2418;
+    --ok:#7BBF9A; --ok-soft:#17251E;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#E8EBE9; --ground:#101315; --surface:#171B1E; --sunk:#1D2225;
+  --line:#2C3337; --line-soft:#232A2D;
+  --text:#E8EBE9; --text-2:#A3AEA7; --text-3:#78837B;
+  --madder:#D9736B; --madder-soft:#2E1E1D;
+  --indigo:#8FAED6; --indigo-soft:#1A2430;
+  --brass:#C9A967; --brass-soft:#2A2418;
+  --ok:#7BBF9A; --ok-soft:#17251E;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--text);
+  font-family:var(--body); font-size:16.5px; line-height:1.68;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--disp); text-wrap:balance; margin:0}
+code{font-family:var(--mono); font-size:.88em; background:var(--sunk); padding:1px 5px; border-radius:3px}
+
+.bars{
+  height:30px; width:100%;
+  background-image:repeating-linear-gradient(90deg,
+    var(--ink) 0 2px, transparent 2px 5px, var(--ink) 5px 6px, transparent 6px 11px,
+    var(--ink) 11px 14px, transparent 14px 16px, var(--ink) 16px 17px, transparent 17px 23px,
+    var(--ink) 23px 25px, transparent 25px 27px, var(--ink) 27px 30px, transparent 30px 37px);
+  opacity:.5;
+}
+
+.shell{max-width:860px; margin:0 auto; padding:0 28px}
+
+header{padding:70px 0 46px; border-bottom:1px solid var(--line)}
+.eyebrow{
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.15em; text-transform:uppercase;
+  color:var(--madder); font-weight:600;
+}
+header h1{font-size:clamp(38px,6.5vw,60px); font-weight:700; letter-spacing:-.028em; line-height:1.06; margin:16px 0 0; max-width:15ch}
+header .stand{font-size:19px; color:var(--text-2); max-width:60ch; margin:22px 0 0; line-height:1.6}
+.facts{display:flex; flex-wrap:wrap; gap:0; margin-top:34px; border-top:1px solid var(--line-soft)}
+.fact{flex:1 1 150px; padding:16px 18px 0 0}
+.fact b{display:block; font-family:var(--disp); font-size:26px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+.fact span{display:block; font-size:12.5px; color:var(--text-3); margin-top:1px}
+
+.intro{padding:44px 0 10px; font-size:17px; color:var(--text-2); max-width:65ch}
+.intro p{margin:0 0 18px}
+.intro strong{color:var(--text)}
+
+article{padding:46px 0; border-bottom:1px solid var(--line)}
+.qhead{display:flex; gap:18px; align-items:baseline; margin-bottom:6px}
+.qnum{
+  font-family:var(--mono); font-size:12px; font-weight:600; color:var(--madder);
+  letter-spacing:.1em; padding-top:8px; white-space:nowrap;
+}
+article h2{font-size:clamp(25px,3.6vw,33px); font-weight:700; letter-spacing:-.02em; line-height:1.18; max-width:22ch}
+.asked{
+  font-family:var(--mono); font-size:13px; color:var(--text-3); margin:2px 0 26px 0;
+  padding-left:calc(18px + 5.4ch); line-height:1.55;
+}
+
+.tension{
+  border-left:3px solid var(--indigo); background:var(--indigo-soft);
+  padding:16px 20px; border-radius:0 6px 6px 0; margin:0 0 24px;
+}
+.tension .lbl{font-family:var(--mono); font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--indigo); font-weight:600; display:block; margin-bottom:6px}
+.tension p{margin:0; font-size:16px}
+
+.weigh{display:grid; gap:10px; margin:0 0 26px}
+.opt{
+  display:grid; grid-template-columns:26px 1fr; gap:14px; align-items:start;
+  border:1px solid var(--line); border-radius:6px; padding:14px 17px; background:var(--surface);
+}
+.opt .mk{
+  font-family:var(--mono); font-size:15px; line-height:1.3; font-weight:600;
+  color:var(--text-3); text-align:center;
+}
+.opt.picked{border-color:var(--ok); background:var(--ok-soft)}
+.opt.picked .mk{color:var(--ok)}
+.opt h4{font-size:15.5px; font-weight:700; font-family:var(--body); margin-bottom:3px}
+.opt p{margin:0; font-size:14.5px; color:var(--text-2); line-height:1.58}
+
+.call{
+  border-left:3px solid var(--madder); padding:18px 22px; background:var(--surface);
+  border-radius:0 6px 6px 0; border-top:1px solid var(--line); border-right:1px solid var(--line);
+  border-bottom:1px solid var(--line); margin:0 0 20px;
+}
+.call .lbl{font-family:var(--mono); font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--madder); font-weight:600; display:block; margin-bottom:8px}
+.call p{margin:0 0 12px; font-size:16.5px}
+.call p:last-child{margin-bottom:0}
+.ads{display:flex; flex-wrap:wrap; gap:6px; margin-top:14px}
+.ads a, .ads span{
+  font-family:var(--mono); font-size:11px; font-weight:600; padding:3px 8px; border-radius:3px;
+  background:var(--indigo-soft); color:var(--indigo); text-decoration:none;
+}
+
+.prevents{
+  font-size:15px; color:var(--text-2); border-top:1px dashed var(--line);
+  padding-top:15px; margin-top:4px;
+}
+.prevents b{color:var(--text); font-weight:600}
+
+.flag{
+  border:1px solid var(--madder); border-left-width:3px; background:var(--madder-soft);
+  padding:15px 19px; border-radius:0 6px 6px 0; margin:22px 0 0;
+}
+.flag .lbl{font-family:var(--mono); font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--madder); font-weight:600; display:block; margin-bottom:6px}
+.flag p{margin:0; font-size:15.5px}
+
+.gate{padding:52px 0 60px}
+.gate h2{font-size:31px; font-weight:700; letter-spacing:-.02em; margin-bottom:10px}
+.gate > p{color:var(--text-2); max-width:64ch; margin:0 0 26px}
+.finds{display:grid; gap:10px}
+.find{display:grid; grid-template-columns:auto 1fr; gap:15px; align-items:start; border:1px solid var(--line); border-radius:6px; padding:14px 17px; background:var(--surface)}
+.sev{font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:3px 7px; border-radius:3px; white-space:nowrap; margin-top:2px}
+.sev.crit{background:var(--madder-soft); color:var(--madder)}
+.sev.high{background:var(--brass-soft); color:var(--brass)}
+.sev.med{background:var(--indigo-soft); color:var(--indigo)}
+.sev.ok{background:var(--ok-soft); color:var(--ok)}
+.find h4{font-size:15.5px; font-weight:700; font-family:var(--body); margin-bottom:3px}
+.find p{margin:0; font-size:14.5px; color:var(--text-2); line-height:1.58}
+
+footer{padding:34px 0 70px; color:var(--text-3); font-size:13.5px; border-top:1px solid var(--line)}
+footer a{color:var(--indigo)}
+
+@media (max-width:640px){
+  header{padding-top:44px}
+  .asked{padding-left:0}
+  .qhead{flex-direction:column; gap:2px}
+  .qnum{padding-top:0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+
+<div class="bars" role="presentation"></div>
+
+<div class="shell">
+
+<header>
+  <div class="eyebrow">Architecture rationale · SPEC-impoc-core</div>
+  <h1>The calls that shaped IMPOC</h1>
+  <p class="stand">The spec fixed the stack, the module layout, and the conventions. It left a handful of things genuinely open. This is what was weighed on each, what was chosen, and the divergence each choice exists to prevent. Revised after a second pass that re-triaged every reviewer finding, and after two calls Raviraj made directly.</p>
+  <div class="facts">
+    <div class="fact"><b>32</b><span>invariants fixed</span></div>
+    <div class="fact"><b>6</b><span>upstream conflicts found</span></div>
+    <div class="fact"><b>35</b><span>findings re-triaged</span></div>
+    <div class="fact"><b>0</b><span>schedulers permitted</span></div>
+  </div>
+</header>
+
+<div class="intro">
+  <p>Every decision below was made against a constraint the spec states plainly and does not negotiate: <strong>a completed transaction is never updated</strong>, <strong>nothing derivable is stored</strong>, and <strong>no cron, scheduler, or background worker may exist</strong>. Those three rule out most of the obvious answers, which is what makes the remaining choices worth writing down.</p>
+  <p>Rationale lives here. The enforceable rules live in the spine, and where the two differ, the spine wins.</p>
+</div>
+
+<article>
+  <div class="qhead"><div class="qnum">01</div><h2>Rental availability, now that <code>reserved</code> is gone</h2></div>
+  <p class="asked">Asked: overlapping-date-range query — and should it use Postgres range types and exclusion constraints?</p>
+
+  <div class="tension">
+    <span class="lbl">The tension</span>
+    <p>A saree booked for the 14th–17th must still be bookable for the 5th–7th, and it sits <code>IN_STOCK</code> the whole time. So availability is a question about ranges, not a flag. But two clerks can ask that question in the same second and both get “yes”.</p>
+  </div>
+
+  <div class="weigh">
+    <div class="opt"><div class="mk">○</div><div><h4>Two date columns and an overlap query</h4><p>Simplest, and reads naturally. But the check and the insert are separate statements — nothing stops two overlapping bookings committing together. It reintroduces the race the spec spent <code>reserved</code> to avoid.</p></div></div>
+    <div class="opt"><div class="mk">○</div><div><h4>A native <code>daterange</code> column</h4><p>Correct, and the constraint works. But the domain speaks start and end dates — that is what the receipt prints and what <code>due_date</code> derives from — and Sequelize’s range bound semantics are easy to get subtly wrong on every write.</p></div></div>
+    <div class="opt picked"><div class="mk">●</div><div><h4>Canonical dates plus a <em>generated</em> range, under a partial <code>EXCLUDE</code></h4><p>Keeps <code>start_date</code>/<code>end_date</code> as the domain columns; adds <code>period</code> as a generated column that exists only to be constrained and indexed.</p></div></div>
+  </div>
+
+  <div class="call">
+    <span class="lbl">The call</span>
+    <p>A generated column cannot drift from its source — Postgres guarantees the two views agree, rather than application code remembering to. Sequelize never needs to know <code>period</code> exists. The guard is <code>EXCLUDE USING gist (unit_id WITH =, period WITH &amp;&amp;)</code>, scoped by a <code>WHERE</code> predicate to open and handed-over bookings only.</p>
+    <p>Bounds are inclusive on both ends, because a piece due back on the 17th is out of the shop on the 17th.</p>
+    <p>This follows the spec’s own stated principle rather than departing from it: the database constraint is the race guard, not application locking. An exclusion constraint is simply what a unique constraint becomes when the thing that must not collide is a range.</p>
+    <div class="ads"><span>AD-7</span><span>AD-23</span></div>
+    <div class="prevents"><b>Verified, not assumed:</b> Sequelize 6’s <code>addConstraint</code> has no exclusion type, so this is raw DDL in the migration. <code>btree_gist</code> is needed to mix the equality column with the range — and it is a <em>trusted</em> extension, so the free-tier Postgres you plan to host on can install it without superuser.</div>
+  </div>
+
+  <div class="flag">
+    <span class="lbl">Conflict found</span>
+    <p>Inclusive bounds exposed an off-by-one in the spec itself. <code>endDate − startDate</code> charges two days for a 15th–17th booking that holds the piece for three — so rent, the <code>floor(deposit / overduePerDay)</code> cap, and utilisation were all short, in the customer’s favour. One named formula now governs everywhere: <code>rentalDays = (end − start) + 1</code>.</p>
+  </div>
+</article>
+
+<article>
+  <div class="qhead"><div class="qnum">02</div><h2>Twenty-four derived questions, no cron</h2></div>
+  <p class="asked">Asked: query and index strategy for the derived-on-read dashboard. (The spec says 21; the catalog lists 24.)</p>
+
+  <div class="tension">
+    <span class="lbl">The tension</span>
+    <p>Every figure must be computed at read time, drillable to its rows, and reconcile exactly — takings minus reversals equalling the sum of the underlying lines. Twenty-four questions, each netting reversing rows, is twenty-four chances to get it wrong once and show a reversed sale as revenue.</p>
+  </div>
+
+  <div class="weigh">
+    <div class="opt"><div class="mk">○</div><div><h4>ORM aggregation with eager loading</h4><p>Unwritable at this shape, and the query plans are catastrophic. Worse, it invites half the dashboard being built one way and half another.</p></div></div>
+    <div class="opt"><div class="mk">○</div><div><h4>Materialized views</h4><p>Fast and tidy — and immediately illegal. A matview needs refreshing, and the refresh <em>is</em> the cron the spec bans.</p></div></div>
+    <div class="opt picked"><div class="mk">●</div><div><h4>Plain views that own netting, read by hand-written SQL</h4><p>Four plain views compute netting and the shop-day once. A <code>reports</code> module of parameterised SQL reads only those.</p></div></div>
+  </div>
+
+  <div class="call">
+    <span class="lbl">The call</span>
+    <p>Netting moves out of the questions and into four views — sale lines, expenses, rental income, and deposits held. No takings, margin, expense, or deposit query may touch a base table. That single rule is the highest-value invariant in the spine, because it converts twenty-four independent chances to forget into one place to get right.</p>
+    <p>Each question is one file exporting <strong>both</strong> a summary and a drill-down — a total the owner cannot open is not an answer — and declares exactly one range anchor, so “which timestamp puts this row in the range” is never decided twice.</p>
+    <p>On indexes: at one shop’s volume, order 10⁴ units over five years, every one of these runs in milliseconds. The index set exists for plan-shape consistency, not speed. There is deliberately no cache, no read replica, and no summary table.</p>
+    <div class="ads"><span>AD-12</span><span>AD-13</span><span>AD-14</span><span>AD-15</span><span>AD-16</span></div>
+    <div class="prevents"><b>Prevents:</b> the moment someone looks at an awkward overdue query and reaches for a nightly job. Overdue is a <code>WHERE</code> clause evaluated in the SELECT that renders the page — if a query tempts a scheduler, the query is wrong.</div>
+  </div>
+</article>
+
+<article>
+  <div class="qhead"><div class="qnum">03</div><h2>Transaction boundaries and the race guards</h2></div>
+  <p class="asked">Asked: boundaries and unique-constraint race guards for checkout, exchange, and rental settlement.</p>
+
+  <div class="tension">
+    <span class="lbl">The tension</span>
+    <p>Two cashiers scan the same barcode into two carts. Exactly one checkout must win, and the loser must be told which unit and why — without a status flag, without a lock table, and without an <code>in_cart</code> state the spec has explicitly removed.</p>
+  </div>
+
+  <div class="weigh">
+    <div class="opt"><div class="mk">○</div><div><h4><code>SELECT … FOR UPDATE</code> on the unit</h4><p>Works, and is application locking by another name. It also serialises the whole counter behind one row on a pooled free-tier connection.</p></div></div>
+    <div class="opt"><div class="mk">○</div><div><h4>Unique constraint on non-reversing sale lines</h4><p>What the spec specifies — and it cannot work. See below.</p></div></div>
+    <div class="opt picked"><div class="mk">●</div><div><h4>Conditional UPDATE on <code>units.status</code></h4><p>One atomic statement whose <code>WHERE</code> names the expected status. Zero rows returned means someone else won.</p></div></div>
+  </div>
+
+  <div class="call">
+    <span class="lbl">The call</span>
+    <p>One unmanaged transaction per counter gesture, opened in the service — never a controller or a model hook — and <strong>nothing that is not Postgres I/O inside it</strong>. Receipts render after commit, from committed rows; a pdfkit render holding a pooled connection open is a real outage on free hosting.</p>
+    <p>Isolation stays at <code>READ COMMITTED</code> and there are no retry loops, because every race closes on a constraint or a compare-and-swap rather than on optimistic conflict detection.</p>
+    <p>One service owns unit movement. <code>units.service</code> writes the status change <em>and</em> its audit event together, as one function other services call with their own transaction.</p>
+    <div class="ads"><span>AD-8</span><span>AD-9</span><span>AD-10</span><span>AD-11</span><span>AD-22</span></div>
+    <div class="prevents"><b>Prevents:</b> five modules each inventing their own message for the same constraint violation. Translation is centralised and keyed on constraint name — which is why every migration must name its constraints explicitly rather than letting Sequelize generate them.</div>
+  </div>
+
+  <div class="flag">
+    <span class="lbl">Conflict found</span>
+    <p>The spec’s chosen guard — unique on <code>unit_id</code> across non-reversing sale lines — makes exchange impossible. An exchange never touches the original line, so it stays non-reversing forever; a second sale of the same unit would violate the constraint and the piece could never be sold again. The compare-and-swap is also the literal reading of CAP-14’s own wording: <em>still <code>IN_STOCK</code> at commit time</em>.</p>
+  </div>
+</article>
+
+<article>
+  <div class="qhead"><div class="qnum">04</div><h2>Erasing a customer without touching history</h2></div>
+  <p class="asked">Asked: how DPDP anonymisation coexists with never updating a completed transaction.</p>
+
+  <div class="tension">
+    <span class="lbl">The tension</span>
+    <p>An administrator must be able to erase a person’s name, number, date of birth and email on request — while every past receipt still reproduces unchanged and every takings figure still reconciles. Those look contradictory only until you notice they describe different rows.</p>
+  </div>
+
+  <div class="weigh">
+    <div class="opt"><div class="mk">○</div><div><h4>Delete the customer row</h4><p>Breaks every foreign key from sales and bookings, and takes the shop’s own transaction history with it.</p></div></div>
+    <div class="opt"><div class="mk">○</div><div><h4>Tombstone and rewrite the snapshots</h4><p>Satisfies erasure and destroys the ledger — this is exactly the UPDATE-a-completed-transaction the spec forbids.</p></div></div>
+    <div class="opt picked"><div class="mk">●</div><div><h4>Tier the rows, then forbid the join</h4><p>Classify every table by what may be written to it after creation, and make historical reads structurally unable to see the customer row.</p></div></div>
+  </div>
+
+  <div class="call">
+    <span class="lbl">The call</span>
+    <p>Three mutability tiers settle it. Append-only ledger tables are INSERT-only. Bookings and agreements may be updated only to advance toward their terminal state, then freeze. Everything else — including <code>customers</code> — is ordinary master data. A row is “completed”, and so covered by the never-UPDATE rule, from the moment it reaches its terminal state, not from the moment it is inserted. <strong>Customer is master data, which is precisely why erasing it breaches nothing.</strong></p>
+    <p>The number is released by setting it NULL under a partial unique index — Postgres does not collide NULLs, so a different person may later register it. Consent metadata is retained deliberately: it holds no personal data and is the proof that consent existed.</p>
+    <p>The load-bearing half is a <em>read</em> rule, not a write one. <strong>No receipt, sale view, agreement view, or dashboard figure may join to <code>customers</code> for a name or number.</strong> Those come from the snapshot columns on the transaction row. Without this, the schema looks correct and every historical receipt still silently changes the day someone is erased.</p>
+    <div class="ads"><span>AD-5</span><span>AD-18</span><span>AD-24</span></div>
+  </div>
+
+  <div class="flag">
+    <span class="lbl">Conflict found</span>
+    <p>The dashboard catalog computes new-versus-returning customers by matching on WhatsApp number. Erasure releases that number, so an erased customer’s history detaches — and a new person reusing the number merges with the old one’s sales. Q21 must match on <code>customer_id</code>, which survives erasure intact.</p>
+  </div>
+</article>
+
+<article>
+  <div class="qhead"><div class="qnum">05</div><h2>The order the tables have to arrive in</h2></div>
+  <p class="asked">Asked: the migration sequence for the new tables.</p>
+
+  <div class="tension">
+    <span class="lbl">The tension</span>
+    <p>Fifteen new tables, a Postgres extension, four views, and a permissions seeder — against a hosted database where <code>down()</code> is not a real option and a free tier gives no convenient restore.</p>
+  </div>
+
+  <div class="call">
+    <span class="lbl">The call</span>
+    <p>Twenty-one migrations plus three seeders, ordered strictly by dependency: extension first, reference data, then intake, then <code>units</code> as the hub, then the transaction tables, then <code>unit_status_events</code> last of the tables so every nullable foreign-key target already exists, then the views, then the report indexes.</p>
+    <p><strong><code>btree_gist</code> goes first and alone.</strong> If the host forbids the extension, that must fail on step one — not fifteen tables into a deploy, with the rental epic already written against a constraint that cannot be created.</p>
+    <p>Migrations are forward-only once hosted. A <code>down()</code> is written for local development and never run against a deployed database; a mistake in production is corrected by a new forward migration.</p>
+    <div class="ads"><span>AD-20</span><span>AD-4</span></div>
+    <div class="prevents"><b>Worth knowing:</b> <code>backend/AGENTS.md</code> requires a soft-delete column on every table, but no existing table has one — <code>users</code> fakes it with a status value. The convention becomes real only on these new tables, and every partial index predicate has to carry <code>deleted_at IS NULL</code> or a soft-deleted booking blocks its dates forever.</div>
+  </div>
+</article>
+
+
+<article>
+  <div class="qhead"><div class="qnum">06</div><h2>A barcode that survives a database restore</h2></div>
+  <p class="asked">Asked by Raviraj, against the draft: &ldquo;instead of a simple counter we can combine the counter with timestamps, so even if the db dies and the counter resets the generated barcodes still be unique.&rdquo;</p>
+
+  <div class="tension">
+    <span class="lbl">The tension</span>
+    <p>The draft drew barcodes from a Postgres sequence. Print a sheet of labels 1001&ndash;1100, stick some on stock, then restore last night&rsquo;s backup &mdash; the counter goes back to 1000 and the next sheet reissues numbers already on sarees. The draft handled this with a boot-time <code>setval</code> plus an operating rule: bin any printed-but-unscanned sheet. Honest, but a procedure a shop will not follow at 8pm on a Saturday.</p>
+  </div>
+
+  <div class="weigh">
+    <div class="opt"><div class="mk">○</div><div><h4>Raw Unix timestamp</h4><p>Already ten digits on its own &mdash; it eats the entire budget with no room for a counter. The 35&nbsp;mm label caps the value at twelve digits, and Code 128 subset C needs an even count.</p></div></div>
+    <div class="opt"><div class="mk">○</div><div><h4>Day prefix plus a within-day counter</h4><p>Four digits of days plus six of counter fits comfortably. But a restore <em>on the same day</em> still collides, which is the common case &mdash; you restore the backup taken this morning.</p></div></div>
+    <div class="opt"><div class="mk">○</div><div><h4>Second prefix plus a counter</h4><p>Nine digits of seconds leaves one for the counter: ten labels a second. A single hundred-label sheet request blows straight through it.</p></div></div>
+    <div class="opt picked"><div class="mk">●</div><div><h4>Minute prefix plus a within-minute counter</h4><p>Seven digits of minutes since 2026-01-01 IST, five digits of counter. Twelve digits, even, subset C intact.</p></div></div>
+  </div>
+
+  <div class="call">
+    <span class="lbl">The call</span>
+    <p>A restore takes far longer than a minute, so the minute the system comes back up in has <em>never issued a label</em>. No printed value can be reissued, whatever the sequence was rolled back to &mdash; and the loose sheet on the counter stays valid instead of being binned.</p>
+    <p>That deletes three things from the architecture: the boot <code>setval</code>, the post-restore discard procedure, and the reviewer finding that the old scheme quietly failed CAP-2&rsquo;s &ldquo;the sequence never rewinds&rdquo;. The criterion is now met literally.</p>
+    <div class="ads"><span>AD-17</span><span>AD-28</span></div>
+    <div class="prevents"><b>The trade accepted:</b> twelve digits puts the bar width at 0.289&nbsp;mm against a phone-camera decode floor of roughly 0.25&nbsp;mm &mdash; above it, with less headroom than ten digits would give. Chosen knowingly in exchange for 100,000 labels a minute. The caliper against a physical print is still the acceptance test.</div>
+  </div>
+
+  <div class="flag">
+    <span class="lbl">Residual risk, named not hidden</span>
+    <p>The failure mode moves from restore to a <em>backwards clock jump</em> &mdash; an NTP correction or a host migration could repeat a minute. Far rarer than the case it replaces, and <code>units.barcode</code> UNIQUE stops being the primary defence and becomes a genuine last resort.</p>
+  </div>
+</article>
+
+<article>
+  <div class="qhead"><div class="qnum">07</div><h2>Who is allowed to give money back</h2></div>
+  <p class="asked">Asked: the per-role authorisation matrix, previously deferred to the permissions seeder.</p>
+
+  <div class="tension">
+    <span class="lbl">The tension</span>
+    <p>The rentals module adds five distinct counter gestures. Two of them &mdash; settling a return and cancelling a booking &mdash; decide how much of a deposit goes back across the counter. A third, an exchange, can refund a cash difference. The existing seeder already withholds <code>sales.cancel</code> and <code>sales.refund</code> from a cashier, so the shop already has a view on this; nothing carried it into the new module.</p>
+  </div>
+
+  <div class="weigh">
+    <div class="opt"><div class="mk">○</div><div><h4>One coarse <code>RENTALS.OPERATE</code> verb</h4><p>Simpler seeder. But anyone who can take a booking can also decide deposit deductions at return &mdash; the split becomes unexpressible, so the question cannot even be asked later.</p></div></div>
+    <div class="opt"><div class="mk">○</div><div><h4>Mirror the four <code>SALES</code> verbs</h4><p>Symmetric with the existing constants file, but hand-over and settle collapse into CREATE and REFUND, which fits the shape of the old module rather than the actual gestures of the new one.</p></div></div>
+    <div class="opt picked"><div class="mk">●</div><div><h4>Five verbs, one per gesture</h4><p><code>VIEW</code>, <code>BOOK</code>, <code>HANDOVER</code>, <code>SETTLE</code>, <code>CANCEL</code> &mdash; granular enough that money-in and money-out can be held by different people.</p></div></div>
+  </div>
+
+  <div class="call">
+    <span class="lbl">The call</span>
+    <p>A cashier holds money-in only: create a sale, view, book and hand over a rental. Settlement, cancellation and any exchange that refunds a difference need a manager. Erasing a customer and changing shop settings are the owner&rsquo;s alone. The accountant reads money and never moves a unit.</p>
+    <p>The granularity is the decision; the assignments are data. A shop that later wants cashiers settling returns edits one seeder row, not the schema.</p>
+    <div class="ads"><span>AD-29</span></div>
+    <div class="prevents"><b>Prevents:</b> the seeder being written twice, once by the rentals epic and once by an admin epic &mdash; and, more concretely, one person being able to both take money and give it back with no second signature.</div>
+  </div>
+
+  <div class="flag">
+    <span class="lbl">Conflict found</span>
+    <p>The UX spec builds navigation on &ldquo;CASHIER sees all of Counter&rdquo;. Under this matrix a cashier&rsquo;s Counter has no <em>Return &amp; settle</em>, no cancellation and no <em>Exchange</em>. Because navigation renders only what the user holds, no UI rework follows &mdash; but that stated intent is now stale and must be corrected upstream.</p>
+  </div>
+</article>
+
+<div class="gate">
+  <h2>What the review caught</h2>
+  <p>The draft went through a rubric lens, an adversarial lens hunting for pairs of modules that could obey every rule and still build incompatibly, and a verification pass on every technical claim. It came back with seven critical findings, which took the spine from 20 invariants to 28. A <strong>second pass</strong> then found that only the criticals and highs had actually been applied &mdash; the mediums and lows were marked done but were not traceable in the document. All thirty-five were re-triaged one by one.</p>
+  <div class="finds">
+    <div class="find"><span class="sev crit">critical</span><div><h4>The rental group had no home</h4><p>Three sarees must share one receipt, and the draft used the word “group” without ever defining it. Resolved as a <code>group_uuid</code> on both rental tables — no header table, because the money is already per-unit.</p></div></div>
+    <div class="find"><span class="sev crit">critical</span><div><h4>Mandated retry against a non-idempotent write</h4><p>The free-tier cold-start rule told clients to retry, and nothing made checkout idempotent. A lost response would either duplicate a sale or report a committed one as a conflict. Every gesture now carries a client-generated key, stored unique.</p></div></div>
+    <div class="find"><span class="sev crit">critical</span><div><h4>Two writers for the audit trail</h4><p>One rule said <code>units.service</code> owned status; a diagram showed <code>sales.service</code> writing the event. Two epics would each write it, doubling every shrinkage figure. Now one function writes both.</p></div></div>
+    <div class="find"><span class="sev crit">critical</span><div><h4>Overdue money appeared in no takings figure</h4><p>The income view had no slot for overdue charges the shop actually collects, so Q1 could never reconcile against Q12 or the till.</p></div></div>
+    <div class="find"><span class="sev crit">critical</span><div><h4>A cancelled booking had nowhere to record its refund</h4><p>Deposit-return columns lived on the agreement, and a cancelled booking never produces one. The drawer would come up short with no row to explain it.</p></div></div>
+    <div class="find"><span class="sev high">high</span><div><h4>The range predicate reintroduced the timezone bug</h4><p>Comparing a timestamp against a date parameter resolves it at the <em>session</em> zone — UTC on the host — which is the exact 5½-hour error the shop-time rule exists to prevent. Filtering now happens only on a pre-computed shop-day column.</p></div></div>
+    <div class="find"><span class="sev high">high</span><div><h4>A rule that cited code it did not match</h4><p>The draft claimed to ratify the repo’s primary-key idiom while specifying a different one, and cited the unguarded rollback rather than the guarded one. Both corrected against the actual files.</p></div></div>
+  </div>
+  <h2 style="font-size:26px;margin:44px 0 10px">The second pass</h2>
+  <p style="color:var(--text-2);max-width:64ch;margin:0 0 22px">Thirty-five medium and low findings, each now either applied as a rule change or rejected with a written reason. Twenty-four were real gaps. These are the ones that would have cost the most.</p>
+  <div class="finds">
+    <div class="find"><span class="sev high">applied</span><div><h4>A handed-over piece that never comes back had no ending</h4><p>The lifecycle offered <code>SETTLED</code> or <code>CANCELLED</code> and nothing for &ldquo;the customer vanished with it&rdquo;. One developer would write a <code>returned_at</code> for a piece that never returned &mdash; a lie in an audit trail &mdash; and another would leave the booking open forever, holding the unit&rsquo;s dates in perpetuity. Now a fourth terminal state, <code>WRITTEN_OFF</code>, with both partial predicates updated to release the slot.</p></div></div>
+    <div class="find"><span class="sev high">applied</span><div><h4>Moving a wedding by a week billed the customer twice</h4><p>Booking dates were frozen, so an amendment could only be cancel-and-rebook &mdash; and a cancellation leaves the rent as charged. Dates are now amendable while the booking is still <code>OPEN</code>, with the rent recomputed and the difference settled at the counter. The generated range column re-checks the overlap constraint by itself.</p></div></div>
+    <div class="find"><span class="sev high">applied</span><div><h4>Staff could mark a booked saree damaged and strand the booking</h4><p>Nothing stopped a unit leaving the floor while a customer held a booking on it for next weekend. The booking stayed open, the deposit had no refund path, and the dates stayed blocked for a piece that no longer existed. The guard now refuses and names the booking, its window and the customer.</p></div></div>
+    <div class="find"><span class="sev med">applied</span><div><h4>Nothing fixed the case of any enum value</h4><p>The repo writes <code>ACTIVE</code>; the draft wrote <code>in_stock</code>. Payment method would have been <code>UPI</code> in one epic and <code>upi</code> in another, surfacing only as a runtime constraint violation with a message that names nothing useful. Every constrained value is now <code>UPPERCASE_SNAKE</code>.</p></div></div>
+    <div class="find"><span class="sev med">applied</span><div><h4>The max-rental-period formula could divide by zero</h4><p>The period cap divides by the overdue rate, and no constraint kept that column above zero &mdash; only above the daily rent, which was itself unbounded below. Plus nothing anywhere forbade a negative price. Non-negativity checks on every money column, and a strict positive on the overdue rate.</p></div></div>
+    <div class="find"><span class="sev med">applied</span><div><h4>The index set could not serve the only query permitted</h4><p>Range filtering must use a shop-day expression; the indexes were plain b-trees on the raw timestamps, which that expression cannot use. They are now expression indexes &mdash; plus three that were simply missing, including the one the customer-matching question depends on.</p></div></div>
+    <div class="find"><span class="sev med">applied</span><div><h4>A walk-in took a different path through the same gesture</h4><p>One developer would insert a walk-in booking straight at <code>HANDED_OVER</code>; another at <code>OPEN</code>, then advance it. The first produces a row no hand-over guard can ever reach &mdash; on the busiest path in the shop. Walk-ins now insert at <code>OPEN</code> and advance through the same compare-and-swap.</p></div></div>
+    <div class="find"><span class="sev med">applied</span><div><h4>Correcting a price typo rewrote last quarter&rsquo;s profit</h4><p>Unit prices were freely mutable, so fixing a typo a month after the sale left the margin figure and the per-unit ledger permanently disagreeing. Price columns now freeze the moment a unit first leaves stock.</p></div></div>
+    <div class="find"><span class="sev ok">rejected</span><div><h4>Two findings about the barcode sequence, now moot</h4><p>Both concerned the old counter: where the boot <code>setval</code> should live, and that the scheme quietly failed a spec criterion. The minute-prefix redesign removes the counter&rsquo;s durability from the problem entirely, so neither finding has anything left to fix. Recorded rather than dropped, because both were valid when written.</p></div></div>
+  </div>
+
+</div>
+
+<footer>
+  Companion to <code>ARCHITECTURE-SPINE.md</code> and the <a href="https://claude.ai/code/artifact/fb415f67-742d-43c3-a6c0-3e757ee2780a">Schema &amp; Query Reference</a>. Full reviewer output in <code>reviews/</code>; the decision trail, including every rejection and its reason, is in <code>.memlog.md</code>. Revised 2026-08-20 &mdash; 32 invariants, four Deferred items remaining.
+</footer>
+
+</div>

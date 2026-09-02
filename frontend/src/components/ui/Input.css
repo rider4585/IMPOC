@@ -1,0 +1,74 @@
+/* Input — light mode only. Uses design tokens from index.css. */
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1, 4px);
+}
+
+.ui-field__label {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink, #2A211C);
+  letter-spacing: 0.02em;
+}
+
+.ui-input {
+  width: 100%;
+  font-family: inherit;
+  color: var(--ink, #2A211C);
+  background: var(--surface-raised, #FFFFFF);
+  border: 1px solid var(--border-strong, #CBBBAA);
+  border-radius: var(--rounded-md, 10px);
+  padding: 0 var(--spacing-3, 12px);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.ui-input--sm {
+  height: 32px;
+  font-size: 13px;
+}
+
+.ui-input--md {
+  height: 40px;
+  font-size: 14px;
+}
+
+.ui-input::placeholder {
+  color: var(--ink-faint, #9C8E83);
+}
+
+.ui-input:hover:not(:disabled) {
+  border-color: var(--border-strong, #CBBBAA);
+}
+
+.ui-input:focus {
+  outline: none;
+  border-color: var(--focus-ring, #7B2D4E);
+  box-shadow: 0 0 0 2px rgba(123, 45, 78, 0.18);
+}
+
+.ui-input:disabled {
+  background: var(--surface-sunken, #F1E9E0);
+  color: var(--ink-faint, #9C8E83);
+  cursor: not-allowed;
+}
+
+.ui-input--error {
+  border-color: var(--danger, #B3261E);
+}
+
+.ui-input--error:focus {
+  box-shadow: 0 0 0 2px rgba(179, 38, 30, 0.18);
+}
+
+.ui-field__error {
+  font-size: 13px;
+  color: var(--danger, #B3261E);
+}
+
+.ui-field__hint {
+  font-size: 13px;
+  color: var(--ink-muted, #6B5D54);
+}

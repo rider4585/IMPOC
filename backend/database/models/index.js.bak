@@ -1,0 +1,167 @@
+import {Sequelize} from 'sequelize';
+
+import config from '../../config/config.js';
+
+const env = process.env.NODE_ENV || 'development';
+
+const sequelize = new Sequelize(
+    config[env].database,
+    config[env].username,
+    config[env].password,
+    {
+        host: config[env].host,
+        port: config[env].port,
+        dialect: config[env].dialect,
+        logging: config[env].logging,
+    }
+);
+
+import UserModel from './User.js';
+import RoleModel from './Role.js';
+import PermissionModel from './Permission.js';
+import UserRoleModel from './UserRole.js';
+import RolePermissionModel from './RolePermission.js';
+import AuthSessionModel from './AuthSession.js';
+import RequestKeyModel from './RequestKey.js';
+import AppSettingsModel from './AppSettings.js';
+import ProductTypeModel from './ProductType.js';
+import ColourModel from './Colour.js';
+import SizeModel from './Size.js';
+
+const User = UserModel(sequelize);
+const Role = RoleModel(sequelize);
+const Permission = PermissionModel(sequelize);
+const UserRole = UserRoleModel(sequelize);
+const RolePermission = RolePermissionModel(sequelize);
+const AuthSession = AuthSessionModel(sequelize);
+const RequestKey = RequestKeyModel(sequelize);
+const AppSettings = AppSettingsModel(sequelize);
+const ProductType = ProductTypeModel(sequelize);
+const Colour = ColourModel(sequelize);
+const Size = SizeModel(sequelize);
+
+/*
+ * User ↔ Role
+ */
+User.belongsToMany(Role, {
+    through: UserRole,
+    foreignKey: 'userId',
+    otherKey: 'roleId',
+    as: 'roles',
+});
+
+Role.belongsToMany(User, {
+    through: UserRole,
+    foreignKey: 'roleId',
+    otherKey: 'userId',
+    as: 'users',
+});
+
+/*
+ * Role ↔ Permission
+ */
+Role.belongsToMany(Permission, {
+    through: RolePermission,
+    foreignKey: 'roleId',
+    otherKey: 'permissionId',
+    as: 'permissions',
+});
+
+Permission.belongsToMany(Role, {
+    through: RolePermission,
+    foreignKey: 'permissionId',
+    otherKey: 'roleId',
+    as: 'roles',
+});
+
+/*
+ * Direct relationships with join models
+ */
+User.hasMany(UserRole, {
+    foreignKey: 'userId',
+    as: 'userRoles',
+});
+
+UserRole.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+});
+
+Role.hasMany(UserRole, {
+    foreignKey: 'roleId',
+    as: 'userRoles',
+});
+
+UserRole.belongsTo(Role, {
+    foreignKey: 'roleId',
+    as: 'role',
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+});
+
+Role.hasMany(RolePermission, {
+    foreignKey: 'roleId',
+    as: 'rolePermissions',
+});
+
+RolePermission.belongsTo(Role, {
+    foreignKey: 'roleId',
+    as: 'role',
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+});
+
+Permission.hasMany(RolePermission, {
+    foreignKey: 'permissionId',
+    as: 'rolePermissions',
+});
+
+RolePermission.belongsTo(Permission, {
+    foreignKey: 'permissionId',
+    as: 'permission',
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+});
+
+// User ↔ AuthSession
+
+User.hasMany(AuthSession, {
+    foreignKey: 'userId',
+    as: 'authSessions',
+});
+
+AuthSession.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+});
+
+/*
+ * ProductType ↔ ProductType (self-referential)
+ */
+ProductType.hasMany(ProductType, {
+    foreignKey: 'parentId',
+    as: 'children',
+});
+
+ProductType.belongsTo(ProductType, {
+    foreignKey: 'parentId',
+    as: 'parent',
+});
+
+export {
+    sequelize,
+    Sequelize,
+    User,
+    Role,
+    Permission,
+    UserRole,
+    RolePermission,
+    AuthSession,
+    RequestKey,
+    AppSettings,
+    ProductType,
+    Colour,
+    Size
+};

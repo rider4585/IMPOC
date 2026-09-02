@@ -1,0 +1,46 @@
+# OS Files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Dependencies
+node_modules/
+yarn.lock
+package-lock.json
+
+# Build & Dist
+dist/
+build/
+.next/
+out/
+
+# Test coverage
+coverage/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+.cache/
+.temp/
+
+# Orchestration / hive state (not part of the IMPOC app)
+hive/
+palace/
+roster-backups/
+hallways.json
+roster.json

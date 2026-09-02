@@ -1,0 +1,254 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 08-24-2026 09:18
+last_updated: 09-02-2026 (Story 1.17 done)
+project: IMPOC
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+development_status:
+  epic-1: in-progress
+  1-1-enable-the-btree_gist-postgres-extension: done
+  1-2-create-the-barcode_seq-sequence: done
+  1-3-create-the-app_settings-table-and-typed-accessor: done
+  1-4-create-the-request_keys-table-and-shared-idempotency-helper: done
+  1-5-rework-the-barcode-label-layout-for-a4-with-configurable-geo: review
+  1-6-replace-the-barcode-value-generator-with-a-persistent-counte: done
+  1-7-authenticate-and-authorize-barcode-routes: done
+  1-8-zod-validation-for-barcode-routes: done
+  1-9-declare-zxing-library-as-an-explicit-frontend-dependency: done
+  1-10-establish-the-platform-module-idempotency-cold-start-retry-e: done
+  1-11-establish-the-design-md-token-theme-typography-colour-and-th: done
+  1-12-expose-the-signed-in-user-s-permission-set-on-login-and-sess: review
+  1-13-move-refresh-token-delivery-to-an-httponly-cookie-with-the-c: done
+  1-14-sign-in-screen-and-token-lifecycle: review
+  1-15-route-guard-app-shell-and-permission-driven-navigation: review
+  1-16-retire-the-mvp-scaffolding: review
+  1-17-barcode-print-screen: review
+  epic-1-retrospective: optional
+
+  epic-2: in-progress
+  2-1-product-type-picklist-with-self-referencing-hierarchy: done
+  2-2-colour-and-size-picklists: done
+  2-3-damage-grade-picklist: done
+  2-4-vendor-registry: done
+  2-5-picklists-screen-product-type-hierarchy-tab: backlog
+  2-6-picklists-screen-colours-and-sizes-tabs-with-size-ordering: backlog
+  2-7-picklists-screen-damage-grades-tab: backlog
+  2-8-vendor-registry-screen: backlog
+  epic-2-retrospective: optional
+
+  epic-3: in-progress
+  3-1-record-a-buying-trip: done
+  3-2-define-a-lot-against-a-trip: done
+  3-3-scan-units-into-a-lot: done
+  3-4-clone-the-last-lot: done
+  3-5-size-run-intake-mode: backlog
+  3-6-vendor-detail-trip-lot-and-unit-history: done
+  3-7-trip-screen-list-create-and-detail-with-variance: backlog
+  3-8-lot-form: backlog
+  3-9-lot-intake-scan-units-into-a-lot-with-the-arm-decode-confirm: backlog
+  3-10-lot-form-clone-last-lot: backlog
+  3-11-lot-intake-size-run-mode: backlog
+  3-12-vendor-detail-screen-trip-lot-and-unit-history: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-create-unit_status_events-and-stand-up-units-service-transit: backlog
+  4-2-mark-a-unit-damaged-or-lost: backlog
+  4-3-resolve-a-unit-out-of-maintenance: backlog
+  4-4-recover-a-lost-unit: backlog
+  4-5-what-is-in-the-workshop-q15-a-live-table-read-no-dashboard-r: backlog
+  4-6-units-list-and-unit-detail-screen-with-the-shared-status-pil: backlog
+  4-7-unit-detail-screen-mark-a-unit-damaged-or-lost: backlog
+  4-8-unit-detail-screen-resolve-a-unit-out-of-maintenance: backlog
+  4-9-unit-detail-screen-recover-a-lost-unit: backlog
+  4-10-workshop-screen-q15: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-add-cart-js-to-the-platform-module: backlog
+  5-2-scan-to-cart-continuous-scan-inline-refusals-duplicate-colla: backlog
+  5-3-customer-capture-and-lookup-whatsapp-number-first: backlog
+  5-4-create-sales-and-sale_lines-and-complete-unit_status_events: backlog
+  5-5-retail-checkout-commit-time-re-verification-bargain-spreadin: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-snapshot-the-exchange-window-onto-every-sale-at-checkout: backlog
+  6-2-render-view-download-and-print-the-shared-a5-receipt: backlog
+  6-3-send-the-receipt-on-whatsapp-a-server-side-cloud-api-send-en: backlog
+  6-4-retail-exchange-reversing-line-replacement-line-and-the-sign: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-create-rental_bookings-generated-daterange-partial-exclude-c: backlog
+  7-2-book-rental-units-retail-channel-refusal-the-maximum-period: backlog
+  7-3-wire-ad-8-s-booked-unit-guard-into-transitionunit-the-decisi: backlog
+  7-4-create-rental_agreements-and-complete-unit_status_events-def: backlog
+  7-5-hand-over-rental-units-one-shared-code-path-for-a-booked-han: backlog
+  7-6-what-is-booked-but-not-yet-collected-q22-a-live-table-read-n: backlog
+  epic-7-retrospective: optional
+
+  epic-8: backlog
+  8-1-return-a-rental-unit-and-settle-its-deposit: backlog
+  8-2-write-off-a-hire-whose-piece-never-came-back: backlog
+  8-3-cancel-a-booking-before-hand-over: backlog
+  8-4-overdue-visibility-and-the-deposit-exhaustion-review-list-de: backlog
+  8-5-extend-a-booking-widen-an-open-window-collect-only-the-diffe: backlog
+  8-6-what-is-out-on-rent-right-now-q11-a-live-table-read-no-dashb: backlog
+  epic-8-retrospective: optional
+
+  epic-9: backlog
+  9-1-record-a-shop-expense: backlog
+  9-2-correct-an-expense-with-a-reversing-row: backlog
+  epic-9-retrospective: optional
+
+  epic-10: backlog
+  10-1-the-erasure-surface-one-audit-table-one-admin-only-permissio: backlog
+  10-2-erase-a-customer-one-update-one-audit-row-and-nothing-else: backlog
+  10-3-prove-that-no-historical-read-joins-live-to-customers: backlog
+  10-4-the-customer-s-own-details-screen-with-consent-shown-as-proo: backlog
+  10-5-the-erase-action-admin-only-confirmed-once-absent-for-everyo: backlog
+  epic-10-retrospective: optional
+
+  epic-11: backlog
+  11-1-choose-the-hosting-provider-and-prove-ad-19-s-three-hard-req: backlog
+  11-2-the-backup-and-restore-procedure-written-down-with-a-named-p: backlog
+  11-3-get-api-health-unauthenticated-no-database-round-trip-and-th: backlog
+  11-4-two-connection-strings-pooled-for-the-app-direct-for-migrati: backlog
+  11-5-nothing-writes-to-the-filesystem-receipts-and-label-sheets-s: backlog
+  11-6-https-is-a-deployment-gate-because-the-camera-will-not-open: backlog
+  11-7-structured-json-logs-on-stdout-and-one-id-that-survives-a-re: backlog
+  11-8-migrations-are-forward-only-once-hosted: backlog
+  11-9-prove-ad-16-holds-no-scheduler-no-interval-no-second-process: backlog
+  epic-11-retrospective: optional
+
+  epic-12: backlog
+  12-1-the-six-read-side-views-one-migration-all-the-netting-the-da: backlog
+  12-2-the-ad-15-index-set-one-migration-exactly-the-fixed-list-not: backlog
+  12-3-the-reports-module-pattern-hand-written-sql-only-and-the-bou: backlog
+  12-4-the-dashboard-shell-three-money-buckets-one-date-range-contr: backlog
+  12-5-takings-and-profit-q1-q2-q3-q4-q5-q6-q25: backlog
+  12-6-inventory-q7-q8-q9-q10-q27: backlog
+  12-7-rental-q13-q14-q23-and-wiring-q11-q12-q15-q22-q26-into-the-c: backlog
+  12-8-vendor-and-lot-q16-q17-q18: backlog
+  12-9-floor-behaviour-q19-q24-q20-q21: backlog
+  12-10-prove-the-reporting-half-of-ad-18-s-read-rule-the-half-story: backlog
+  epic-12-retrospective: optional
+sequencing:
+  epic_order: "Epics run 1 through 11 in build/migration order. Epic 12 (owner dashboard)
+    is deliberately sequenced last, after Epic 11 (deployment) — moved there by Raviraj
+    so it can be designed once the shop has actually been run. Its three migrations
+    (report views, index set, user_preferences) are consequently the build's last
+    three, slots 23-25, run after Epic 11, which ships none of its own."
+  gates:
+    - epic: 1
+      rule: "Epic 1 gates everything. Nothing can be scanned until barcodes are unique
+        (FR-D2) and A4 sheets print correctly (FR-D1). No intake, cart, or rental
+        work starts before Epic 1 closes. Within Epic 1, the backend foundation (Stories
+        1.1-1.9) comes before the frontend foundation (1.10-1.17)."
+    - story: "1.10"
+      key: 1-10-establish-the-platform-module-idempotency-cold-start-retry-e
+      rule: "Hard prerequisite for every screen in Epics 2 onward. Stands up the frontend
+        platform module that owns four of the five client-side obligations the spine
+        leaves homeless: idempotency key (AD-22), cold-start retry (AD-19.1), collection
+        envelope (AD-26), money formatting (AD-2). The fifth, cart.js (AD-25), is
+        added on top of this module by Story 5.1, once Epic 5 has a cart to manage.
+        Every later frontend story imports from this module rather than reimplementing
+        any of the five."
+    - story: "1.15"
+      key: 1-15-route-guard-app-shell-and-permission-driven-navigation
+      rule: "Hard prerequisite for every screen in Epics 2 onward. Stands up the route
+        guard and the permission-driven app shell/navigation registry (AD-29, UX-DR16);
+        every later frontend story registers its nav entry through this registry rather
+        than a role-name check."
+    - story: "4.1"
+      key: 4-1-create-unit_status_events-and-stand-up-units-service-transit
+      rule: "Hard prerequisite for every later epic. Stands up units.service.transitionUnit(),
+        the sole writer of unit status/channel/rental snapshots (AD-8). Every later
+        epic that touches unit state calls into it rather than writing units.status
+        directly."
+
+# Already settled and written into the epic files. These are CLOSED.
+# Do not reopen them, re-litigate them, or treat them as blockers.
+resolved_cross_epic_dependencies:
+  - item: "Vendor history view"
+    resolution: "Sits in Epic 3 (Story 3.6), not Epic 2. It reads stock_intakes, stock_intake_lines
+      and units, none of which exist until Epic 3 creates them. Epic 2 ships vendor
+      CRUD only (Story 2.4)."
+    status: closed
+  - item: "unit_status_events foreign keys"
+    resolution: "The table is created in Epic 4 (Story 4.1) with its two foreign keys
+      deferred: sale_line_id completed by Story 5.4, agreement_id completed by Story
+      7.4."
+    status: closed
+  - item: "AD-8 booked-unit guard"
+    resolution: "Story 7.3, not Epic 4. It needs rental_bookings, which does not exist
+      until Epic 7. Story 4.1 structures transitionUnit()'s guard as an ordered list
+      of pre-write checks so Story 7.3 appends the predicate without touching Epic
+      4's CAS statement."
+    status: closed
+  - item: "Story 9.3-9.12 tracking keys lived under 'epic-9', not 'epic-12'"
+    resolution: "Superseded 2026-08-30. The 10 dashboard stories in
+      epics/epic-12-owner-dashboard.md were renumbered from 9.3-9.12 to 12.1-12.10,
+      so they now key naturally as 12-1 through 12-10 under epic-12 in
+      development_status above. None had progress beyond backlog, so the
+      renumbering carried no status forward. This entry is kept for history; the
+      key-format workaround it used to describe no longer applies."
+    status: closed
+
+# Open items that need a decision or an external process. Not tracking state.
+outstanding_decisions:
+  - epic: "2"
+    owner: Raviraj
+    status: open
+    note: >-
+      No unique index on colours.name or sizes.name. The duplicate-name check
+      is application-level only, so two concurrent creates could both pass it.
+      Flagged in high-effort code review as "DB covers all" but left undecided.
+      Requires a decision on whether to add database-level constraints or
+      document the application-level check as sufficient and implement
+      distributed-locking mitigation if needed.
+  - story: "6.3"
+    key: 6-3-send-the-receipt-on-whatsapp-a-server-side-cloud-api-send-en
+    owner: Raviraj
+    status: open
+    note: >-
+      Story 6.3 cannot be fully tested until a WhatsApp number is registered and
+      Meta template approval clears. Both carry multi-day lead time and neither
+      is under this team's control. The story's own acceptance criteria require
+      Meta's template-approval process plus one live send against the Cloud API
+      recorded before it is considered done, so the story can be built and
+      unit-tested but cannot be marked done on code alone. Start the
+      registration and template submission well before Epic 6 begins, otherwise
+      Epic 6 stalls on an external queue. Story 6.2 (View / Download PDF /
+      Print) is unaffected and remains the resilient baseline.

@@ -1,0 +1,1062 @@
+/* =========================================================
+   Mobile-only Barcode Scanner
+   ========================================================= */
+
+html,
+body,
+#root {
+    width: 100%;
+    height: 100%;
+
+    margin: 0;
+    padding: 0;
+
+    overflow: hidden;
+
+    overscroll-behavior: none;
+}
+
+html {
+    touch-action: manipulation;
+
+    /*
+     * Prevent iOS text size adjustment.
+     */
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    position: fixed;
+
+    inset: 0;
+
+    overflow: hidden;
+
+    background: #ffffff;
+
+    /*
+     * Prevent pull-to-refresh / overscroll behavior.
+     */
+    overscroll-behavior: none;
+
+    /*
+     * Prevent accidental browser gestures.
+     */
+    touch-action: manipulation;
+}
+
+
+/* =========================================================
+   Scanner root
+   ========================================================= */
+
+.barcode-scanner {
+    position: fixed;
+
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    margin: 0;
+    padding: 0;
+
+    overflow: hidden;
+
+    background: #ffffff;
+
+    box-sizing: border-box;
+
+    /*
+     * Respect iPhone safe areas.
+     */
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+
+    touch-action: manipulation;
+}
+
+
+/* =========================================================
+   Start screen
+   ========================================================= */
+
+.scanner-start {
+    position: absolute;
+
+    inset: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 24px;
+
+    box-sizing: border-box;
+}
+
+.scanner-start-button {
+    width: 100%;
+    max-width: 420px;
+
+    min-height: 54px;
+
+    padding: 14px 18px;
+
+    border: none;
+    border-radius: 12px;
+
+    background: #111111;
+    color: #ffffff;
+
+    font-size: 17px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    touch-action: manipulation;
+
+    -webkit-tap-highlight-color: transparent;
+
+    user-select: none;
+    -webkit-user-select: none;
+
+    box-sizing: border-box;
+}
+
+.scanner-start-button:active {
+    transform: scale(0.99);
+}
+
+.scanner-error {
+    position: absolute;
+
+    left: 24px;
+    right: 24px;
+
+    bottom: 24px;
+
+    padding: 12px;
+
+    border-radius: 10px;
+
+    background: #fef2f2;
+    color: #dc2626;
+
+    text-align: center;
+
+    font-size: 14px;
+    line-height: 1.4;
+
+    box-sizing: border-box;
+}
+
+
+/* =========================================================
+   Scanner
+   ========================================================= */
+
+.scanner {
+    position: absolute;
+
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    overflow: hidden;
+
+    background: #000000;
+
+    touch-action: none;
+}
+
+
+/* =========================================================
+   Torch
+   ========================================================= */
+
+.scanner-torch {
+    position: absolute;
+
+    top: 16px;
+    right: 16px;
+
+    z-index: 30;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 5px;
+
+    min-width: 72px;
+    height: 42px;
+
+    padding: 8px 12px;
+
+    border: 1px solid
+    rgba(255, 255, 255, 0.35);
+
+    border-radius: 22px;
+
+    background: rgba(0, 0, 0, 0.65);
+
+    color: #ffffff;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    touch-action: manipulation;
+
+    -webkit-tap-highlight-color: transparent;
+
+    user-select: none;
+    -webkit-user-select: none;
+
+    box-sizing: border-box;
+}
+
+.scanner-torch.active {
+    background: #ffffff;
+
+    color: #111111;
+
+    border-color: #ffffff;
+}
+
+.scanner-torch:active {
+    transform: scale(0.96);
+}
+
+.scanner-torch-icon {
+    font-size: 16px;
+
+    line-height: 1;
+}
+
+
+/* =========================================================
+   Camera
+   ========================================================= */
+
+.scanner-camera {
+    position: absolute;
+
+    /*
+     * Leave a small area at the bottom for Close.
+     */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 64px;
+
+    width: 100%;
+    height: auto;
+
+    overflow: hidden;
+
+    background: #000000;
+
+    border-radius: 0;
+
+    box-sizing: border-box;
+
+    touch-action: none;
+}
+
+.scanner-camera video {
+    position: absolute;
+
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    display: block;
+
+    object-fit: cover;
+
+    /*
+     * Important for iOS Safari.
+     */
+    pointer-events: none;
+
+    user-select: none;
+    -webkit-user-select: none;
+
+    -webkit-touch-callout: none;
+
+    /*
+     * Prevent video from becoming a gesture target.
+     */
+    touch-action: none;
+
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+}
+
+
+/* =========================================================
+   Barcode overlay
+   ========================================================= */
+
+.scanner-overlay {
+    position: absolute;
+
+    inset: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    pointer-events: none;
+
+    touch-action: none;
+}
+
+
+/* =========================================================
+   Barcode frame
+   ========================================================= */
+
+.scanner-frame {
+    position: relative;
+
+    width: 88%;
+
+    /*
+     * Code 128 is horizontal, so the scan window
+     * should remain relatively short vertically.
+     */
+    height: 23%;
+
+    border-radius: 12px;
+
+    box-sizing: border-box;
+
+    box-shadow:
+            0 0 0 9999px rgba(0, 0, 0, 0.32);
+}
+
+.scanner-frame.paused {
+    opacity: 0.6;
+}
+
+
+/* =========================================================
+   Frame corners
+   ========================================================= */
+
+.scanner-frame .corner {
+    position: absolute;
+
+    width: 28px;
+    height: 28px;
+
+    border-color: #ffffff;
+    border-style: solid;
+
+    box-sizing: border-box;
+}
+
+.scanner-frame .top-left {
+    top: 0;
+    left: 0;
+
+    border-width: 3px 0 0 3px;
+
+    border-top-left-radius: 10px;
+}
+
+.scanner-frame .top-right {
+    top: 0;
+    right: 0;
+
+    border-width: 3px 3px 0 0;
+
+    border-top-right-radius: 10px;
+}
+
+.scanner-frame .bottom-left {
+    bottom: 0;
+    left: 0;
+
+    border-width: 0 0 3px 3px;
+
+    border-bottom-left-radius: 10px;
+}
+
+.scanner-frame .bottom-right {
+    right: 0;
+    bottom: 0;
+
+    border-width: 0 3px 3px 0;
+
+    border-bottom-right-radius: 10px;
+}
+
+
+/* =========================================================
+   Pause message
+   ========================================================= */
+
+.scanner-pause-message {
+    position: absolute;
+
+    top: 20px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    z-index: 5;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    max-width: calc(100% - 32px);
+
+    padding: 9px 14px;
+
+    border-radius: 999px;
+
+    background: rgba(0, 0, 0, 0.8);
+
+    color: #ffffff;
+
+    font-size: 13px;
+    line-height: 1;
+
+    white-space: nowrap;
+
+    box-sizing: border-box;
+
+    pointer-events: none;
+}
+
+.scanner-pause-message strong {
+    font-size: 15px;
+}
+
+
+/* =========================================================
+   Result
+   ========================================================= */
+
+.scanner-result {
+    position: absolute;
+
+    left: 50%;
+    bottom: 20px;
+
+    transform: translateX(-50%);
+
+    z-index: 5;
+
+    width: calc(100% - 32px);
+
+    padding: 11px 14px;
+
+    border-radius: 10px;
+
+    background: rgba(0, 0, 0, 0.82);
+
+    color: #ffffff;
+
+    text-align: center;
+
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+
+    word-break: break-all;
+
+    box-sizing: border-box;
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   Close
+   ========================================================= */
+
+.scanner-close {
+    position: absolute;
+
+    left: 16px;
+    right: 16px;
+    bottom: 10px;
+
+    z-index: 20;
+
+    width: calc(100% - 32px);
+
+    height: 44px;
+
+    padding: 10px 16px;
+
+    border: 1px solid #dddddd;
+    border-radius: 10px;
+
+    background: #ffffff;
+    color: #444444;
+
+    font-size: 15px;
+    font-weight: 500;
+
+    cursor: pointer;
+
+    touch-action: manipulation;
+
+    -webkit-tap-highlight-color: transparent;
+
+    user-select: none;
+    -webkit-user-select: none;
+
+    box-sizing: border-box;
+}
+
+.scanner-close:active {
+    background: #eeeeee;
+}
+
+
+/* =========================================================
+   Very small phones
+   ========================================================= */
+
+@media (max-height: 600px) {
+    .scanner-camera {
+        bottom: 58px;
+    }
+
+    .scanner-close {
+        bottom: 7px;
+        height: 42px;
+    }
+
+    .scanner-frame {
+        width: 90%;
+        height: 24%;
+    }
+
+    .scanner-pause-message {
+        top: 12px;
+    }
+
+    .scanner-result {
+        bottom: 14px;
+    }
+
+    .scanner-torch {
+        top: 12px;
+        right: 12px;
+    }
+}
+
+
+/* =========================================================
+   Very narrow phones
+   ========================================================= */
+
+@media (max-width: 360px) {
+    .scanner-frame {
+        width: 90%;
+        height: 22%;
+    }
+
+    .scanner-frame .corner {
+        width: 24px;
+        height: 24px;
+
+        border-width: 2px;
+    }
+
+    .scanner-result {
+        width: calc(100% - 24px);
+
+        font-size: 14px;
+    }
+
+    .scanner-close {
+        left: 12px;
+        right: 12px;
+
+        width: calc(100% - 24px);
+    }
+
+    .scanner-torch {
+        top: 10px;
+        right: 10px;
+
+        min-width: 68px;
+        height: 40px;
+    }
+}
+
+
+/* =========================================================
+   Disable browser selection / callout
+   ========================================================= */
+
+.barcode-scanner,
+.barcode-scanner * {
+    -webkit-user-select: none;
+    user-select: none;
+
+    -webkit-touch-callout: none;
+}
+
+
+/* =========================================================
+   Prevent video dragging
+   ========================================================= */
+
+.barcode-scanner img,
+.barcode-scanner video {
+    -webkit-user-drag: none;
+}
+
+
+/* =========================================================
+   Reduced motion
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .scanner-start-button,
+    .scanner-close,
+    .scanner-torch {
+        transition: none;
+    }
+}
+
+/* =========================================================
+   Intake Form Styles
+   ========================================================= */
+
+.intake-form {
+    padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+}
+
+.intake-section {
+    margin-bottom: 20px;
+}
+
+.intake-section label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+}
+
+.intake-section select,
+.intake-section input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.intake-section select:disabled,
+.intake-section input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.intake-error {
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    background-color: #fee;
+    border: 1px solid #fcc;
+    border-radius: 8px;
+    color: #c33;
+    font-size: 14px;
+}
+
+.intake-success {
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    background-color: #efe;
+    border: 1px solid #cfc;
+    border-radius: 8px;
+    color: #3c3;
+    font-size: 14px;
+}
+
+.intake-submit-btn {
+    width: 100%;
+    padding: 12px 16px;
+    background-color: #111;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.intake-submit-btn:hover:not(:disabled) {
+    background-color: #333;
+}
+
+.intake-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* =========================================================
+   Size Run Mode Styles
+   ========================================================= */
+
+.size-run-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.size-run-header label {
+    margin-bottom: 0;
+}
+
+.size-run-enable-btn,
+.size-run-disable-btn {
+    padding: 8px 12px;
+    background-color: #0066cc;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.2s;
+}
+
+.size-run-enable-btn:hover:not(:disabled),
+.size-run-disable-btn:hover:not(:disabled) {
+    background-color: #0052a3;
+}
+
+.size-run-enable-btn:disabled,
+.size-run-disable-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.size-run-chip {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: #e8f4f8;
+    border: 1px solid #0066cc;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0066cc;
+}
+
+.size-run-input-wrapper {
+    margin-bottom: 16px;
+}
+
+.size-run-select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #0066cc;
+    border-radius: 8px;
+    background-color: #f0f8ff;
+    color: #0066cc;
+    font-size: 14px;
+    font-weight: 600;
+    box-sizing: border-box;
+}
+
+.size-run-select:hover:not(:disabled) {
+    border-color: #0052a3;
+    background-color: #e8f4f8;
+}
+
+.size-run-select:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* =========================================================
+   Size Run Configuration Dialog
+   ========================================================= */
+
+.size-run-config {
+    margin-top: 16px;
+    padding: 16px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.size-run-config h3 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 16px;
+}
+
+.size-run-config-help {
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #666;
+}
+
+.size-run-config-list {
+    margin-bottom: 12px;
+    padding: 8px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+}
+
+.size-run-config-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 4px;
+    transition: background-color 0.15s;
+}
+
+.size-run-config-item:hover {
+    background-color: #f5f5f5;
+}
+
+.size-run-config-item.selected {
+    background-color: #e8f4f8;
+}
+
+.size-run-config-item input[type='checkbox'] {
+    width: auto;
+    margin: 0;
+    cursor: pointer;
+}
+
+.size-run-config-item label {
+    flex: 1;
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+.size-run-config-arrow {
+    padding: 4px 8px;
+    font-size: 12px;
+    background-color: #e0e0e0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.size-run-config-arrow:hover:not(:disabled) {
+    background-color: #bbb;
+}
+
+.size-run-config-arrow:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.size-run-config-preview {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    background-color: #e8f4f8;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #0066cc;
+}
+
+.size-run-config-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.config-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.config-save {
+    background-color: #0066cc;
+    color: #fff;
+}
+
+.config-save:hover:not(:disabled) {
+    background-color: #0052a3;
+}
+
+.config-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.config-cancel {
+    background-color: #ddd;
+    color: #333;
+}
+
+.config-cancel:hover {
+    background-color: #ccc;
+}
+
+/* =========================================================
+   Scanner start content
+   ========================================================= */
+
+.scanner-start-content {
+    width: 100%;
+    max-width: 420px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 16px;
+}
+
+.scanner-start-title {
+    margin-bottom: 4px;
+
+    color: #111111;
+
+    text-align: center;
+
+    font-size: 22px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   Zoom input
+   ========================================================= */
+
+.scanner-zoom-input {
+    width: 100%;
+
+    box-sizing: border-box;
+}
+
+.scanner-zoom-input label {
+    display: block;
+
+    margin-bottom: 8px;
+
+    color: #333333;
+
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.scanner-zoom-input-wrapper {
+    display: flex;
+
+    align-items: center;
+
+    width: 100%;
+
+    height: 52px;
+
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+
+    background: #ffffff;
+
+    overflow: hidden;
+
+    box-sizing: border-box;
+}
+
+.scanner-zoom-input-wrapper input {
+    flex: 1;
+
+    width: 100%;
+    height: 100%;
+
+    min-width: 0;
+
+    padding: 0 14px;
+
+    border: none;
+    outline: none;
+
+    background: transparent;
+
+    color: #111111;
+
+    font-size: 17px;
+    font-weight: 500;
+
+    text-align: center;
+
+    box-sizing: border-box;
+
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.scanner-zoom-input-wrapper input::-webkit-inner-spin-button,
+.scanner-zoom-input-wrapper input::-webkit-outer-spin-button {
+    margin: 0;
+
+    -webkit-appearance: none;
+}
+
+.scanner-zoom-input-wrapper span {
+    flex: 0 0 auto;
+
+    padding-right: 14px;
+
+    color: #666666;
+
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.scanner-zoom-error {
+    margin-top: 6px;
+
+    color: #dc2626;
+
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.scanner-zoom-range {
+    margin-top: 6px;
+
+    color: #777777;
+
+    font-size: 12px;
+
+    text-align: center;
+}

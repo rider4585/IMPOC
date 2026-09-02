@@ -1,0 +1,45 @@
+/* Badge — light mode only. Uses design tokens from index.css. */
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: var(--rounded-full, 9999px);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.ui-badge--neutral {
+  background: var(--surface-sunken, #F1E9E0);
+  color: var(--ink-muted, #6B5D54);
+}
+
+.ui-badge--success {
+  background: rgba(47, 110, 79, 0.12);
+  color: var(--success, #2F6E4F);
+}
+
+.ui-badge--danger {
+  background: rgba(179, 38, 30, 0.12);
+  color: var(--danger, #B3261E);
+}
+
+.ui-badge--warning {
+  background: rgba(138, 90, 31, 0.14);
+  color: var(--status-maintenance, #8A5A1F);
+}
+
+.ui-badge--info {
+  background: rgba(43, 92, 138, 0.12);
+  color: var(--status-rented, #2B5C8A);
+}
+
+.ui-badge--brand {
+  background: rgba(123, 45, 78, 0.12);
+  color: var(--primary, #7B2D4E);
+}

@@ -1,0 +1,175 @@
+/* BarcodePrintScreen — Barcode label print request form */
+
+.barcode-print-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--surface-base);
+  padding: var(--spacing-4);
+}
+
+.barcode-print-card {
+  width: 100%;
+  max-width: 400px;
+  padding: var(--spacing-8);
+  background-color: var(--surface-raised);
+}
+
+.barcode-print-card h1 {
+  margin-top: 0;
+  margin-bottom: var(--spacing-2);
+  text-align: center;
+  color: var(--ink);
+}
+
+.barcode-print-subtitle {
+  margin: 0 0 var(--spacing-6) 0;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+/* Waking banner — non-blocking, amber background per DESIGN.md */
+.waking-banner {
+  padding: var(--spacing-4);
+  margin-bottom: var(--spacing-6);
+  background-color: rgba(138, 90, 31, 0.1);
+  border-left: 4px solid var(--waking);
+  border-radius: var(--rounded-md);
+  color: var(--ink);
+}
+
+.waking-content p {
+  margin: 0 0 var(--spacing-2) 0;
+  line-height: 1.5;
+}
+
+.waking-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Success message — shown after PDF is downloaded */
+.success-message {
+  padding: var(--spacing-4);
+  margin-bottom: var(--spacing-6);
+  background-color: rgba(47, 110, 79, 0.1);
+  border-left: 4px solid var(--success);
+  border-radius: var(--rounded-md);
+  color: var(--success);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* Replay message — shown when same requestUuid is resubmitted */
+.replay-message {
+  padding: var(--spacing-4);
+  margin-bottom: var(--spacing-6);
+  background-color: rgba(91, 75, 138, 0.1);
+  border-left: 4px solid var(--money-held);
+  border-radius: var(--rounded-md);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+/* Error message — shown for validation and server errors */
+.error-message {
+  padding: var(--spacing-4);
+  margin-bottom: var(--spacing-6);
+  background-color: rgba(179, 38, 30, 0.1);
+  border-left: 4px solid var(--danger);
+  border-radius: var(--rounded-md);
+  color: var(--danger);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Form — always interactive, even during waking state */
+.barcode-print-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.form-group label {
+  display: block;
+  color: var(--ink);
+  margin-bottom: var(--spacing-1);
+}
+
+.barcode-input {
+  padding: var(--spacing-3) var(--spacing-4);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-md);
+  font-size: 16px;
+  color: var(--ink);
+  background-color: var(--surface-raised);
+  font-family: inherit;
+  transition: border-color 200ms;
+}
+
+.barcode-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(123, 45, 78, 0.1);
+}
+
+.barcode-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.barcode-input::placeholder {
+  color: var(--ink-muted);
+}
+
+/* Primary button — submit and retry actions */
+.barcode-button {
+  padding: var(--spacing-3) var(--spacing-4);
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--rounded-md);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 200ms;
+  margin-top: var(--spacing-2);
+}
+
+.barcode-button:hover:not(:disabled) {
+  background-color: #6B2644;
+}
+
+.barcode-button:active:not(:disabled) {
+  background-color: #5F1F3B;
+}
+
+.barcode-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.retry-button {
+  margin-top: 0;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .barcode-input:focus {
+    box-shadow: 0 0 0 3px rgba(228, 139, 171, 0.1);
+  }
+
+  .barcode-button:hover:not(:disabled) {
+    background-color: #D67A9F;
+  }
+
+  .barcode-button:active:not(:disabled) {
+    background-color: #E48BAB;
+  }
+}

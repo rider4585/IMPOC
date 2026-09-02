@@ -1,0 +1,50 @@
+# Project overrides for bmad-build — IMPOC
+#
+# Added 2026-08-24 after Epic 1, where single stories were costing ~300k tokens.
+# Cause: step-04's review loopback reverts the implementation and re-derives it
+# from an amended spec, up to 5 times, re-running all three reviewer subagents
+# each pass. Worst case is 6 implementations and 18 reviewer runs for one story.
+#
+# These two instructions cap that. Neither weakens review on the stories that
+# need it — see the exclusion list in the second one.
+#
+# Deliberately NOT changed: step-04's tie-break that prefers `bad_spec` over
+# `patch` when triage is uncertain. That bias is expensive but it is a real
+# quality choice — code re-derived from a corrected spec is more coherent than
+# code patched around a spec error. Revisit only if cost is still hurting after
+# these two land.
+
+[workflow]
+
+activation_steps_append = [
+  """
+CAP THE REVIEW LOOPBACK AT 2, NOT 5.
+
+Step 04 increments `review_loop_iteration` in the spec frontmatter before each
+loopback and halts above 5. For this project the ceiling is 2. Before looping
+back, read `review_loop_iteration`; if it is already 2, do not loop again —
+HALT and escalate to the human with the outstanding findings listed plainly.
+
+Reason: every loopback discards a complete implementation and re-runs every
+reviewer subagent. A story that needs a third re-derivation has a problem
+another rebuild will not solve, and a human should look at it instead.
+""",
+  """
+ROUTE TRIVIAL CHANGES TO ONE-SHOT.
+
+At step 01 routing, actively consider route (a) one-shot rather than defaulting
+to the full path. One-shot runs a single reviewer instead of three and has no
+loopback, so it is the correct route whenever the change genuinely has zero
+blast radius.
+
+Usually qualifies: a migration that creates exactly one database object and
+writes no rows; declaring a dependency; a single-file configuration or constant
+change; adding a test with no production-code change.
+
+NEVER route to one-shot, no matter how small the diff looks, anything that
+touches money columns or money arithmetic, transaction boundaries, unit status
+transitions, the barcode value generator, permissions or authorisation, or the
+rental availability constraint. Those keep the full three-reviewer path with its
+loopback intact — they are exactly what it exists for.
+""",
+]

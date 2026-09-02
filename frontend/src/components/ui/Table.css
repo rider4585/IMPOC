@@ -1,0 +1,43 @@
+/* Table — light mode only. Uses design tokens from index.css. */
+
+.ui-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  background: var(--surface-raised, #FFFFFF);
+  border: 1px solid var(--border, #E4D9CD);
+  border-radius: var(--rounded-lg, 14px);
+}
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink, #2A211C);
+}
+
+.ui-table__th {
+  text-align: left;
+  padding: var(--spacing-3, 12px) var(--spacing-4, 16px);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted, #6B5D54);
+  background: var(--surface-sunken, #F1E9E0);
+  border-bottom: 1px solid var(--border, #E4D9CD);
+  white-space: nowrap;
+}
+
+.ui-table__td {
+  padding: var(--spacing-3, 12px) var(--spacing-4, 16px);
+  border-bottom: 1px solid var(--border, #E4D9CD);
+  vertical-align: middle;
+}
+
+.ui-table__row:last-child .ui-table__td {
+  border-bottom: none;
+}
+
+.ui-table__row:hover .ui-table__td {
+  background: rgba(241, 233, 224, 0.5);
+}

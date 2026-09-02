@@ -1,0 +1,73 @@
+/* Toast — light mode only. Uses design tokens from index.css. */
+
+.ui-toast__viewport {
+  position: fixed;
+  top: var(--spacing-4, 16px);
+  right: var(--spacing-4, 16px);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3, 12px);
+  max-width: 360px;
+  width: calc(100vw - 32px);
+}
+
+.ui-toast {
+  position: relative;
+  background: var(--surface-raised, #FFFFFF);
+  border: 1px solid var(--border, #E4D9CD);
+  border-left-width: 4px;
+  border-radius: var(--rounded-md, 10px);
+  box-shadow: 0 4px 16px rgba(42, 33, 28, 0.16);
+  padding: var(--spacing-3, 12px) var(--spacing-8, 32px) var(--spacing-3, 12px)
+    var(--spacing-4, 16px);
+  color: var(--ink, #2A211C);
+}
+
+.ui-toast--success {
+  border-left-color: var(--success, #2F6E4F);
+}
+
+.ui-toast--error {
+  border-left-color: var(--danger, #B3261E);
+}
+
+.ui-toast--info {
+  border-left-color: var(--status-rented, #2B5C8A);
+}
+
+.ui-toast--warning {
+  border-left-color: var(--status-maintenance, #8A5A1F);
+}
+
+.ui-toast__title {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ui-toast__desc {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink-muted, #6B5D54);
+  margin-top: 2px;
+}
+
+.ui-toast__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-faint, #9C8E83);
+  cursor: pointer;
+  border-radius: var(--rounded-sm, 6px);
+  padding: 0 4px;
+}
+
+.ui-toast__close:hover {
+  color: var(--ink, #2A211C);
+  background: var(--surface-sunken, #F1E9E0);
+}
