@@ -82,6 +82,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
             pages: 7,
             requestUuid: 'test-request-key-uuid',
           },
+          responseType: 'arraybuffer',
         });
       });
     });
