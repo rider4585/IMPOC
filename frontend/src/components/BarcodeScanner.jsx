@@ -20,7 +20,7 @@ const SCAN_PAUSE_DURATION = 5;
  */
 const DEFAULT_ZOOM = 1;
 
-function BarcodeScanner() {
+function BarcodeScanner({ onDetected }) {
     const videoRef = useRef(null);
     const streamRef = useRef(null);
 
@@ -253,6 +253,10 @@ function BarcodeScanner() {
 
         playSuccessSound();
         vibrateOnSuccess();
+
+        if (typeof onDetected === 'function') {
+            onDetected(value);
+        }
 
         pauseScanning();
     };

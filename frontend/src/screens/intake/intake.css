@@ -1,0 +1,149 @@
+/* Intake workflow screen styling (T-07) */
+
+.intake-page {
+  padding: var(--spacing-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-5);
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.intake-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+}
+
+.intake-page__header h1 {
+  margin: var(--spacing-2) 0 var(--spacing-1);
+}
+
+.intake-page__subtitle {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.intake-card__content {
+  padding: var(--spacing-4);
+}
+
+.intake-inline-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-3);
+  flex-wrap: wrap;
+}
+
+.intake-inline-form .ui-field {
+  flex: 1;
+  min-width: 180px;
+}
+
+.intake-scan-toggle {
+  margin-top: var(--spacing-4);
+}
+
+.intake-scanner {
+  margin-top: var(--spacing-4);
+}
+
+.intake-section-title {
+  margin: var(--spacing-5) 0 var(--spacing-2);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.intake-unit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.intake-unit-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-md);
+  font-size: 14px;
+}
+
+.intake-unit-barcode {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.intake-unit-meta {
+  margin-left: auto;
+  color: var(--ink-muted);
+}
+
+.intake-lot-channel {
+  text-transform: capitalize;
+}
+
+.intake-lot-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.intake-lot-link:hover {
+  text-decoration: underline;
+}
+
+.intake-header-actions {
+  display: flex;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.intake-trip-list,
+.intake-lot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.intake-trip-item,
+.intake-lot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-md);
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.intake-lot-title {
+  font-weight: 600;
+}
+
+.intake-lot-meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.intake-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}

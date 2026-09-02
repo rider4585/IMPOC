@@ -7,31 +7,37 @@
 
 import apiClient from '../platform/apiClient.js';
 import { createRequestKey } from '../platform/requestKey.js';
-import { STOCK_INTAKE_ROUTES } from '../platform/routes.js';
+import { STOCK_INTAKE_LINE_ROUTES } from '../platform/routes.js';
 
 /**
  * Scan a barcode into a stock intake line (lot)
- * POST /api/stock-intake-lines/:uuid/scan
+ * POST /api/stock-intakes/:tripUuid/lines/:uuid/scan
  *
  * @param {Object} params - Scan parameters
  * @param {string} params.barcode - The barcode value
+ * @param {string} params.tripUuid - UUID of the trip (stock intake)
  * @param {string} params.stockIntakeLineUuid - UUID of the stock intake line (lot)
  * @param {string} params.colourUuid - UUID of the colour
  * @param {string} params.sizeUuid - UUID of the size
- * @param {string} params.actorUserId - UUID of the user performing the scan
  * @returns {Promise<Object>} - The created unit DTO
  * @throws {Error} - On 4xx/5xx responses or SESSION_EXPIRED
  */
 export const scan = async ({
     barcode,
+    tripUuid,
     stockIntakeLineUuid,
     colourUuid,
     sizeUuid,
-    actorUserId,
 }) => {
     // Validate required parameters
     if (!barcode || typeof barcode !== 'string' || barcode.trim().length === 0) {
         const error = new Error('Barcode must be a non-empty string');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (!tripUuid || typeof tripUuid !== 'string') {
+        const error = new Error('Trip UUID is required');
         error.statusCode = 400;
         throw error;
     }
@@ -54,7 +60,7 @@ export const scan = async ({
         throw error;
     }
 
-    const url = STOCK_INTAKE_ROUTES.SCAN(stockIntakeLineUuid);
+    const url = STOCK_INTAKE_LINE_ROUTES.SCAN(tripUuid, stockIntakeLineUuid);
     const requestKey = createRequestKey();
 
     try {
@@ -62,7 +68,6 @@ export const scan = async ({
             barcode,
             colourUuid,
             sizeUuid,
-            actorUserId,
         }, {
             headers: {
                 'X-Idempotency-Key': requestKey,

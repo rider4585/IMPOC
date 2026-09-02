@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { BARCODE_ROUTES, STOCK_INTAKE_ROUTES } from '../routes.js';
+import {
+  BARCODE_ROUTES,
+  STOCK_INTAKE_ROUTES,
+  STOCK_INTAKE_LINE_ROUTES,
+  SALES_ROUTES,
+  UNIT_ROUTES,
+} from '../routes.js';
 
 describe('BARCODE_ROUTES', () => {
   describe('GENERATE', () => {
@@ -18,70 +24,85 @@ describe('BARCODE_ROUTES', () => {
 });
 
 describe('STOCK_INTAKE_ROUTES', () => {
+  it('exposes list/create constants', () => {
+    expect(STOCK_INTAKE_ROUTES.LIST).toBe('/stock-intakes');
+    expect(STOCK_INTAKE_ROUTES.CREATE).toBe('/stock-intakes');
+  });
+
+  it('builds a GET path for a trip uuid', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(STOCK_INTAKE_ROUTES.GET(uuid)).toBe(`/stock-intakes/${uuid}`);
+  });
+
+  it('builds the clone-last-lot path', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(STOCK_INTAKE_ROUTES.CLONE_LAST_LOT(uuid)).toBe(
+      `/stock-intakes/${uuid}/clone-last-lot`
+    );
+    expect(STOCK_INTAKE_ROUTES.CLONE_LAST_LOT(uuid)).not.toContain('/api/');
+  });
+});
+
+describe('STOCK_INTAKE_LINE_ROUTES', () => {
   describe('SCAN', () => {
-    it('returns the correct path for a valid UUID', () => {
-      const uuid = '550e8400-e29b-41d4-a716-446655440000';
-      const result = STOCK_INTAKE_ROUTES.SCAN(uuid);
-      expect(result).toBe('/stock-intake-lines/550e8400-e29b-41d4-a716-446655440000/scan');
+    const trip = '11111111-1111-4111-8111-111111111111';
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('returns the correct path under the trip lines mount', () => {
+      expect(STOCK_INTAKE_LINE_ROUTES.SCAN(trip, uuid)).toBe(
+        `/stock-intakes/${trip}/lines/${uuid}/scan`
+      );
     });
 
     it('is a function', () => {
-      expect(typeof STOCK_INTAKE_ROUTES.SCAN).toBe('function');
+      expect(typeof STOCK_INTAKE_LINE_ROUTES.SCAN).toBe('function');
     });
 
     it('does not include /api prefix', () => {
-      const uuid = '550e8400-e29b-41d4-a716-446655440000';
-      const result = STOCK_INTAKE_ROUTES.SCAN(uuid);
-      expect(result).not.toContain('/api/');
+      expect(STOCK_INTAKE_LINE_ROUTES.SCAN(trip, uuid)).not.toContain('/api/');
     });
 
-    it('encodes special characters in the UUID', () => {
-      const uuidWithSpecialChars = 'test-id-with-@-symbol';
-      const result = STOCK_INTAKE_ROUTES.SCAN(uuidWithSpecialChars);
-      // The @ should be encoded as %40
-      expect(result).toContain('test-id-with-%40-symbol');
+    it('encodes special characters in both params', () => {
+      const result = STOCK_INTAKE_LINE_ROUTES.SCAN('trip@x', 'line@y');
+      expect(result).toContain('trip%40x');
+      expect(result).toContain('line%40y');
     });
+  });
 
-    it('throws an error when UUID is null', () => {
-      expect(() => {
-        STOCK_INTAKE_ROUTES.SCAN(null);
-      }).toThrow('stockIntakeLineUuid must be a non-empty string');
-    });
+  it('builds list/create/update paths', () => {
+    const trip = '11111111-1111-4111-8111-111111111111';
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(STOCK_INTAKE_LINE_ROUTES.LIST(trip)).toBe(`/stock-intakes/${trip}/lines`);
+    expect(STOCK_INTAKE_LINE_ROUTES.CREATE(trip)).toBe(`/stock-intakes/${trip}/lines`);
+    expect(STOCK_INTAKE_LINE_ROUTES.UPDATE(trip, uuid)).toBe(
+      `/stock-intakes/${trip}/lines/${uuid}`
+    );
+  });
+});
 
-    it('throws an error when UUID is undefined', () => {
-      expect(() => {
-        STOCK_INTAKE_ROUTES.SCAN(undefined);
-      }).toThrow('stockIntakeLineUuid must be a non-empty string');
-    });
+describe('SALES_ROUTES', () => {
+  it('list/create are constants', () => {
+    expect(SALES_ROUTES.LIST).toBe('/sales');
+    expect(SALES_ROUTES.CREATE).toBe('/sales');
+  });
 
-    it('throws an error when UUID is an empty string', () => {
-      expect(() => {
-        STOCK_INTAKE_ROUTES.SCAN('');
-      }).toThrow('stockIntakeLineUuid must not be empty or whitespace-only');
-    });
+  it('builds GET/CANCEL/REFUND paths for a sale uuid', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(SALES_ROUTES.GET(uuid)).toBe(`/sales/${uuid}`);
+    expect(SALES_ROUTES.CANCEL(uuid)).toBe(`/sales/${uuid}/cancel`);
+    expect(SALES_ROUTES.REFUND(uuid)).toBe(`/sales/${uuid}/refund`);
+    expect(SALES_ROUTES.REFUND(uuid)).not.toContain('/api/');
+  });
+});
 
-    it('throws an error when UUID is whitespace-only', () => {
-      expect(() => {
-        STOCK_INTAKE_ROUTES.SCAN('   ');
-      }).toThrow('stockIntakeLineUuid must not be empty or whitespace-only');
-    });
+describe('UNIT_ROUTES', () => {
+  it('builds the by-barcode path', () => {
+    expect(UNIT_ROUTES.BY_BARCODE('ABC123')).toBe('/units/by-barcode/ABC123');
+    expect(UNIT_ROUTES.BY_BARCODE('ABC123')).not.toContain('/api/');
+  });
 
-    it('throws an error when UUID is not a string', () => {
-      expect(() => {
-        STOCK_INTAKE_ROUTES.SCAN(123);
-      }).toThrow('stockIntakeLineUuid must be a non-empty string');
-    });
-
-    it('throws an error when UUID is an object', () => {
-      expect(() => {
-        STOCK_INTAKE_ROUTES.SCAN({});
-      }).toThrow('stockIntakeLineUuid must be a non-empty string');
-    });
-
-    it('trims whitespace from the UUID before encoding', () => {
-      const uuidWithWhitespace = '  550e8400-e29b-41d4-a716-446655440000  ';
-      const result = STOCK_INTAKE_ROUTES.SCAN(uuidWithWhitespace);
-      expect(result).toBe('/stock-intake-lines/550e8400-e29b-41d4-a716-446655440000/scan');
-    });
+  it('builds the get path for a unit uuid', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(UNIT_ROUTES.GET(uuid)).toBe(`/units/${uuid}`);
   });
 });

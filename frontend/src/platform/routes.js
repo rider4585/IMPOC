@@ -11,31 +11,58 @@ export const BARCODE_ROUTES = {
   GENERATE: '/barcodes/generate',
 };
 
-// Stock intake endpoints
+// Stock intake (trip) endpoints
 export const STOCK_INTAKE_ROUTES = {
+  /** GET /stock-intakes - List all trips */
+  LIST: '/stock-intakes',
+  /** POST /stock-intakes - Create a trip */
+  CREATE: '/stock-intakes',
+  /** GET /stock-intakes/{uuid} - Get a single trip */
+  GET: (uuid) => `/stock-intakes/${encodeURIComponent(uuid)}`,
+  /** GET /stock-intakes/{tripUuid}/clone-last-lot - Clone the last lot of a trip */
+  CLONE_LAST_LOT: (tripUuid) =>
+    `/stock-intakes/${encodeURIComponent(tripUuid)}/clone-last-lot`,
+};
+
+// Stock intake line (lot) endpoints, mounted under /stock-intakes/:tripUuid/lines
+export const STOCK_INTAKE_LINE_ROUTES = {
+  /** GET /stock-intakes/{tripUuid}/lines - List lots for a trip */
+  LIST: (tripUuid) => `/stock-intakes/${encodeURIComponent(tripUuid)}/lines`,
+  /** POST /stock-intakes/{tripUuid}/lines - Create a lot */
+  CREATE: (tripUuid) => `/stock-intakes/${encodeURIComponent(tripUuid)}/lines`,
+  /** GET /stock-intakes/{tripUuid}/lines/{uuid} - Get a single lot */
+  GET: (tripUuid, uuid) =>
+    `/stock-intakes/${encodeURIComponent(tripUuid)}/lines/${encodeURIComponent(uuid)}`,
+  /** PATCH /stock-intakes/{tripUuid}/lines/{uuid} - Update a lot */
+  UPDATE: (tripUuid, uuid) =>
+    `/stock-intakes/${encodeURIComponent(tripUuid)}/lines/${encodeURIComponent(uuid)}`,
   /**
-   * Build the URL path for scanning a barcode into a stock intake line.
-   * POST /stock-intake-lines/{uuid}/scan - Scan a barcode into a stock intake line
-   *
-   * @param {string} stockIntakeLineUuid - UUID of the stock intake line (lot)
-   *                                       Must be a valid UUID string, e.g., "550e8400-e29b-41d4-a716-446655440000"
-   * @returns {string} The URL path with the UUID properly encoded, e.g., "/stock-intake-lines/550e8400-e29b-41d4-a716-446655440000/scan"
-   * @throws {Error} If stockIntakeLineUuid is not a non-empty string
+   * POST /stock-intakes/{tripUuid}/lines/{uuid}/scan - Scan a barcode into a lot
+   * (creates a unit). The stock-intake-line router is mounted with mergeParams, so
+   * both :tripUuid and :uuid are required in the path.
    */
-  SCAN: (stockIntakeLineUuid) => {
-    // Check type first
-    if (typeof stockIntakeLineUuid !== 'string') {
-      throw new Error('stockIntakeLineUuid must be a non-empty string');
-    }
+  SCAN: (tripUuid, uuid) =>
+    `/stock-intakes/${encodeURIComponent(tripUuid)}/lines/${encodeURIComponent(uuid)}/scan`,
+};
 
-    // Trim and validate that it's not empty or whitespace-only
-    const trimmedUuid = stockIntakeLineUuid.trim();
-    if (trimmedUuid.length === 0) {
-      throw new Error('stockIntakeLineUuid must not be empty or whitespace-only');
-    }
+// Sales / POS endpoints
+export const SALES_ROUTES = {
+  /** GET /sales - List sales */
+  LIST: '/sales',
+  /** POST /sales - Checkout a RETAIL sale */
+  CREATE: '/sales',
+  /** GET /sales/{uuid} - Get a single sale (receipt) */
+  GET: (uuid) => `/sales/${encodeURIComponent(uuid)}`,
+  /** POST /sales/{uuid}/cancel - Cancel a completed sale */
+  CANCEL: (uuid) => `/sales/${encodeURIComponent(uuid)}/cancel`,
+  /** POST /sales/{uuid}/refund - Refund a completed sale */
+  REFUND: (uuid) => `/sales/${encodeURIComponent(uuid)}/refund`,
+};
 
-    // Encode the UUID to prevent URL injection and handle special characters
-    const encodedUuid = encodeURIComponent(trimmedUuid);
-    return `/stock-intake-lines/${encodedUuid}/scan`;
-  },
+// Unit endpoints
+export const UNIT_ROUTES = {
+  /** GET /units/by-barcode/{barcode} - Get a unit by its barcode */
+  BY_BARCODE: (barcode) => `/units/by-barcode/${encodeURIComponent(barcode)}`,
+  /** GET /units/{uuid} - Get a unit by uuid */
+  GET: (uuid) => `/units/${encodeURIComponent(uuid)}`,
 };
