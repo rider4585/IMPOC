@@ -1,0 +1,50 @@
+import { z } from 'zod';
+
+const uuidSchema = z.string().uuid('Invalid UUID format');
+
+const itemSchema = z.object({
+    unitUuid: uuidSchema.optional(),
+    barcode: z.string().trim().min(1).max(12).optional(),
+});
+
+/**
+ * Validation schema for POST /api/rentals (checkout / hand-out)
+ */
+export const createRentalBodySchema = z.object({
+    customerName: z.string().trim().max(255).optional().default(undefined),
+    startDate: z.string().date('Invalid date').optional().default(undefined),
+    rentalDays: z.number().int().positive('Rental days must be a positive integer').optional().default(undefined),
+    notes: z.string().trim().max(2000).optional().default(undefined),
+    items: z.array(itemSchema).min(1, 'At least one item is required'),
+});
+
+/**
+ * Validation schema for GET /api/rentals/:uuid
+ */
+export const rentalUuidParamSchema = z.object({
+    uuid: uuidSchema,
+});
+
+/**
+ * Validation schema for POST /api/rentals/:uuid/return
+ * Returns one or more units. gradeUuid refers to a damage grade (optional).
+ */
+export const returnBodySchema = z.object({
+    actualReturnDate: z.string().date('Invalid date').optional().default(undefined),
+    items: z.array(
+        z.object({
+            unitUuid: uuidSchema.optional(),
+            barcode: z.string().trim().min(1).max(12).optional(),
+            gradeUuid: uuidSchema.optional(),
+            damageChargePaise: z.number().int().nonnegative('Damage charge must be >= 0').optional(),
+            notes: z.string().trim().max(2000).optional(),
+        })
+    ).min(1, 'At least one item is required'),
+});
+
+/**
+ * Validation schema for POST /api/rentals/:uuid/cancel
+ */
+export const cancelBodySchema = z.object({
+    reason: z.string().trim().max(2000).optional().default(undefined),
+});

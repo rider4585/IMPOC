@@ -16,6 +16,8 @@ import intakeRoutes from './src/modules/intake/stock-intake.routes.js';
 import intakeLineRoutes from './src/modules/intake/stock-intake-line.routes.js';
 import unitsRoutes from './src/modules/units/units.routes.js';
 import salesRoutes from './src/modules/sales/sales.routes.js';
+import rentalRoutes from './src/modules/rentals/rental-agreement.routes.js';
+import expensesRoutes from './src/modules/expenses/expenses.routes.js';
 import errorMiddleware from './src/middleware/error.middleware.js';
 
 const app = express();
@@ -62,6 +64,8 @@ app.use('/api/stock-intakes', intakeRoutes);
 app.use('/api/stock-intakes/:tripUuid/lines', intakeLineRoutes);
 app.use('/api/units', unitsRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/rentals', rentalRoutes);
+app.use('/api/expenses', expensesRoutes);
 
 app.use(errorMiddleware);
 

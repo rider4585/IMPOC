@@ -46,6 +46,12 @@ import UnitStatusEventModel from './UnitStatusEvent.js';
 import SaleModel from './Sale.js';
 import SaleLineModel from './SaleLine.js';
 import SaleReversalModel from './SaleReversal.js';
+import RentalAgreementModel from './RentalAgreement.js';
+import RentalLineModel from './RentalLine.js';
+import RentalReturnModel from './RentalReturn.js';
+import RentalReversalModel from './RentalReversal.js';
+import ExpenseModel from './Expense.js';
+import ExpenseReversalModel from './ExpenseReversal.js';
 
 const User = UserModel(sequelize);
 const Role = RoleModel(sequelize);
@@ -67,6 +73,12 @@ const UnitStatusEvent = UnitStatusEventModel(sequelize);
 const Sale = SaleModel(sequelize);
 const SaleLine = SaleLineModel(sequelize);
 const SaleReversal = SaleReversalModel(sequelize);
+const RentalAgreement = RentalAgreementModel(sequelize);
+const RentalLine = RentalLineModel(sequelize);
+const RentalReturn = RentalReturnModel(sequelize);
+const RentalReversal = RentalReversalModel(sequelize);
+const Expense = ExpenseModel(sequelize);
+const ExpenseReversal = ExpenseReversalModel(sequelize);
 
 /*
  * User ↔ Role
@@ -293,6 +305,84 @@ SaleReversal.belongsTo(Sale, {
     as: 'sale',
 });
 
+/*
+ * RentalAgreement �+" RentalLine
+ */
+RentalAgreement.hasMany(RentalLine, {
+    foreignKey: 'agreement_id',
+    as: 'lines',
+});
+
+RentalLine.belongsTo(RentalAgreement, {
+    foreignKey: 'agreement_id',
+    as: 'agreement',
+});
+
+/*
+ * RentalLine �+" Unit
+ */
+RentalLine.belongsTo(Unit, {
+    foreignKey: 'unit_id',
+    as: 'unit',
+});
+
+Unit.hasMany(RentalLine, {
+    foreignKey: 'unit_id',
+    as: 'rentalLines',
+});
+
+/*
+ * RentalAgreement �+" RentalReturn
+ */
+RentalAgreement.hasMany(RentalReturn, {
+    foreignKey: 'agreement_id',
+    as: 'returns',
+});
+
+RentalReturn.belongsTo(RentalAgreement, {
+    foreignKey: 'agreement_id',
+    as: 'agreement',
+});
+
+/*
+ * RentalLine �+" RentalReturn
+ */
+RentalLine.hasMany(RentalReturn, {
+    foreignKey: 'rental_line_id',
+    as: 'returns',
+});
+
+RentalReturn.belongsTo(RentalLine, {
+    foreignKey: 'rental_line_id',
+    as: 'line',
+});
+
+/*
+ * RentalAgreement �+" RentalReversal
+ */
+RentalAgreement.hasMany(RentalReversal, {
+    foreignKey: 'agreement_id',
+    as: 'reversals',
+});
+
+RentalReversal.belongsTo(RentalAgreement, {
+    foreignKey: 'agreement_id',
+    as: 'agreement',
+});
+
+/*
+ * Expense �+" ExpenseReversal
+ */
+Expense.hasMany(ExpenseReversal, {
+    foreignKey: 'expense_id',
+    as: 'reversals',
+});
+
+ExpenseReversal.belongsTo(Expense, {
+    foreignKey: 'expense_id',
+    as: 'expense',
+});
+
 export {
     sequelize,
     Sequelize,
@@ -315,5 +405,11 @@ export {
     UnitStatusEvent,
     Sale,
     SaleLine,
-    SaleReversal
+    SaleReversal,
+    RentalAgreement,
+    RentalLine,
+    RentalReturn,
+    RentalReversal,
+    Expense,
+    ExpenseReversal
 };
