@@ -1,0 +1,322 @@
+import { Sale, SaleLine, SaleReversal, Unit, sequelize } from '../../../database/models/index.js';
+import { transitionUnit } from '../units/units.service.js';
+import { CHANNEL } from '../../constants/channel.js';
+
+/**
+ * Generate the next sale number, e.g. S-0001
+ * @returns {Promise<string>}
+ */
+async function nextSaleNumber(transaction) {
+    const last = await Sale.findOne({
+        order: [['id', 'DESC']],
+        attributes: ['saleNumber'],
+        paranoid: false,
+        transaction,
+    });
+    const lastNum = last ? parseInt(last.saleNumber.replace(/\D/g, ''), 10) || 0 : 0;
+    return `S-${String(lastNum + 1).padStart(4, '0')}`;
+}
+
+function mapSaleDTO(sale, lines = [], reversals = []) {
+    return {
+        uuid: sale.uuid,
+        saleNumber: sale.saleNumber,
+        customerName: sale.customerName,
+        soldAt: sale.soldAt,
+        totalPaise: String(sale.totalPaise),
+        status: sale.status,
+        notes: sale.notes,
+        createdAt: sale.createdAt,
+        updatedAt: sale.updatedAt,
+        lines: lines.map((line) => ({
+            uuid: line.uuid,
+            unitUuid: line.unitUuid,
+            barcode: line.barcode,
+            sellingPricePaise: String(line.sellingPricePaise),
+            unitStatus: line.unit ? line.unit.status : null,
+        })),
+        reversals: reversals.map((rev) => ({
+            uuid: rev.uuid,
+            reversalType: rev.reversalType,
+            amountPaise: String(rev.amountPaise),
+            reason: rev.reason,
+            createdAt: rev.createdAt,
+        })),
+    };
+}
+
+/**
+ * Resolve a single sellable unit (RETAIL + in_stock).
+ * @returns {Promise<Unit>}
+ */
+async function resolveSellableUnit({ unitUuid, barcode }, transaction) {
+    const where = unitUuid ? { uuid: unitUuid } : { barcode };
+    const unit = await Unit.findOne({
+        where: { ...where, deletedAt: null },
+        attributes: ['id', 'uuid', 'barcode', 'status', 'channel', 'sellingPricePaise', 'floorPricePaise', 'rentPerDayPaise', 'depositPaise', 'overduePerDayPaise'],
+        transaction,
+    });
+
+    if (!unit) {
+        const error = new Error(`Unit ${barcode || unitUuid} not found`);
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (unit.channel !== CHANNEL.RETAIL) {
+        const error = new Error(`Unit ${unit.barcode} is not a RETAIL unit and cannot be sold`);
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (unit.status !== 'in_stock') {
+        const error = new Error(`Unit ${unit.barcode} is not available for sale (status: ${unit.status})`);
+        error.statusCode = 409;
+        throw error;
+    }
+
+    return unit;
+}
+
+/**
+ * Create/checkout a RETAIL sale: one or more in_stock RETAIL units.
+ * Snapshots each unit's selling_price_paise at checkout and moves each unit
+ * in_stock -> sold via the state machine inside one transaction.
+ *
+ * @param {Object} params - { customerName, soldAt, notes, items, actorUserId }
+ * @returns {Object} sale DTO
+ */
+export const createSale = async ({ customerName, soldAt, notes, items, actorUserId }) => {
+    const transaction = await sequelize.transaction();
+    try {
+        const units = [];
+        for (const item of items) {
+            // eslint-disable-next-line no-await-in-loop
+            const unit = await resolveSellableUnit(item, transaction);
+            units.push(unit);
+        }
+
+        const date = soldAt || new Date().toISOString().split('T')[0];
+        const saleNumber = await nextSaleNumber(transaction);
+
+        const totalPaise = units.reduce((sum, u) => sum + Number(u.sellingPricePaise), 0);
+
+        const sale = await Sale.create(
+            {
+                saleNumber,
+                customerName: customerName || null,
+                soldAt: date,
+                totalPaise,
+                status: 'completed',
+                notes: notes || null,
+                createdBy: actorUserId || null,
+            },
+            { transaction }
+        );
+
+        const lines = [];
+        for (const unit of units) {
+            // eslint-disable-next-line no-await-in-loop
+            const line = await SaleLine.create(
+                {
+                    saleId: sale.id,
+                    unitId: unit.id,
+                    unitUuid: unit.uuid,
+                    barcode: unit.barcode,
+                    sellingPricePaise: unit.sellingPricePaise,
+                },
+                { transaction }
+            );
+            lines.push(line);
+
+            // eslint-disable-next-line no-await-in-loop
+            await transitionUnit(
+                {
+                    unitUuid: unit.uuid,
+                    to: 'sold',
+                    cause: 'CHECKOUT',
+                    actorUserId,
+                    saleLineId: line.id,
+                },
+                { transaction }
+            );
+        }
+
+        await transaction.commit();
+
+        const fullSale = await Sale.findByPk(sale.id, {
+            include: [
+                { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+                { association: 'reversals' },
+            ],
+        });
+
+        return mapSaleDTO(fullSale, fullSale.lines, fullSale.reversals);
+    } catch (error) {
+        await transaction.rollback();
+        throw error;
+    }
+};
+
+/**
+ * List sales, newest first, with their lines.
+ */
+export const listSales = async () => {
+    const sales = await Sale.findAll({
+        where: { deletedAt: null },
+        order: [['createdAt', 'DESC']],
+        include: [
+            { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+            { association: 'reversals' },
+        ],
+    });
+
+    return sales.map((sale) => mapSaleDTO(sale, sale.lines || [], sale.reversals || []));
+};
+
+/**
+ * Get a single sale by uuid.
+ */
+export const getSaleByUuid = async (uuid) => {
+    const sale = await Sale.findOne({
+        where: { uuid, deletedAt: null },
+        include: [
+            { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+            { association: 'reversals' },
+        ],
+    });
+
+    if (!sale) {
+        return null;
+    }
+
+    return mapSaleDTO(sale, sale.lines || [], sale.reversals || []);
+};
+
+/**
+ * Cancel a completed sale: snapshot a reversal row (CANCEL), reverse each
+ * sold unit back to in_stock (EXCHANGE), and mark the sale cancelled.
+ * The completed sale's financial fields are never mutated.
+ */
+export const cancelSale = async ({ uuid, reason, actorUserId }) => {
+    const transaction = await sequelize.transaction();
+    try {
+        const sale = await Sale.findOne({
+            where: { uuid, deletedAt: null },
+            include: [
+                { association: 'lines', include: [{ association: 'unit', attributes: ['id', 'uuid', 'status'] }] },
+            ],
+            transaction,
+        });
+
+        if (!sale) {
+            const error = new Error('Sale not found');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        if (sale.status !== 'completed') {
+            const error = new Error(`Sale ${sale.saleNumber} is not completed and cannot be cancelled`);
+            error.statusCode = 409;
+            throw error;
+        }
+
+        // Record the reversal (settlement) row - history is never rewritten
+        await SaleReversal.create(
+            {
+                saleId: sale.id,
+                reversalType: 'CANCEL',
+                amountPaise: sale.totalPaise,
+                reason: reason || null,
+            },
+            { transaction }
+        );
+
+        // Reverse each sold unit back to in_stock via EXCHANGE
+        for (const line of sale.lines) {
+            if (line.unit && line.unit.status === 'sold') {
+                // eslint-disable-next-line no-await-in-loop
+                await transitionUnit(
+                    {
+                        unitUuid: line.unit.uuid,
+                        to: 'in_stock',
+                        cause: 'EXCHANGE',
+                        reason: reason || `Sale ${sale.saleNumber} cancelled`,
+                        actorUserId,
+                        saleLineId: line.id,
+                    },
+                    { transaction }
+                );
+            }
+        }
+
+        // Lifecycle marker only - financial fields are never touched
+        sale.status = 'cancelled';
+        await sale.save({ transaction });
+
+        await transaction.commit();
+
+        const fullSale = await Sale.findByPk(sale.id, {
+            include: [
+                { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+                { association: 'reversals' },
+            ],
+        });
+
+        return mapSaleDTO(fullSale, fullSale.lines, fullSale.reversals);
+    } catch (error) {
+        await transaction.rollback();
+        throw error;
+    }
+};
+
+/**
+ * Refund a completed sale: snapshot a reversal row (REFUND). Units stay sold.
+ * An identical-item return/exchange is handled by the cancel flow.
+ */
+export const refundSale = async ({ uuid, reason, actorUserId }) => {
+    const transaction = await sequelize.transaction();
+    try {
+        const sale = await Sale.findOne({ where: { uuid, deletedAt: null }, transaction });
+
+        if (!sale) {
+            const error = new Error('Sale not found');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        if (sale.status !== 'completed') {
+            const error = new Error(`Sale ${sale.saleNumber} is not completed and cannot be refunded`);
+            error.statusCode = 409;
+            throw error;
+        }
+
+        await SaleReversal.create(
+            {
+                saleId: sale.id,
+                reversalType: 'REFUND',
+                amountPaise: sale.totalPaise,
+                reason: reason || null,
+            },
+            { transaction }
+        );
+
+        // Lifecycle marker only - financial fields are never touched
+        sale.status = 'refunded';
+        await sale.save({ transaction });
+
+        await transaction.commit();
+
+        const fullSale = await Sale.findByPk(sale.id, {
+            include: [
+                { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+                { association: 'reversals' },
+            ],
+        });
+
+        return mapSaleDTO(fullSale, fullSale.lines, fullSale.reversals);
+    } catch (error) {
+        await transaction.rollback();
+        throw error;
+    }
+};
