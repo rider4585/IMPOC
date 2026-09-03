@@ -6,6 +6,10 @@ import { AuthProvider } from './auth/AuthProvider';
 import { RouteGuard } from './app/RouteGuard';
 import { AppShell } from './app/AppShell';
 import { navigationRegistry } from './app/navigation';
+import TripDetailScreen from './screens/inventory/TripDetailScreen';
+import LotForm from './screens/inventory/LotForm';
+import LotIntake from './screens/inventory/LotIntake';
+import VendorDetail from './screens/inventory/VendorDetail';
 
 /**
  * App.jsx — top-level router and auth setup
@@ -69,6 +73,14 @@ function App() {
                     />
                   );
                 })}
+
+                {/* Nested inventory routes */}
+                <Route path="/trips/:tripUuid" element={<TripDetailScreen />} />
+                <Route path="/trips/:tripUuid/lots/new" element={<LotForm />} />
+                <Route path="/trips/:tripUuid/lots/:lotUuid/scan" element={<LotIntake />} />
+
+                {/* Nested vendor detail route */}
+                <Route path="/vendors/:uuid" element={<VendorDetail />} />
 
                 {/* Fallback: if user has no accessible routes, show "nothing here yet" */}
                 <Route

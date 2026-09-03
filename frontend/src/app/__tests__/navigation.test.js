@@ -36,7 +36,7 @@ describe('navigationSections — grouped, labelled, iconed', () => {
       (acc, s) => ({ ...acc, [s.key]: s.items.map((i) => i.path) }),
       {}
     );
-    expect(sectionItems.inventory).toEqual(['/intake', '/vendors', '/barcode-sheets']);
+    expect(sectionItems.inventory).toEqual(['/trips', '/vendors', '/barcode-sheets']);
     expect(sectionItems.pos).toEqual(['/pos', '/sales']);
     expect(sectionItems.rentals).toEqual(['/rentals']);
     expect(sectionItems.expenses).toEqual(['/expenses']);
@@ -77,13 +77,13 @@ describe('navigationRegistry compatibility with grouped sections', () => {
 });
 
 describe('Role visibility — absent-not-disabled (preserved)', () => {
-  it('should show Intake + Vendors for a user holding inventory.view', () => {
+  it('should show Trips + Vendors for a user holding inventory.view', () => {
     const acc = navigationSections
       .filter((s) => s.items.length > 0)
       .flatMap((s) => s.items)
       .filter((item) => item.permission === PERMISSIONS.INVENTORY.VIEW);
     const labels = acc.map((item) => item.label);
-    expect(labels).toContain('Intake');
+    expect(labels).toContain('Trips');
     expect(labels).toContain('Vendors');
   });
 

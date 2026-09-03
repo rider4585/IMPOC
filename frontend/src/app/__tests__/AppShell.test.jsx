@@ -70,7 +70,7 @@ describe('AppShell — grouped, role-gated navigation chrome', () => {
 
   it('shows every permitted item (absent-not-disabled) for a full-access admin', () => {
     renderShell(FULL_ADMIN);
-    ['Intake', 'Vendors', 'Print labels', 'POS', 'Sales', 'Rentals', 'Expenses', 'Users', 'Roles', 'Permissions', 'Picklists', 'Dashboard'].forEach(
+    ['Trips', 'Vendors', 'Print labels', 'POS', 'Sales', 'Rentals', 'Expenses', 'Users', 'Roles', 'Permissions', 'Picklists', 'Dashboard'].forEach(
       (label) => {
         expect(screen.getAllByText(label).length).toBeGreaterThan(0);
       }
@@ -82,7 +82,7 @@ describe('AppShell — grouped, role-gated navigation chrome', () => {
   it('hides the Admin section for an inventory manager (no users/roles/picklists view)', () => {
     renderShell(INVENTORY_MANAGER);
     expect(screen.getByText('Inventory')).toBeInTheDocument();
-    expect(screen.getByText('Intake')).toBeInTheDocument();
+    expect(screen.getByText('Trips')).toBeInTheDocument();
     expect(screen.queryByText('Admin')).toBeNull();
     expect(screen.queryByText('Users')).toBeNull();
     expect(screen.queryByText('Roles')).toBeNull();
@@ -97,7 +97,7 @@ describe('AppShell — grouped, role-gated navigation chrome', () => {
     expect(screen.queryByText('Print labels')).toBeNull();
     expect(screen.queryByText('Admin')).toBeNull();
     expect(screen.queryByText('Users')).toBeNull();
-    expect(screen.queryByText('Intake')).toBeNull();
+    expect(screen.queryByText('Trips')).toBeNull();
     expect(screen.queryByText('Expenses')).toBeNull();
   });
 

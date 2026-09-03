@@ -5,7 +5,11 @@ import RolesScreen from '../screens/admin/RolesScreen';
 import PermissionsScreen from '../screens/admin/PermissionsScreen';
 import PicklistManagementScreen from '../screens/admin/PicklistManagementScreen';
 import VendorsScreen from '../screens/admin/VendorsScreen';
-import IntakeScreen from '../screens/intake/IntakeScreen';
+import TripsScreen from '../screens/inventory/TripsScreen';
+import TripDetailScreen from '../screens/inventory/TripDetailScreen';
+import LotForm from '../screens/inventory/LotForm';
+import LotIntake from '../screens/inventory/LotIntake';
+import VendorDetail from '../screens/inventory/VendorDetail';
 import POSScreen from '../screens/pos/POSScreen';
 import SalesListScreen from '../screens/pos/SalesListScreen';
 import RentalsScreen from '../screens/rentals/RentalsScreen';
@@ -29,7 +33,7 @@ export const navigationRegistry = [
   { permission: PERMISSIONS.ROLES.VIEW, label: 'Permissions', path: '/permissions', element: PermissionsScreen },
   { permission: PERMISSIONS.PICKLISTS.VIEW, label: 'Picklists', path: '/picklists', element: PicklistManagementScreen },
   { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Vendors', path: '/vendors', element: VendorsScreen },
-  { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Intake', path: '/intake', element: IntakeScreen },
+  { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Trips', path: '/trips', element: TripsScreen },
   { permission: PERMISSIONS.SALES.CREATE, label: 'POS', path: '/pos', element: POSScreen },
   { permission: PERMISSIONS.SALES.VIEW, label: 'Sales', path: '/sales', element: SalesListScreen },
   { permission: PERMISSIONS.RENTALS.VIEW, label: 'Rentals', path: '/rentals', element: RentalsScreen },
@@ -51,7 +55,7 @@ export const navigationSections = [
     label: 'Inventory',
     icon: 'inventory',
     items: [
-      { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Intake', path: '/intake' },
+      { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Trips', path: '/trips' },
       { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Vendors', path: '/vendors' },
       { permission: PERMISSIONS.INVENTORY.BARCODE_GENERATE, label: 'Print labels', path: '/barcode-sheets' },
     ],
