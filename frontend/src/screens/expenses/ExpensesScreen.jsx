@@ -21,8 +21,6 @@ import {
 } from '../../services/expensesApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { ExpenseFormDialog } from './ExpenseFormDialog.jsx';
-import '../admin/admin.css';
-import './expenses.css';
 
 const STATUS_FILTERS = ['all', 'completed', 'cancelled'];
 
@@ -122,18 +120,18 @@ export function ExpensesScreen() {
 
   if (!canView) {
     return (
-      <div className="admin-page">
-        <p className="admin-muted">You do not have permission to view expenses.</p>
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+        <p className="text-sm text-[var(--ink-muted)]">You do not have permission to view expenses.</p>
       </div>
     );
   }
 
   return (
-    <div className="expenses-page">
-      <div className="expenses-page__header">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="typography-heading">Expenses</h1>
-          <p className="typography-body-sm expenses-page__subtitle">
+          <h1 className="typography-heading mb-1">Expenses</h1>
+          <p className="typography-body-sm text-[var(--ink-muted)]">
             Record and track shop expenses.
           </p>
         </div>
@@ -144,15 +142,15 @@ export function ExpensesScreen() {
         )}
       </div>
 
-      {error && <div className="admin-error" role="alert">{error}</div>}
+      {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       <Card>
         <CardHeader>
           <CardTitle>Expense list</CardTitle>
         </CardHeader>
-        <CardContent className="expenses-card__content">
-          <div className="expenses-filter">
-            <Select label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <CardContent className="p-4">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <Select label="Status" className="min-w-[160px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="all">All</option>
               {STATUS_FILTERS.filter((s) => s !== 'all').map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -160,6 +158,7 @@ export function ExpensesScreen() {
             </Select>
             <Select
               label="Category"
+              className="min-w-[160px]"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
@@ -171,32 +170,36 @@ export function ExpensesScreen() {
             <Input
               label="Date"
               type="date"
+              className="min-w-[160px]"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
             />
           </div>
 
           {loading ? (
-            <p className="admin-muted">Loading expenses…</p>
+            <p className="text-sm text-[var(--ink-muted)]">Loading expenses…</p>
           ) : filtered.length === 0 ? (
-            <p className="admin-muted">No expenses match this view.</p>
+            <p className="text-sm text-[var(--ink-muted)]">No expenses match this view.</p>
           ) : (
-            <ul className="expenses-list">
+            <ul className="flex flex-col gap-2">
               {filtered.map((e) => (
-                <li key={e.uuid} className="expenses-item">
+                <li
+                  key={e.uuid}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-sm"
+                >
                   <div>
-                    <div className="expenses-item__title">{e.category}</div>
-                    <div className="expenses-item__meta">
+                    <div className="font-semibold">{e.category}</div>
+                    <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
                       {e.expenseDate} · {e.purpose || 'No purpose'}
                       {e.notes ? ` · ${e.notes}` : ''}
                     </div>
                     {e.reversals && e.reversals.length > 0 && (
-                      <div className="expenses-item__meta">
+                      <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
                         Reversals: {e.reversals.map((r) => `${r.reversalType} (${formatPaise(Number(r.amountPaise))})`).join(', ')}
                       </div>
                     )}
                   </div>
-                  <div className="expenses-item__right">
+                  <div className="flex items-center gap-3">
                     <Badge variant={e.status === 'cancelled' ? 'neutral' : 'success'}>{e.status}</Badge>
                     <strong>{formatPaise(Number(e.amountPaise))}</strong>
                     {e.status !== 'cancelled' && canUpdate && (
@@ -243,10 +246,10 @@ export function ExpensesScreen() {
             </>
           }
         >
-          <p className="admin-muted">
+          <p className="text-sm text-[var(--ink-muted)]">
             This records a reversing row for {formatPaise(Number(cancelling.amountPaise))} and marks the expense cancelled. It cannot be undone.
           </p>
-          <div className="admin-form">
+          <div className="mt-4 flex flex-col gap-4">
             <Input
               label="Reason"
               value={cancelReason}

@@ -22,8 +22,6 @@ import { formatPaise } from '../../platform/money.js';
 import { CreateTripDialog } from './CreateTripDialog.jsx';
 import { CreateLotDialog } from './CreateLotDialog.jsx';
 import { ScanScreen } from './ScanScreen.jsx';
-import '../admin/admin.css';
-import './intake.css';
 
 export function IntakeScreen() {
   const { permissions } = useAuth();
@@ -153,8 +151,8 @@ export function IntakeScreen() {
 
   if (!canView) {
     return (
-      <div className="admin-page">
-        <p className="admin-muted">You do not have permission to view intake.</p>
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+        <p className="text-sm text-[var(--ink-muted)]">You do not have permission to view intake.</p>
       </div>
     );
   }
@@ -173,13 +171,13 @@ export function IntakeScreen() {
   }
 
   return (
-    <div className="intake-page">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
       {!activeTrip ? (
         <>
-          <div className="intake-page__header">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="typography-heading">Intake</h1>
-              <p className="typography-body-sm intake-page__subtitle">
+              <h1 className="typography-heading mb-1">Intake</h1>
+              <p className="typography-body-sm text-[var(--ink-muted)]">
                 Manage purchase trips and scan units into lots.
               </p>
             </div>
@@ -190,31 +188,34 @@ export function IntakeScreen() {
             )}
           </div>
 
-          {error && <div className="admin-error" role="alert">{error}</div>}
+          {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
           <Card>
             <CardHeader>
               <CardTitle>Trips</CardTitle>
             </CardHeader>
-            <CardContent className="intake-card__content">
+            <CardContent className="p-4">
               {loading ? (
-                <p className="admin-muted">Loading trips…</p>
+                <p className="text-sm text-[var(--ink-muted)]">Loading trips…</p>
               ) : trips.length === 0 ? (
-                <p className="admin-muted">No trips yet. Create your first trip to get started.</p>
+                <p className="text-sm text-[var(--ink-muted)]">No trips yet. Create your first trip to get started.</p>
               ) : (
-                <ul className="intake-trip-list">
+                <ul className="flex flex-col gap-2">
                   {trips.map((t) => {
                     const v = vendors.find((x) => x.uuid === t.vendorUuid);
                     return (
-                      <li key={t.uuid} className="intake-trip-item">
+                      <li
+                        key={t.uuid}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-sm"
+                      >
                         <button
                           type="button"
-                          className="intake-lot-link"
+                          className="border-none bg-transparent p-0 font-semibold text-primary hover:underline"
                           onClick={() => loadLots(t)}
                         >
                           {v ? v.name : 'Vendor'} &middot; {new Date(t.purchasedOn).toLocaleDateString()}
                         </button>
-                        <span className="intake-unit-meta">
+                        <span className="text-[var(--ink-muted)]">
                           Paid {formatPaise(Number(t.totalPaidPaise))}
                           {t.variancePaise != null && ` · Variance ${formatPaise(Number(t.variancePaise))}`}
                         </span>
@@ -228,17 +229,17 @@ export function IntakeScreen() {
         </>
       ) : (
         <>
-          <div className="intake-page__header">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <Button variant="ghost" size="sm" onClick={goBack}>&larr; All trips</Button>
-              <h1 className="typography-heading">{vendorName || 'Trip'} &middot; {new Date(activeTrip.purchasedOn).toLocaleDateString()}</h1>
-              <p className="typography-body-sm intake-page__subtitle">
+              <h1 className="typography-heading mb-1 mt-1">{vendorName || 'Trip'} &middot; {new Date(activeTrip.purchasedOn).toLocaleDateString()}</h1>
+              <p className="typography-body-sm text-[var(--ink-muted)]">
                 {activeTrip.billReference || 'No bill reference'} &middot; Paid{' '}
                 {formatPaise(Number(activeTrip.totalPaidPaise))}
               </p>
             </div>
             {canCreate && (
-              <div className="intake-header-actions">
+              <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={handleCloneLot}>Clone last lot</Button>
                 <Button onClick={() => { setLotPrefill(null); setLotOpen(true); }}>
                   Add lot
@@ -247,34 +248,37 @@ export function IntakeScreen() {
             )}
           </div>
 
-          {error && <div className="admin-error" role="alert">{error}</div>}
+          {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
           <Card>
             <CardHeader>
               <CardTitle>Lots</CardTitle>
             </CardHeader>
-            <CardContent className="intake-card__content">
+            <CardContent className="p-4">
               {lotsLoading ? (
-                <p className="admin-muted">Loading lots…</p>
+                <p className="text-sm text-[var(--ink-muted)]">Loading lots…</p>
               ) : lots.length === 0 ? (
-                <p className="admin-muted">No lots in this trip yet.</p>
+                <p className="text-sm text-[var(--ink-muted)]">No lots in this trip yet.</p>
               ) : (
-                <ul className="intake-lot-list">
+                <ul className="flex flex-col gap-2">
                   {lots.map((lot) => {
                     const pt = productTypes.find((x) => x.uuid === lot.productTypeUuid);
                     return (
-                      <li key={lot.uuid} className="intake-lot-item">
+                      <li
+                        key={lot.uuid}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-sm"
+                      >
                         <div>
-                          <div className="intake-lot-title">
+                          <div className="font-semibold">
                             {pt ? pt.name : 'Product'} &middot; qty {lot.quantity}
                           </div>
-                          <div className="intake-lot-meta">
+                          <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
                             Buy {formatPaise(Number(lot.buyingPricePaise))} · Sell{' '}
                             {formatPaise(Number(lot.sellingPricePaise))} · Channel{' '}
-                            <span className="intake-lot-channel">{lot.channel.toLowerCase()}</span>
+                            <span className="capitalize">{lot.channel.toLowerCase()}</span>
                           </div>
                         </div>
-                        <div className="intake-actions">
+                        <div className="flex gap-2">
                           {canCreate && (
                             <Button
                               size="sm"

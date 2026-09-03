@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Button, Input, Card, CardHeader, CardContent, CardTitle } from '../components/ui';
 import { createRequestKey } from '../platform/requestKey.js';
 import { wakingRequest } from '../platform/wakingRequest.js';
 import apiClient from '../platform/apiClient.js';
 import { BARCODE_ROUTES } from '../platform/routes.js';
-import './BarcodePrintScreen.css';
 
 /**
  * Barcode Print Screen (Story 1.17)
@@ -119,52 +119,50 @@ export function BarcodePrintScreen() {
   };
 
   return (
-    <div className="barcode-print-container">
-      <div className="barcode-print-card surface-flat">
-        <h1 className="typography-heading">Print Labels</h1>
-        <p className="barcode-print-subtitle typography-body-sm">
-          Request a sheet of blank barcode labels for your inventory.
-        </p>
+    <div className="flex min-h-full items-center justify-center p-4">
+      <Card className="w-full max-w-[400px]">
+        <CardHeader className="items-center">
+          <CardTitle>Print Labels</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="typography-body-sm mb-6 text-center text-[var(--ink-muted)]">
+            Request a sheet of blank barcode labels for your inventory.
+          </p>
 
-        {/* Waking banner  -  shown when request is pending after 1200ms */}
-        {status === 'waking' && (
-          <div className="waking-banner">
-            <div className="waking-content">
-              <p className="typography-body">Waking the system up.</p>
-              <p className="typography-body-sm">This takes up to a minute after a quiet spell. Nothing is lost.</p>
+          {/* Waking banner  -  shown when request is pending after 1200ms */}
+          {status === 'waking' && (
+            <div className="mb-6 rounded-md border-l-4 border-[var(--waking)] bg-[rgba(138,90,31,0.1)] p-4 text-[var(--ink)]">
+              <p className="mb-2 leading-relaxed">Waking the system up.</p>
+              <p className="leading-relaxed text-sm">This takes up to a minute after a quiet spell. Nothing is lost.</p>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Success message  -  shown after PDF download */}
-        {status === 'success' && successPages && (
-          <div className="success-message">
-            Sheet generated  -  {successPages} page(s).
-          </div>
-        )}
+          {/* Success message  -  shown after PDF download */}
+          {status === 'success' && successPages && (
+            <div className="mb-6 rounded-md border-l-4 border-[var(--success)] bg-[rgba(47,110,79,0.1)] p-4 font-medium leading-relaxed text-[var(--success)]">
+              Sheet generated  -  {successPages} page(s).
+            </div>
+          )}
 
-        {/* Replay message  -  shown when the same requestUuid is submitted again */}
-        {status === 'replay' && (
-          <div className="replay-message">
-            This sheet was already generated in your last attempt. Nothing new was printed  -  use the copy you already have.
-          </div>
-        )}
+          {/* Replay message  -  shown when the same requestUuid is submitted again */}
+          {status === 'replay' && (
+            <div className="mb-6 rounded-md border-l-4 border-[var(--money-held)] bg-[rgba(91,75,138,0.1)] p-4 leading-relaxed text-[var(--ink)]">
+              This sheet was already generated in your last attempt. Nothing new was printed  -  use the copy you already have.
+            </div>
+          )}
 
-        {/* Error message  -  shown inline on validation or server errors */}
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
+          {/* Error message  -  shown inline on validation or server errors */}
+          {error && (
+            <div className="mb-6 rounded-md border-l-4 border-[var(--danger)] bg-[rgba(179,38,30,0.1)] p-4 text-sm leading-relaxed text-[var(--danger)]">
+              {error}
+            </div>
+          )}
 
-        {/* Form  -  always visible and interactive, even during waking state */}
-        {status !== 'success' && status !== 'replay' ? (
-          <form onSubmit={handleSubmit} className="barcode-print-form">
-            <div className="form-group">
-              <label htmlFor="pages" className="typography-label">
-                Number of pages
-              </label>
-              <input
+          {/* Form  -  always visible and interactive, even during waking state */}
+          {status !== 'success' && status !== 'replay' ? (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <Input
+                label="Number of pages"
                 id="pages"
                 type="number"
                 min="1"
@@ -172,33 +170,32 @@ export function BarcodePrintScreen() {
                 value={pages}
                 onChange={(e) => setPages(e.target.value)}
                 disabled={isLoading}
-                className="barcode-input"
                 required
               />
-            </div>
 
-            {/* Submit button  -  disabled during initial loading, always present */}
-            <button
-              type="submit"
-              disabled={isLoading || !pages || parseInt(pages, 10) < 1}
-              className="barcode-button"
+              {/* Submit button  -  disabled during initial loading, always present */}
+              <Button
+                type="submit"
+                disabled={isLoading || !pages || parseInt(pages, 10) < 1}
+                className="mt-1"
+              >
+                {isLoading ? 'Requesting...' : 'Request Sheet'}
+              </Button>
+            </form>
+          ) : null}
+
+          {/* Retry button  -  shown when request times out at 90s */}
+          {status === 'failed' && (
+            <Button
+              onClick={handleRetry}
+              disabled={isLoading}
+              className="mt-6 w-full"
             >
-              {isLoading ? 'Requesting...' : 'Request Sheet'}
-            </button>
-          </form>
-        ) : null}
-
-        {/* Retry button  -  shown when request times out at 90s */}
-        {status === 'failed' && (
-          <button
-            onClick={handleRetry}
-            className="barcode-button retry-button"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Retrying...' : 'Try again'}
-          </button>
-        )}
-      </div>
+              {isLoading ? 'Retrying...' : 'Try again'}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

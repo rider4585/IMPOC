@@ -107,7 +107,7 @@ export function CreateLotDialog({ open, onClose, onSave, saving, productTypes, p
     >
       <Card>
         <CardContent>
-          <form id="lot-form" onSubmit={handleSubmit} className="admin-form">
+          <form id="lot-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Select label="Product type" value={form.productTypeUuid} onChange={set('productTypeUuid')} required>
               <option value="">Select a product type…</option>
               {productTypes.map((t) => (
@@ -180,7 +180,7 @@ export function CreateLotDialog({ open, onClose, onSave, saving, productTypes, p
             )}
 
             {error && (
-              <div className="admin-error" role="alert">{error}</div>
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

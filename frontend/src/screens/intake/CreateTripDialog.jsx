@@ -61,7 +61,7 @@ export function CreateTripDialog({ open, onClose, onSave, saving, vendors }) {
     >
       <Card>
         <CardContent>
-          <form id="trip-form" onSubmit={handleSubmit} className="admin-form">
+          <form id="trip-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Select label="Vendor" value={form.vendorUuid} onChange={set('vendorUuid')} required>
               <option value="">Select a vendor…</option>
               {vendors.map((v) => (
@@ -93,7 +93,7 @@ export function CreateTripDialog({ open, onClose, onSave, saving, vendors }) {
               hint="Enter in rupees; stored as whole paise."
             />
             {error && (
-              <div className="admin-error" role="alert">{error}</div>
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>
