@@ -107,7 +107,6 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
       open={open}
       onClose={handleClose}
       title="New rental agreement"
-      className="rentals-create-dialog"
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={saving}>
@@ -120,8 +119,8 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
       }
     >
       <Card>
-        <CardContent>
-          <form id="rental-form" onSubmit={handleSubmit} className="admin-form">
+        <CardContent className="p-4">
+          <form id="rental-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
               label="Customer name"
               value={form.customerName}
@@ -129,7 +128,7 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
               placeholder="Optional"
               maxLength={255}
             />
-            <div className="rentals-add-item">
+            <div className="flex flex-wrap items-end gap-2">
               <Input
                 label="Scan or enter barcode"
                 value={barcode}
@@ -142,21 +141,25 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
                 }}
                 placeholder="RENTAL unit barcode"
                 maxLength={12}
+                className="min-w-[200px] flex-1"
               />
               <Button variant="outline" onClick={handleAddByBarcode}>
                 Add
               </Button>
             </div>
             {lookupError && (
-              <div className="admin-error" role="alert">{lookupError}</div>
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{lookupError}</div>
             )}
 
             {items.length > 0 && (
-              <ul className="rentals-cart">
+              <ul className="mt-3 flex flex-col gap-2">
                 {items.map((i) => (
-                  <li key={i.uuid} className="rentals-cart-item">
-                    <span className="intake-unit-barcode">{i.barcode}</span>
-                    <span className="rentals-cart-price">
+                  <li
+                    key={i.uuid}
+                    className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                  >
+                    <span className="font-semibold">{i.barcode}</span>
+                    <span className="ml-auto text-[var(--ink-muted)]">
                       {formatPaise(i.rentPerDayPaise)}/day · deposit {formatPaise(i.depositPaise)}
                     </span>
                     <Button variant="ghost" size="sm" onClick={() => removeItem(i.uuid)} aria-label={`Remove ${i.barcode}`}>
@@ -167,7 +170,7 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
               </ul>
             )}
 
-            <div className="intake-inline-form">
+            <div className="flex flex-wrap gap-4">
               <Input
                 label="Start date"
                 type="date"
@@ -192,7 +195,7 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
               maxLength={2000}
             />
             {error && (
-              <div className="admin-error" role="alert">{error}</div>
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

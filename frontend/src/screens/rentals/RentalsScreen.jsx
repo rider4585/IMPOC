@@ -18,8 +18,6 @@ import { getDamageGrades } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { RentalCreateDialog } from './RentalCreateDialog.jsx';
 import { ReturnUnitsDialog } from './ReturnUnitsDialog.jsx';
-import '../admin/admin.css';
-import './rentals.css';
 
 function statusBadgeVariant(status) {
   switch (status) {
@@ -60,7 +58,6 @@ export function RentalsScreen() {
 
   const [damageGrades, setDamageGrades] = useState([]);
 
-  // Dialogs
   const [createOpen, setCreateOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -164,20 +161,20 @@ export function RentalsScreen() {
 
   if (!canView) {
     return (
-      <div className="admin-page">
-        <p className="admin-muted">You do not have permission to view rentals.</p>
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+        <p className="text-sm text-[var(--ink-muted)]">You do not have permission to view rentals.</p>
       </div>
     );
   }
 
   return (
-    <div className="rentals-page">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
       {!activeRental ? (
         <>
-          <div className="rentals-page__header">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="typography-heading">Rentals</h1>
-              <p className="typography-body-sm rentals-page__subtitle">
+              <h1 className="typography-heading mb-1">Rentals</h1>
+              <p className="typography-body-sm text-[var(--ink-muted)]">
                 Rent out units, track active agreements, and process returns.
               </p>
             </div>
@@ -188,14 +185,16 @@ export function RentalsScreen() {
             )}
           </div>
 
-          {error && <div className="admin-error" role="alert">{error}</div>}
+          {error && (
+            <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+          )}
 
           <Card>
             <CardHeader>
               <CardTitle>Agreements</CardTitle>
             </CardHeader>
-            <CardContent className="rentals-card__content">
-              <div className="rentals-filter">
+            <CardContent className="p-4">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
                 <Select label="Filter" value={filter} onChange={(e) => setFilter(e.target.value)}>
                   <option value="all">All statuses</option>
                   <option value="active">Active</option>
@@ -205,33 +204,40 @@ export function RentalsScreen() {
               </div>
 
               {loading ? (
-                <p className="admin-muted">Loading rentals…</p>
+                <div className="flex flex-col gap-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="h-16 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
+                  ))}
+                </div>
               ) : filtered.length === 0 ? (
-                <p className="admin-muted">No rental agreements in this view.</p>
+                <p className="text-sm text-[var(--ink-muted)]">No rental agreements in this view.</p>
               ) : (
-                <ul className="rentals-list">
+                <ul className="flex flex-col gap-2">
                   {filtered.map((r) => {
                     const late = isLate(r);
                     const returnedCount = r.lines.filter((l) => l.returns && l.returns.length > 0).length;
                     return (
-                      <li key={r.uuid} className="rentals-item">
+                      <li
+                        key={r.uuid}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                      >
                         <div>
-                          <div className="rentals-item__title">
+                          <div className="font-semibold">
                             <button
                               type="button"
-                              className="rentals-item__link"
+                              className="border-none bg-transparent p-0 font-semibold text-primary hover:underline"
                               onClick={() => openDetail(r)}
                             >
                               {r.agreementNumber}
-                            </button>{' '}
-                            · {r.customerName || 'Walk-in'}
+                            </button>
+                            {' · '}{r.customerName || 'Walk-in'}
                           </div>
-                          <div className="rentals-item__meta">
+                          <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
                             {r.lines.length} unit(s) · {returnedCount} returned · due{' '}
                             {new Date(`${r.dueDate}T00:00:00`).toLocaleDateString()}
                           </div>
                         </div>
-                        <div className="rentals-item__right">
+                        <div className="flex items-center gap-3">
                           {late && <Badge variant="danger">Late</Badge>}
                           <Badge variant={statusBadgeVariant(r.status)}>{r.status}</Badge>
                           <strong>{formatPaise(Number(r.depositRefundablePaise))}</strong>
@@ -249,18 +255,18 @@ export function RentalsScreen() {
         </>
       ) : (
         <>
-          <div className="rentals-page__header">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <Button variant="ghost" size="sm" onClick={goBack}>&larr; All rentals</Button>
-              <h1 className="typography-heading">
+              <h1 className="typography-heading mb-1">
                 {activeRental.agreementNumber} · {activeRental.customerName || 'Walk-in'}
               </h1>
-              <p className="typography-body-sm rentals-page__subtitle">
+              <p className="typography-body-sm text-[var(--ink-muted)]">
                 {activeRental.startDate} → due {activeRental.dueDate}
               </p>
             </div>
             {activeRental.status === 'active' && (
-              <div className="rentals-header-actions">
+              <div className="flex flex-wrap gap-2">
                 {canReturn && (
                   <Button onClick={() => setReturnOpen(true)}>Process return</Button>
                 )}
@@ -271,8 +277,14 @@ export function RentalsScreen() {
             )}
           </div>
 
-          {detailLoading && <p className="admin-muted">Loading…</p>}
-          {error && <div className="admin-error" role="alert">{error}</div>}
+          {detailLoading && (
+            <div className="flex flex-col gap-2">
+              <div className="h-20 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
+            </div>
+          )}
+          {error && (
+            <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+          )}
 
           <Card>
             <CardHeader>
@@ -280,10 +292,10 @@ export function RentalsScreen() {
                 Status <Badge variant={statusBadgeVariant(activeRental.status)}>{activeRental.status}</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="rentals-card__content">
-              {activeRental.notes && <p className="admin-muted">{activeRental.notes}</p>}
-              <div className="rentals-summary">
-                <div className="rentals-money-row">
+            <CardContent className="p-4">
+              {activeRental.notes && <p className="mb-2 text-sm text-[var(--ink-muted)]">{activeRental.notes}</p>}
+              <div className="mt-2 flex flex-col gap-1">
+                <div className="flex items-center justify-between border-b border-[var(--border)] py-2 text-sm last:border-b-0">
                   <span>Total deposit collected</span>
                   <strong>{formatPaise(Number(activeRental.depositRefundablePaise))}</strong>
                 </div>
@@ -295,15 +307,18 @@ export function RentalsScreen() {
             <CardHeader>
               <CardTitle>Units</CardTitle>
             </CardHeader>
-            <CardContent className="rentals-card__content">
-              <ul className="rentals-lines-list">
+            <CardContent className="p-4">
+              <ul className="flex flex-col gap-2">
                 {activeRental.lines.map((line) => (
-                  <li key={line.uuid} className="rentals-line-item">
+                  <li
+                    key={line.uuid}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                  >
                     <div>
-                      <div className="rentals-line-title">
+                      <div className="font-semibold">
                         {line.barcode} · {formatPaise(Number(line.rentPerDayPaise))}/day
                       </div>
-                      <div className="rentals-line-meta">
+                      <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
                         Deposit {formatPaise(Number(line.depositPaise))} · overdue{' '}
                         {formatPaise(Number(line.overduePerDayPaise))}/day · status:{' '}
                         <Badge variant="neutral">{line.unitStatus}</Badge>
@@ -320,23 +335,24 @@ export function RentalsScreen() {
               <CardHeader>
                 <CardTitle>Returns</CardTitle>
               </CardHeader>
-              <CardContent className="rentals-card__content">
-                <ul className="rentals-lines-list">
+              <CardContent className="p-4">
+                <ul className="flex flex-col gap-2">
                   {activeRental.returns.map((ret) => (
-                    <li key={ret.uuid} className="rentals-line-item">
-                      <div>
-                        <div className="rentals-line-title">
-                          Unit · returned{' '}
-                          {new Date(`${ret.actualReturnDate}T00:00:00`).toLocaleDateString()}
-                        </div>
-                        <div className="rentals-line-meta">
-                          {ret.damageGradeName ? `Grade: ${ret.damageGradeName}` : 'No damage grade'}
-                          {ret.damageGradeOutcome ? ` · ${ret.damageGradeOutcome}` : ''}
-                          {' · '}late {ret.lateDays} day(s)
-                          {' · '}overdue {formatPaise(Number(ret.overdueChargePaise))}
-                          {' · '}damage {formatPaise(Number(ret.damageChargePaise))}
-                          {' · '}refunded {formatPaise(Number(ret.depositRefundedPaise))}
-                        </div>
+                    <li
+                      key={ret.uuid}
+                      className="rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                    >
+                      <div className="font-semibold">
+                        Unit · returned{' '}
+                        {new Date(`${ret.actualReturnDate}T00:00:00`).toLocaleDateString()}
+                      </div>
+                      <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
+                        {ret.damageGradeName ? `Grade: ${ret.damageGradeName}` : 'No damage grade'}
+                        {ret.damageGradeOutcome ? ` · ${ret.damageGradeOutcome}` : ''}
+                        {' · '}late {ret.lateDays} day(s)
+                        {' · '}overdue {formatPaise(Number(ret.overdueChargePaise))}
+                        {' · '}damage {formatPaise(Number(ret.damageChargePaise))}
+                        {' · '}refunded {formatPaise(Number(ret.depositRefundedPaise))}
                       </div>
                     </li>
                   ))}
@@ -350,12 +366,15 @@ export function RentalsScreen() {
               <CardHeader>
                 <CardTitle>Reversals</CardTitle>
               </CardHeader>
-              <CardContent className="rentals-card__content">
-                <ul className="rentals-lines-list">
+              <CardContent className="p-4">
+                <ul className="flex flex-col gap-2">
                   {activeRental.reversals.map((rev) => (
-                    <li key={rev.uuid} className="rentals-line-item">
-                      <div className="rentals-line-title">{rev.reversalType}</div>
-                      <div className="rentals-line-meta">
+                    <li
+                      key={rev.uuid}
+                      className="rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                    >
+                      <div className="font-semibold">{rev.reversalType}</div>
+                      <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
                         {formatPaise(Number(rev.amountPaise))}
                         {rev.reason ? ` · ${rev.reason}` : ''}
                       </div>
@@ -404,10 +423,10 @@ export function RentalsScreen() {
             </>
           }
         >
-          <p className="admin-muted">
+          <p className="mb-4 text-sm text-[var(--ink-muted)]">
             Cancelling returns any still-rented units to stock and records a reversal. This cannot be undone.
           </p>
-          <div className="admin-form">
+          <form className="flex flex-col gap-4">
             <Input
               label="Reason"
               value={cancelReason}
@@ -415,7 +434,7 @@ export function RentalsScreen() {
               placeholder="Optional"
               maxLength={2000}
             />
-          </div>
+          </form>
         </Dialog>
       )}
     </div>

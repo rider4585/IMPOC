@@ -80,7 +80,6 @@ export function ReturnUnitsDialog({ open, onClose, onSave, saving, agreement, da
       open={open}
       onClose={handleClose}
       title="Process returns"
-      className="rentals-return-dialog"
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={saving}>
@@ -93,8 +92,8 @@ export function ReturnUnitsDialog({ open, onClose, onSave, saving, agreement, da
       }
     >
       <Card>
-        <CardContent>
-          <form id="return-form" onSubmit={handleSubmit} className="admin-form">
+        <CardContent className="p-4">
+          <form id="return-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
               label="Actual return date"
               type="date"
@@ -104,30 +103,32 @@ export function ReturnUnitsDialog({ open, onClose, onSave, saving, agreement, da
             />
 
             {rentableBackLines.length === 0 ? (
-              <p className="admin-muted">All units in this agreement have already been returned.</p>
+              <p className="text-sm text-[var(--ink-muted)]">All units in this agreement have already been returned.</p>
             ) : (
-              <ul className="rentals-return-list">
+              <ul className="flex flex-col gap-3">
                 {rentableBackLines.map((line) => {
                   const selected = Boolean(selections[line.uuid]);
                   return (
-                    <li key={line.uuid} className="rentals-return-item">
-                      <div className="rentals-return-item__header">
-                        <label className="rentals-line-title">
+                    <li
+                      key={line.uuid}
+                      className="rounded-md border border-[var(--border)] bg-white p-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label className="flex items-center gap-2 font-semibold text-sm">
                           <input
                             type="checkbox"
                             checked={selected}
                             onChange={() => toggle(line)}
-                            style={{ marginRight: '8px' }}
                           />
                           {line.barcode}
                         </label>
-                        <span className="rentals-line-meta">
+                        <span className="text-xs text-[var(--ink-muted)]">
                           {formatPaise(Number(line.rentPerDayPaise))}/day · deposit{' '}
                           {formatPaise(Number(line.depositPaise))}
                         </span>
                       </div>
                       {selected && (
-                        <div className="rentals-return-item__body">
+                        <div className="mt-3 flex flex-col gap-2">
                           <Select
                             label="Damage grade (optional)"
                             value={selections[line.uuid]?.gradeUuid || ''}
@@ -163,7 +164,7 @@ export function ReturnUnitsDialog({ open, onClose, onSave, saving, agreement, da
             )}
 
             {error && (
-              <div className="admin-error" role="alert">{error}</div>
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>
