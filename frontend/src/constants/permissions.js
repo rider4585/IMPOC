@@ -32,6 +32,13 @@ export const PERMISSIONS = Object.freeze({
     REFUND: 'sales.refund',
   },
 
+  RENTALS: {
+    VIEW: 'rentals.view',
+    CREATE: 'rentals.create',
+    RETURN: 'rentals.return',
+    CANCEL: 'rentals.cancel',
+  },
+
   EXPENSES: {
     VIEW: 'expenses.view',
     CREATE: 'expenses.create',

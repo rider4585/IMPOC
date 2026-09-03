@@ -1,0 +1,234 @@
+/* Rental screens styling (T-11) */
+
+.rentals-page {
+  padding: var(--spacing-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-5);
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.rentals-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+}
+
+.rentals-page__header h1 {
+  margin: var(--spacing-2) 0 var(--spacing-1);
+}
+
+.rentals-page__subtitle {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.rentals-card__content {
+  padding: var(--spacing-4);
+}
+
+.rentals-toolbar {
+  display: flex;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-4);
+}
+
+.rentals-filter {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.rentals-filter .ui-field {
+  min-width: 160px;
+}
+
+.rentals-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.rentals-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-md);
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.rentals-item__title {
+  font-weight: 600;
+}
+
+.rentals-item__link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rentals-item__link:hover {
+  text-decoration: underline;
+}
+
+.rentals-item__meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.rentals-item__right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.rentals-lines-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.rentals-line-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-md);
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.rentals-line-title {
+  font-weight: 600;
+}
+
+.rentals-line-meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.rentals-return-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.rentals-return-item {
+  padding: var(--spacing-3);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-md);
+  background-color: var(--surface-sunken);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.rentals-return-item__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.rentals-return-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.rentals-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-5);
+}
+
+.rentals-money-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.rentals-money-row:last-child {
+  border-bottom: none;
+}
+
+.rentals-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  margin-top: var(--spacing-2);
+}
+
+.rentals-header-actions {
+  display: flex;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.rentals-add-item {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.rentals-add-item .ui-field {
+  flex: 1;
+  min-width: 200px;
+}
+
+.rentals-cart {
+  list-style: none;
+  margin: var(--spacing-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.rentals-cart-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-md);
+  font-size: 14px;
+}
+
+.rentals-cart-price {
+  margin-left: auto;
+  color: var(--ink-muted);
+}

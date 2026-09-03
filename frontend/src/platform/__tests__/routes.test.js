@@ -4,6 +4,8 @@ import {
   STOCK_INTAKE_ROUTES,
   STOCK_INTAKE_LINE_ROUTES,
   SALES_ROUTES,
+  RENTAL_ROUTES,
+  EXPENSE_ROUTES,
   UNIT_ROUTES,
 } from '../routes.js';
 
@@ -104,5 +106,35 @@ describe('UNIT_ROUTES', () => {
   it('builds the get path for a unit uuid', () => {
     const uuid = '550e8400-e29b-41d4-a716-446655440000';
     expect(UNIT_ROUTES.GET(uuid)).toBe(`/units/${uuid}`);
+  });
+});
+
+describe('RENTAL_ROUTES', () => {
+  it('list/create are constants', () => {
+    expect(RENTAL_ROUTES.LIST).toBe('/rentals');
+    expect(RENTAL_ROUTES.CREATE).toBe('/rentals');
+  });
+
+  it('builds GET/RETURN/CANCEL paths for an agreement uuid', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(RENTAL_ROUTES.GET(uuid)).toBe(`/rentals/${uuid}`);
+    expect(RENTAL_ROUTES.RETURN(uuid)).toBe(`/rentals/${uuid}/return`);
+    expect(RENTAL_ROUTES.CANCEL(uuid)).toBe(`/rentals/${uuid}/cancel`);
+    expect(RENTAL_ROUTES.CANCEL(uuid)).not.toContain('/api/');
+  });
+});
+
+describe('EXPENSE_ROUTES', () => {
+  it('list/create are constants', () => {
+    expect(EXPENSE_ROUTES.LIST).toBe('/expenses');
+    expect(EXPENSE_ROUTES.CREATE).toBe('/expenses');
+  });
+
+  it('builds GET/UPDATE/CANCEL paths for an expense uuid', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(EXPENSE_ROUTES.GET(uuid)).toBe(`/expenses/${uuid}`);
+    expect(EXPENSE_ROUTES.UPDATE(uuid)).toBe(`/expenses/${uuid}`);
+    expect(EXPENSE_ROUTES.CANCEL(uuid)).toBe(`/expenses/${uuid}/cancel`);
+    expect(EXPENSE_ROUTES.CANCEL(uuid)).not.toContain('/api/');
   });
 });

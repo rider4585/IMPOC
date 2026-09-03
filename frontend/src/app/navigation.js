@@ -8,6 +8,8 @@ import VendorsScreen from '../screens/admin/VendorsScreen';
 import IntakeScreen from '../screens/intake/IntakeScreen';
 import POSScreen from '../screens/pos/POSScreen';
 import SalesListScreen from '../screens/pos/SalesListScreen';
+import RentalsScreen from '../screens/rentals/RentalsScreen';
+import ExpensesScreen from '../screens/expenses/ExpensesScreen';
 
 /**
  * Navigation registry — one entry per accessible screen.
@@ -72,6 +74,18 @@ export const navigationRegistry = [
     label: 'Sales',
     path: '/sales',
     element: SalesListScreen,
+  },
+  {
+    permission: PERMISSIONS.RENTALS.VIEW,
+    label: 'Rentals',
+    path: '/rentals',
+    element: RentalsScreen,
+  },
+  {
+    permission: PERMISSIONS.EXPENSES.VIEW,
+    label: 'Expenses',
+    path: '/expenses',
+    element: ExpensesScreen,
   },
   // Future epics add entries here
 ];

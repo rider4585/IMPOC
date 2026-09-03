@@ -59,6 +59,34 @@ export const SALES_ROUTES = {
   REFUND: (uuid) => `/sales/${encodeURIComponent(uuid)}/refund`,
 };
 
+// Rental agreement endpoints
+export const RENTAL_ROUTES = {
+  /** GET /rentals - List rental agreements */
+  LIST: '/rentals',
+  /** POST /rentals - Create (checkout / hand-out) a rental */
+  CREATE: '/rentals',
+  /** GET /rentals/{uuid} - Get a single agreement */
+  GET: (uuid) => `/rentals/${encodeURIComponent(uuid)}`,
+  /** POST /rentals/{uuid}/return - Process a return */
+  RETURN: (uuid) => `/rentals/${encodeURIComponent(uuid)}/return`,
+  /** POST /rentals/{uuid}/cancel - Cancel an active agreement */
+  CANCEL: (uuid) => `/rentals/${encodeURIComponent(uuid)}/cancel`,
+};
+
+// Expense endpoints
+export const EXPENSE_ROUTES = {
+  /** GET /expenses - List expenses */
+  LIST: '/expenses',
+  /** POST /expenses - Create an expense */
+  CREATE: '/expenses',
+  /** GET /expenses/{uuid} - Get a single expense */
+  GET: (uuid) => `/expenses/${encodeURIComponent(uuid)}`,
+  /** PATCH /expenses/{uuid} - Update pre-completion */
+  UPDATE: (uuid) => `/expenses/${encodeURIComponent(uuid)}`,
+  /** POST /expenses/{uuid}/cancel - Cancel a completed expense (reversal) */
+  CANCEL: (uuid) => `/expenses/${encodeURIComponent(uuid)}/cancel`,
+};
+
 // Unit endpoints
 export const UNIT_ROUTES = {
   /** GET /units/by-barcode/{barcode} - Get a unit by its barcode */
