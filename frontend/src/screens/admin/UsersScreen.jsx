@@ -31,7 +31,6 @@ import {
 } from '../../services/usersApi.js';
 import { getRoles } from '../../services/rolesApi.js';
 import { UserFormDialog } from './UserFormDialog.jsx';
-import './admin.css';
 
 const USER_STATUS_BADGE = {
   active: 'success',
@@ -192,11 +191,11 @@ export function UsersScreen() {
   );
 
   return (
-    <div className="admin-page">
-      <div className="admin-page__header">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="typography-heading">Users</h1>
-          <p className="typography-body-sm admin-page__subtitle">
+          <h1 className="typography-heading mb-1">Users</h1>
+          <p className="typography-body-sm text-[var(--ink-muted)]">
             Manage user accounts, status, and role assignments.
           </p>
         </div>
@@ -207,15 +206,15 @@ export function UsersScreen() {
         )}
       </div>
 
-      {error && <div className="admin-error" role="alert">{error}</div>}
+      {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.USERS.VIEW) && (
         <Card>
           <CardHeader>
             <CardTitle>All users</CardTitle>
           </CardHeader>
-          <CardContent className="admin-card__content">
-            <div className="admin-toolbar">
+          <CardContent className="p-4">
+            <div className="mb-4 max-w-[360px]">
               <Input
                 type="search"
                 placeholder="Search by name, username, email…"
@@ -226,7 +225,7 @@ export function UsersScreen() {
             </div>
 
             {loading ? (
-              <p className="admin-muted">Loading users…</p>
+              <p className="text-sm text-[var(--ink-muted)]">Loading users…</p>
             ) : (
               <Table>
                 <TableHead>
@@ -260,7 +259,7 @@ export function UsersScreen() {
                           : 'Never'}
                       </TableCell>
                       <TableCell>
-                        <div className="admin-actions">
+                        <div className="flex flex-wrap gap-2">
                           {canUpdate && (
                             <Button variant="outline" size="sm" onClick={() => openEdit(user)}>
                               Edit
@@ -291,7 +290,7 @@ export function UsersScreen() {
                   ))}
                   {filteredUsers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="admin-muted">
+                      <TableCell colSpan={7} className="text-sm text-[var(--ink-muted)]">
                         No users found.
                       </TableCell>
                     </TableRow>
@@ -329,15 +328,18 @@ export function UsersScreen() {
             <CardContent>
               <h3 className="typography-label">Assigned roles</h3>
               {assignedRoles.length === 0 ? (
-                <p className="admin-muted">No roles assigned.</p>
+                <p className="text-sm text-[var(--ink-muted)]">No roles assigned.</p>
               ) : (
-                <ul className="admin-chip-list">
+                <ul className="mt-2 flex flex-wrap gap-2">
                   {assignedRoles.map((role) => (
-                    <li key={role.uuid} className="admin-chip">
+                    <li
+                      key={role.uuid}
+                      className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-sunken)] px-2 py-0.5 text-[13px] text-[var(--ink)]"
+                    >
                       <span>{role.name}</span>
                       <button
                         type="button"
-                        className="admin-chip__remove"
+                        className="cursor-pointer border-none bg-transparent text-[16px] leading-none text-[var(--ink-muted)] hover:text-[var(--danger)]"
                         aria-label={`Remove role ${role.name}`}
                         onClick={() => handleRemoveRole(role)}
                       >
@@ -349,24 +351,26 @@ export function UsersScreen() {
               )}
 
               {canUpdate && availableRoles.length > 0 && (
-                <form onSubmit={handleAssignRole} className="admin-inline-form">
-                  <Select name="role" label="Add role" defaultValue="">
-                    <option value="" disabled>
-                      Select a role…
-                    </option>
-                    {availableRoles.map((role) => (
-                      <option key={role.uuid} value={role.uuid}>
-                        {role.name}
+                <form onSubmit={handleAssignRole} className="mt-4 flex flex-wrap items-end gap-3">
+                  <div className="flex-1">
+                    <Select name="role" label="Add role" defaultValue="">
+                      <option value="" disabled>
+                        Select a role…
                       </option>
-                    ))}
-                  </Select>
+                      {availableRoles.map((role) => (
+                        <option key={role.uuid} value={role.uuid}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
                   <Button type="submit" size="sm" loading={roleSaveLoading}>
                     Assign
                   </Button>
                 </form>
               )}
               {canUpdate && availableRoles.length === 0 && (
-                <p className="admin-muted">All roles are already assigned.</p>
+                <p className="text-sm text-[var(--ink-muted)]">All roles are already assigned.</p>
               )}
             </CardContent>
           </Card>

@@ -84,7 +84,7 @@ export function UserFormDialog({ open, onClose, onSave, saving, user, roles }) {
     >
       <Card>
         <CardContent>
-          <form id="user-form" onSubmit={handleSubmit} className="admin-form">
+          <form id="user-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input label="Username" value={form.username} onChange={set('username')} required />
             <Input label="First name" value={form.firstName} onChange={set('firstName')} required />
             <Input label="Last name" value={form.lastName} onChange={set('lastName')} />
@@ -123,7 +123,7 @@ export function UserFormDialog({ open, onClose, onSave, saving, user, roles }) {
             )}
 
             {error && (
-              <div className="admin-error" role="alert">
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">
                 {error}
               </div>
             )}

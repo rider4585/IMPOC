@@ -7,7 +7,6 @@ import {
 } from './FlatPicklistManager.jsx';
 import { getColours, getSizes, getDamageGrades } from '../../services/picklistsApi.js';
 import { DAMAGE_GRADE_OUTCOMES } from '../../constants/damageGrades.js';
-import './admin.css';
 
 const TABS = [
   { key: 'product-types', label: 'Product types' },
@@ -51,30 +50,34 @@ export function PicklistManagementScreen() {
 
   if (!canView) {
     return (
-      <div className="admin-page">
-        <p className="admin-muted">You do not have permission to view picklists.</p>
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+        <p className="text-sm text-[var(--ink-muted)]">You do not have permission to view picklists.</p>
       </div>
     );
   }
 
   return (
-    <div className="admin-page">
-      <div className="admin-page__header">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="typography-heading">Picklists</h1>
-          <p className="typography-body-sm admin-page__subtitle">
+          <h1 className="typography-heading mb-1">Picklists</h1>
+          <p className="typography-body-sm text-[var(--ink-muted)]">
             Manage product types, colours, sizes, and damage grades.
           </p>
         </div>
       </div>
 
-      <div className="admin-tabbar" role="tablist">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-2" role="tablist">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             role="tab"
             aria-selected={active === tab.key}
-            className={`admin-tab${active === tab.key ? ' admin-tab--active' : ''}`}
+            className={`rounded-[var(--rounded-md)] border px-4 py-2 text-[14px] font-semibold text-[var(--ink-muted)] cursor-pointer ${
+              active === tab.key
+                ? 'border-[var(--border)] bg-[var(--surface-raised)] text-[var(--primary)]'
+                : 'border-transparent bg-transparent hover:bg-[var(--surface-sunken)]'
+            }`}
             onClick={() => setActive(tab.key)}
           >
             {tab.label}

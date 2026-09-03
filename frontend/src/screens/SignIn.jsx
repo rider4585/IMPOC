@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../auth/useAuth.js';
-import './SignIn.css';
+import { Card, CardContent, Input, Button } from '../components/ui';
 
-/**
- * SignIn.jsx — Username/password login form
- *
- * Styled on .surface-flat per DESIGN.md (unnamed-default rule).
- * Submits username/password via useAuth().signIn() and displays server error inline.
- * On successful login, AuthContext transitions to signed-in state.
- */
 export function SignIn() {
   const { signIn, status } = useAuth();
   const [username, setUsername] = useState('');
@@ -23,9 +16,7 @@ export function SignIn() {
 
     try {
       await signIn(username, password);
-      // On success, AuthContext transitions to signed-in and component unmounts via RouteGuard
     } catch (err) {
-      // Display server's error message inline on the form
       setError(err.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -33,62 +24,59 @@ export function SignIn() {
   };
 
   return (
-    <div className="sign-in-container">
-      <div className="sign-in-card surface-flat">
-        <h1 className="typography-heading">Sign In</h1>
+    <div className="flex min-h-screen items-center justify-center bg-[var(--surface-base)] p-4">
+      <Card className="w-full max-w-sm">
+        <CardContent className="p-8">
+          <h1 className="typography-heading mb-6 text-center">Sign In</h1>
 
-        <form onSubmit={handleSubmit} className="sign-in-form">
-          <div className="form-group">
-            <label htmlFor="username" className="typography-label">
-              Username
-            </label>
-            <input
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <Input
               id="username"
+              label="Username"
               type="text"
               placeholder="Enter your username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
               autoComplete="username"
-              className="sign-in-input"
               required
             />
-          </div>
 
-          <div className="form-group">
-            <label htmlFor="password" className="typography-label">
-              Password
-            </label>
-            <input
+            <Input
               id="password"
+              label="Password"
               type="password"
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
               autoComplete="current-password"
-              className="sign-in-input"
               required
             />
-          </div>
 
-          {error && <div className="sign-in-error">{error}</div>}
+            {error && (
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">
+                {error}
+              </div>
+            )}
 
-          <button
-            type="submit"
-            disabled={isLoading || !username || !password}
-            className="sign-in-button"
-          >
-            {isLoading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+            <Button
+              type="submit"
+              disabled={isLoading || !username || !password}
+              loading={isLoading}
+              className="mt-2"
+            >
+              {isLoading ? 'Signing in...' : 'Sign In'}
+            </Button>
+          </form>
 
-        {status === 'restoring' && (
-          <div className="sign-in-loading">
-            Restoring your session...
-          </div>
-        )}
-      </div>
+          {status === 'restoring' && (
+            <p className="mt-4 text-center text-sm text-[var(--ink-muted)]">
+              Restoring your session...
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

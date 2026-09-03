@@ -20,7 +20,6 @@ import {
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { createPicklistItem, updatePicklistItem } from '../../services/picklistsApi.js';
-import './admin.css';
 
 /**
  * Generic manager for the flat picklists (colours, sizes, damage-grades).
@@ -31,7 +30,6 @@ import './admin.css';
  * @param {Array<{list}>} props.source - load function returning the list
  * @param {Array<{key, label, type?, options?, required?}>} props.columns - table display columns
  * @param {Array<{key, label, type?, options?, required?, min?}>} props.fields - create/edit form fields
- * @param {(row)=>string} props.formatRow - optional row label for confirm dialogs
  */
 export function FlatPicklistManager({
   resource,
@@ -106,9 +104,9 @@ export function FlatPicklistManager({
       <CardHeader>
         <CardTitle>{singular}s</CardTitle>
       </CardHeader>
-      <CardContent className="admin-card__content">
-        <div className="admin-page__header" style={{ marginBottom: 'var(--spacing-4)' }}>
-          <p className="typography-body-sm admin-page__subtitle">
+      <CardContent className="p-4">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+          <p className="typography-body-sm text-[var(--ink-muted)]">
             Manage {singular.toLowerCase()} picklist values.
           </p>
           {can(PERMISSIONS.PICKLISTS.CREATE) && (
@@ -118,10 +116,10 @@ export function FlatPicklistManager({
           )}
         </div>
 
-        {error && <div className="admin-error" role="alert">{error}</div>}
+        {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
         {loading ? (
-          <p className="admin-muted">Loading {singular.toLowerCase()}s…</p>
+          <p className="text-sm text-[var(--ink-muted)]">Loading {singular.toLowerCase()}s…</p>
         ) : (
           <Table>
             <TableHead>
@@ -145,7 +143,7 @@ export function FlatPicklistManager({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="admin-actions">
+                    <div className="flex flex-wrap gap-2">
                       {canUpdate && (
                         <Button variant="outline" size="sm" onClick={() => { setEditing(item); setFormOpen(true); }}>
                           Edit
@@ -162,7 +160,7 @@ export function FlatPicklistManager({
               ))}
               {items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={columns.length + 2} className="admin-muted">
+                  <TableCell colSpan={columns.length + 2} className="text-sm text-[var(--ink-muted)]">
                     No {singular.toLowerCase()}s found.
                   </TableCell>
                 </TableRow>
@@ -286,10 +284,10 @@ function FlatPicklistFormDialog({ open, onClose, onSave, saving, item, singular,
     >
       <Card>
         <CardContent>
-          <form id={`flat-form-${resourceName(singular)}`} onSubmit={handleSubmit} className="admin-form">
+          <form id={`flat-form-${resourceName(singular)}`} onSubmit={handleSubmit} className="flex flex-col gap-4">
             {fields.map(renderControl)}
             {error && (
-              <div className="admin-error" role="alert">{error}</div>
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

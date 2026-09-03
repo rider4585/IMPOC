@@ -26,7 +26,6 @@ import {
 } from '../../services/vendorsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { VendorFormDialog } from './VendorFormDialog.jsx';
-import './admin.css';
 
 export function VendorsScreen() {
   const { permissions } = useAuth();
@@ -134,11 +133,11 @@ export function VendorsScreen() {
   };
 
   return (
-    <div className="admin-page">
-      <div className="admin-page__header">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="typography-heading">Vendors</h1>
-          <p className="typography-body-sm admin-page__subtitle">
+          <h1 className="typography-heading mb-1">Vendors</h1>
+          <p className="typography-body-sm text-[var(--ink-muted)]">
             Manage suppliers and view their purchase history.
           </p>
         </div>
@@ -149,15 +148,15 @@ export function VendorsScreen() {
         )}
       </div>
 
-      {error && <div className="admin-error" role="alert">{error}</div>}
+      {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.INVENTORY.VIEW) && (
         <Card>
           <CardHeader>
             <CardTitle>All vendors</CardTitle>
           </CardHeader>
-          <CardContent className="admin-card__content">
-            <div className="admin-toolbar">
+          <CardContent className="p-4">
+            <div className="mb-4 max-w-[360px]">
               <Input
                 type="search"
                 placeholder="Search by name, phone, address…"
@@ -168,7 +167,7 @@ export function VendorsScreen() {
             </div>
 
             {loading ? (
-              <p className="admin-muted">Loading vendors…</p>
+              <p className="text-sm text-[var(--ink-muted)]">Loading vendors…</p>
             ) : (
               <Table>
                 <TableHead>
@@ -192,7 +191,7 @@ export function VendorsScreen() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="admin-actions">
+                        <div className="flex flex-wrap gap-2">
                           <Button variant="outline" size="sm" onClick={() => openHistory(v)}>
                             History
                           </Button>
@@ -212,7 +211,7 @@ export function VendorsScreen() {
                   ))}
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="admin-muted">
+                      <TableCell colSpan={5} className="text-sm text-[var(--ink-muted)]">
                         No vendors found.
                       </TableCell>
                     </TableRow>
@@ -246,20 +245,20 @@ export function VendorsScreen() {
           }
         >
           {historyLoading ? (
-            <p className="admin-muted">Loading history…</p>
+            <p className="text-sm text-[var(--ink-muted)]">Loading history…</p>
           ) : historyData && historyData.trips.length === 0 ? (
-            <p className="admin-muted">No purchase history yet.</p>
+            <p className="text-sm text-[var(--ink-muted)]">No purchase history yet.</p>
           ) : (
             historyData &&
             historyData.trips.map((trip) => (
-              <Card key={trip.uuid} style={{ marginBottom: 'var(--spacing-4)' }}>
+              <Card key={trip.uuid} className="mb-4">
                 <CardHeader>
                   <CardTitle>
                     Trip on {new Date(trip.purchasedOn).toLocaleDateString()}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="typography-body-sm admin-page__subtitle">
+                  <p className="typography-body-sm text-[var(--ink-muted)]">
                     Paid {formatPaise(Number(trip.totalPaidPaise))} · Variance{' '}
                     {formatPaise(Number(trip.variancePaise))}
                   </p>
@@ -285,7 +284,7 @@ export function VendorsScreen() {
                       ))}
                       {trip.lines.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="admin-muted">
+                          <TableCell colSpan={5} className="text-sm text-[var(--ink-muted)]">
                             No lots in this trip.
                           </TableCell>
                         </TableRow>

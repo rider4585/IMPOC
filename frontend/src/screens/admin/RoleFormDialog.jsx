@@ -34,7 +34,7 @@ export function RoleFormDialog({ open, onClose, onSave, saving, role }) {
     >
       <Card>
         <CardContent>
-          <form id="role-form" onSubmit={handleSubmit} className="admin-form">
+          <form id="role-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
             <Input
               label="Description"
@@ -42,7 +42,7 @@ export function RoleFormDialog({ open, onClose, onSave, saving, role }) {
               onChange={(e) => setDescription(e.target.value)}
             />
             {error && (
-              <div className="admin-error" role="alert">
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">
                 {error}
               </div>
             )}

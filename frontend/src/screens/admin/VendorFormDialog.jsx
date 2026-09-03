@@ -45,13 +45,13 @@ export function VendorFormDialog({ open, onClose, onSave, saving, vendor }) {
     >
       <Card>
         <CardContent>
-          <form id="vendor-form" onSubmit={handleSubmit} className="admin-form">
+          <form id="vendor-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input label="Name" value={form.name} onChange={set('name')} required />
             <Input label="Phone" value={form.phone} onChange={set('phone')} />
             <Input label="Address" value={form.address} onChange={set('address')} />
             <Input label="Notes" value={form.notes} onChange={set('notes')} />
             {error && (
-              <div className="admin-error" role="alert">{error}</div>
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

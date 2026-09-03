@@ -20,15 +20,14 @@ import {
   deactivateProductType,
 } from '../../services/picklistsApi.js';
 import { buildProductTypeTree, collectDescendantUuids } from '../../platform/adminHelpers.js';
-import './admin.css';
 
 function Tree({ nodes, onEdit, onDeactivate, canUpdate, depth = 0 }) {
   return (
-    <ul className={`admin-hierarchy${depth > 0 ? '' : ''}`} role="tree">
+    <ul className="list-none m-0 p-0" style={depth > 0 ? { paddingLeft: '1.5rem' } : undefined} role="tree">
       {nodes.map((node) => (
-        <li key={node.uuid} role="treeitem" aria-expanded={node.children.length > 0}>
-          <div className="admin-hierarchy__row">
-            <span className="admin-hierarchy__name">{node.name}</span>
+        <li key={node.uuid} className="py-1" role="treeitem" aria-expanded={node.children.length > 0}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{node.name}</span>
             {!node.isActive && <Badge variant="neutral">inactive</Badge>}
             {canUpdate && (
               <Button variant="outline" size="sm" onClick={() => onEdit(node)}>
@@ -118,9 +117,9 @@ export function ProductTypesManager() {
       <CardHeader>
         <CardTitle>Product types</CardTitle>
       </CardHeader>
-      <CardContent className="admin-card__content">
-        <div className="admin-page__header" style={{ marginBottom: 'var(--spacing-4)' }}>
-          <p className="typography-body-sm admin-page__subtitle">
+      <CardContent className="p-4">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+          <p className="typography-body-sm text-[var(--ink-muted)]">
             Hierarchical categories. Editing a parent picker omits itself and its descendants
             to prevent cycles.
           </p>
@@ -131,12 +130,12 @@ export function ProductTypesManager() {
           )}
         </div>
 
-        {error && <div className="admin-error" role="alert">{error}</div>}
+        {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
         {loading ? (
-          <p className="admin-muted">Loading product types…</p>
+          <p className="text-sm text-[var(--ink-muted)]">Loading product types…</p>
         ) : tree.length === 0 ? (
-          <p className="admin-muted">No product types yet.</p>
+          <p className="text-sm text-[var(--ink-muted)]">No product types yet.</p>
         ) : (
           <Tree
             nodes={tree}
@@ -169,7 +168,6 @@ function ProductTypeFormDialog({ open, onClose, onSave, saving, type, allTypes }
   );
   const [error, setError] = useState('');
 
-  // When editing, exclude this node and its descendants from parent options (cycle safety).
   const excluded = useMemo(
     () => (isEdit ? collectDescendantUuids(allTypes, type.uuid) : new Set()),
     [isEdit, type, allTypes]
@@ -209,7 +207,7 @@ function ProductTypeFormDialog({ open, onClose, onSave, saving, type, allTypes }
     >
       <Card>
         <CardContent>
-          <form id="pt-form" onSubmit={handleSubmit} className="admin-form">
+          <form id="pt-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
             <Select
               label="Parent"
@@ -225,7 +223,7 @@ function ProductTypeFormDialog({ open, onClose, onSave, saving, type, allTypes }
               ))}
             </Select>
             {error && (
-              <div className="admin-error" role="alert">{error}</div>
+              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

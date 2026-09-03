@@ -28,7 +28,6 @@ import {
 } from '../../services/rolesApi.js';
 import { getPermissions } from '../../services/permissionsApi.js';
 import { RoleFormDialog } from './RoleFormDialog.jsx';
-import './admin.css';
 
 export function RolesScreen() {
   const { permissions } = useAuth();
@@ -156,11 +155,11 @@ export function RolesScreen() {
   );
 
   return (
-    <div className="admin-page">
-      <div className="admin-page__header">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="typography-heading">Roles</h1>
-          <p className="typography-body-sm admin-page__subtitle">
+          <h1 className="typography-heading mb-1">Roles</h1>
+          <p className="typography-body-sm text-[var(--ink-muted)]">
             Create and manage roles and their permission sets.
           </p>
         </div>
@@ -171,16 +170,16 @@ export function RolesScreen() {
         )}
       </div>
 
-      {error && <div className="admin-error" role="alert">{error}</div>}
+      {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.ROLES.VIEW) && (
         <Card>
           <CardHeader>
             <CardTitle>All roles</CardTitle>
           </CardHeader>
-          <CardContent className="admin-card__content">
+          <CardContent className="p-4">
             {loading ? (
-              <p className="admin-muted">Loading roles…</p>
+              <p className="text-sm text-[var(--ink-muted)]">Loading roles…</p>
             ) : (
               <Table>
                 <TableHead>
@@ -196,7 +195,7 @@ export function RolesScreen() {
                       <TableCell>{role.name}</TableCell>
                       <TableCell>{role.description || '—'}</TableCell>
                       <TableCell>
-                        <div className="admin-actions">
+                        <div className="flex flex-wrap gap-2">
                           {canManage && (
                             <Button variant="outline" size="sm" onClick={() => openEdit(role)}>
                               Edit
@@ -218,7 +217,7 @@ export function RolesScreen() {
                   ))}
                   {roles.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={3} className="admin-muted">
+                      <TableCell colSpan={3} className="text-sm text-[var(--ink-muted)]">
                         No roles found.
                       </TableCell>
                     </TableRow>
@@ -254,21 +253,24 @@ export function RolesScreen() {
           <Card>
             <CardContent>
               {permsLoading ? (
-                <p className="admin-muted">Loading permissions…</p>
+                <p className="text-sm text-[var(--ink-muted)]">Loading permissions…</p>
               ) : (
                 <>
                   <h3 className="typography-label">Assigned permissions</h3>
                   {assignedPerms.length === 0 ? (
-                    <p className="admin-muted">No permissions assigned.</p>
+                    <p className="text-sm text-[var(--ink-muted)]">No permissions assigned.</p>
                   ) : (
-                    <ul className="admin-chip-list">
+                    <ul className="mt-2 flex flex-wrap gap-2">
                       {assignedPerms.map((p) => (
-                        <li key={p.uuid} className="admin-chip">
+                        <li
+                          key={p.uuid}
+                          className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-sunken)] px-2 py-0.5 text-[13px] text-[var(--ink)]"
+                        >
                           <span title={p.description || undefined}>{p.name}</span>
                           {canManage && (
                             <button
                               type="button"
-                              className="admin-chip__remove"
+                              className="cursor-pointer border-none bg-transparent text-[16px] leading-none text-[var(--ink-muted)] hover:text-[var(--danger)]"
                               aria-label={`Remove permission ${p.name}`}
                               onClick={() => handleRemovePerm(p)}
                             >
@@ -281,24 +283,26 @@ export function RolesScreen() {
                   )}
 
                   {canManage && availablePerms.length > 0 && (
-                    <form onSubmit={handleAssign} className="admin-inline-form">
-                      <Select name="permission" label="Add permission" defaultValue="">
-                        <option value="" disabled>
-                          Select a permission…
-                        </option>
-                        {availablePerms.map((p) => (
-                          <option key={p.uuid} value={p.uuid}>
-                            {p.name}
+                    <form onSubmit={handleAssign} className="mt-4 flex flex-wrap items-end gap-3">
+                      <div className="flex-1">
+                        <Select name="permission" label="Add permission" defaultValue="">
+                          <option value="" disabled>
+                            Select a permission…
                           </option>
-                        ))}
-                      </Select>
+                          {availablePerms.map((p) => (
+                            <option key={p.uuid} value={p.uuid}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
                       <Button type="submit" size="sm">
                         Assign
                       </Button>
                     </form>
                   )}
                   {canManage && availablePerms.length === 0 && (
-                    <p className="admin-muted">All permissions are already assigned.</p>
+                    <p className="text-sm text-[var(--ink-muted)]">All permissions are already assigned.</p>
                   )}
                 </>
               )}
