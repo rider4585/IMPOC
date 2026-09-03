@@ -18,6 +18,7 @@ import unitsRoutes from './src/modules/units/units.routes.js';
 import salesRoutes from './src/modules/sales/sales.routes.js';
 import rentalRoutes from './src/modules/rentals/rental-agreement.routes.js';
 import expensesRoutes from './src/modules/expenses/expenses.routes.js';
+import reportsRoutes from './src/modules/reports/reports.routes.js';
 import errorMiddleware from './src/middleware/error.middleware.js';
 
 const app = express();
@@ -66,6 +67,7 @@ app.use('/api/units', unitsRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/rentals', rentalRoutes);
 app.use('/api/expenses', expensesRoutes);
+app.use('/api/reports', reportsRoutes);
 
 app.use(errorMiddleware);
 
