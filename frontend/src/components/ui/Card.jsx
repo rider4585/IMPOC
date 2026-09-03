@@ -1,13 +1,16 @@
 import React from 'react';
-import './Card.css';
 
 /**
- * Card — base container primitive (light mode).
+ * Card — shadcn-style base container primitive (light mode, Tailwind).
  * Composes CardHeader / CardTitle / CardContent / CardFooter.
  */
 export const Card = React.forwardRef(function Card({ className = '', children, ...rest }, ref) {
   return (
-    <div ref={ref} className={`ui-card ${className}`.trim()} {...rest}>
+    <div
+      ref={ref}
+      className={`rounded-lg border border-[var(--border)] bg-white text-[var(--ink)] shadow-sm ${className}`.trim()}
+      {...rest}
+    >
       {children}
     </div>
   );
@@ -18,7 +21,11 @@ export const CardHeader = React.forwardRef(function CardHeader(
   ref
 ) {
   return (
-    <div ref={ref} className={`ui-card__header ${className}`.trim()} {...rest}>
+    <div
+      ref={ref}
+      className={`flex flex-col space-y-1.5 p-6 ${className}`.trim()}
+      {...rest}
+    >
       {children}
     </div>
   );
@@ -29,7 +36,11 @@ export const CardTitle = React.forwardRef(function CardTitle(
   ref
 ) {
   return (
-    <h3 ref={ref} className={`ui-card__title ${className}`.trim()} {...rest}>
+    <h3
+      ref={ref}
+      className={`text-lg font-semibold leading-none tracking-tight ${className}`.trim()}
+      {...rest}
+    >
       {children}
     </h3>
   );
@@ -40,7 +51,7 @@ export const CardContent = React.forwardRef(function CardContent(
   ref
 ) {
   return (
-    <div ref={ref} className={`ui-card__content ${className}`.trim()} {...rest}>
+    <div ref={ref} className={`p-6 pt-0 ${className}`.trim()} {...rest}>
       {children}
     </div>
   );
@@ -51,7 +62,11 @@ export const CardFooter = React.forwardRef(function CardFooter(
   ref
 ) {
   return (
-    <div ref={ref} className={`ui-card__footer ${className}`.trim()} {...rest}>
+    <div
+      ref={ref}
+      className={`flex items-center p-6 pt-0 ${className}`.trim()}
+      {...rest}
+    >
       {children}
     </div>
   );

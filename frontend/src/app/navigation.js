@@ -10,82 +10,88 @@ import POSScreen from '../screens/pos/POSScreen';
 import SalesListScreen from '../screens/pos/SalesListScreen';
 import RentalsScreen from '../screens/rentals/RentalsScreen';
 import ExpensesScreen from '../screens/expenses/ExpensesScreen';
+import DashboardPlaceholder from './DashboardPlaceholder';
 
 /**
- * Navigation registry — one entry per accessible screen.
- * Each entry is checked against the signed-in user's permissions array.
- * Only screens whose permission is present in the user's permissions render in navigation.
+ * Flat navigation registry — one entry per accessible screen. Used by App.jsx to
+ * render routes and by the nav to drive permission-gated visibility.
  *
- * Entries are ordered top-to-bottom in navigation.
- * Future stories add their own entries to this list; this is the single source of truth
- * for routing and permission-driven navigation, mirroring the gesture-type.js pattern.
+ * Each entry is checked against the signed-in user's permissions array. Only
+ * screens whose permission is present in the user's permissions render.
+ *
+ * This stays the single source of truth for routing + permission gates; paths,
+ * gates, and element destinations are UNCHANGED from the pre-revamp app.
  */
 export const navigationRegistry = [
+  { permission: PERMISSIONS.INVENTORY.BARCODE_GENERATE, label: 'Print labels', path: '/barcode-sheets', element: BarcodePrintScreen },
+  { permission: PERMISSIONS.USERS.VIEW, label: 'Users', path: '/users', element: UsersScreen },
+  { permission: PERMISSIONS.ROLES.VIEW, label: 'Roles', path: '/roles', element: RolesScreen },
+  { permission: PERMISSIONS.ROLES.VIEW, label: 'Permissions', path: '/permissions', element: PermissionsScreen },
+  { permission: PERMISSIONS.PICKLISTS.VIEW, label: 'Picklists', path: '/picklists', element: PicklistManagementScreen },
+  { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Vendors', path: '/vendors', element: VendorsScreen },
+  { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Intake', path: '/intake', element: IntakeScreen },
+  { permission: PERMISSIONS.SALES.CREATE, label: 'POS', path: '/pos', element: POSScreen },
+  { permission: PERMISSIONS.SALES.VIEW, label: 'Sales', path: '/sales', element: SalesListScreen },
+  { permission: PERMISSIONS.RENTALS.VIEW, label: 'Rentals', path: '/rentals', element: RentalsScreen },
+  { permission: PERMISSIONS.EXPENSES.VIEW, label: 'Expenses', path: '/expenses', element: ExpensesScreen },
+  { permission: PERMISSIONS.REPORTS.VIEW, label: 'Dashboard', path: '/dashboard', element: DashboardPlaceholder },
+];
+
+/**
+ * Grouped navigation — labelled, icon'd sections (light, role-gated, absent-not-disabled).
+ *
+ * Each item references the SAME path + permission gate as navigationRegistry (never
+ * removed or changed). AppShell consumes this to render labelled grouped sections.
+ *
+ * `icon` is a short key resolved to an inline SVG by AppShell's icon map.
+ */
+export const navigationSections = [
   {
-    permission: PERMISSIONS.INVENTORY.BARCODE_GENERATE,
-    label: 'Print labels',
-    path: '/barcode-sheets',
-    element: BarcodePrintScreen,
+    key: 'inventory',
+    label: 'Inventory',
+    icon: 'inventory',
+    items: [
+      { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Intake', path: '/intake' },
+      { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Vendors', path: '/vendors' },
+      { permission: PERMISSIONS.INVENTORY.BARCODE_GENERATE, label: 'Print labels', path: '/barcode-sheets' },
+    ],
   },
   {
-    permission: PERMISSIONS.USERS.VIEW,
-    label: 'Users',
-    path: '/users',
-    element: UsersScreen,
+    key: 'pos',
+    label: 'POS / Counter',
+    icon: 'pos',
+    items: [
+      { permission: PERMISSIONS.SALES.CREATE, label: 'POS', path: '/pos' },
+      { permission: PERMISSIONS.SALES.VIEW, label: 'Sales', path: '/sales' },
+    ],
   },
   {
-    permission: PERMISSIONS.ROLES.VIEW,
-    label: 'Roles',
-    path: '/roles',
-    element: RolesScreen,
-  },
-  {
-    permission: PERMISSIONS.ROLES.VIEW,
-    label: 'Permissions',
-    path: '/permissions',
-    element: PermissionsScreen,
-  },
-  {
-    permission: PERMISSIONS.PICKLISTS.VIEW,
-    label: 'Picklists',
-    path: '/picklists',
-    element: PicklistManagementScreen,
-  },
-  {
-    permission: PERMISSIONS.INVENTORY.VIEW,
-    label: 'Vendors',
-    path: '/vendors',
-    element: VendorsScreen,
-  },
-  {
-    permission: PERMISSIONS.INVENTORY.VIEW,
-    label: 'Intake',
-    path: '/intake',
-    element: IntakeScreen,
-  },
-  {
-    permission: PERMISSIONS.SALES.CREATE,
-    label: 'POS',
-    path: '/pos',
-    element: POSScreen,
-  },
-  {
-    permission: PERMISSIONS.SALES.VIEW,
-    label: 'Sales',
-    path: '/sales',
-    element: SalesListScreen,
-  },
-  {
-    permission: PERMISSIONS.RENTALS.VIEW,
+    key: 'rentals',
     label: 'Rentals',
-    path: '/rentals',
-    element: RentalsScreen,
+    icon: 'rentals',
+    items: [{ permission: PERMISSIONS.RENTALS.VIEW, label: 'Rentals', path: '/rentals' }],
   },
   {
-    permission: PERMISSIONS.EXPENSES.VIEW,
+    key: 'expenses',
     label: 'Expenses',
-    path: '/expenses',
-    element: ExpensesScreen,
+    icon: 'expenses',
+    items: [{ permission: PERMISSIONS.EXPENSES.VIEW, label: 'Expenses', path: '/expenses' }],
   },
-  // Future epics add entries here
+  {
+    key: 'admin',
+    label: 'Admin',
+    icon: 'admin',
+    items: [
+      { permission: PERMISSIONS.USERS.VIEW, label: 'Users', path: '/users' },
+      { permission: PERMISSIONS.ROLES.VIEW, label: 'Roles', path: '/roles' },
+      { permission: PERMISSIONS.ROLES.VIEW, label: 'Permissions', path: '/permissions' },
+      { permission: PERMISSIONS.PICKLISTS.VIEW, label: 'Picklists', path: '/picklists' },
+    ],
+  },
+  {
+    key: 'dashboard',
+    label: 'Dashboard',
+    icon: 'dashboard',
+    items: [{ permission: PERMISSIONS.REPORTS.VIEW, label: 'Dashboard', path: '/dashboard' }],
+  },
 ];

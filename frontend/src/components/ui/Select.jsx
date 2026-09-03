@@ -1,10 +1,15 @@
 import React, { forwardRef } from 'react';
-import './Select.css';
 
 /**
- * Select — base dropdown primitive (light mode).
+ * Select — shadcn-style base dropdown primitive (light mode, Tailwind).
  * Children should be <option> elements.
  */
+const selectCls =
+  'flex h-9 w-full appearance-none rounded-md border border-[var(--border-strong)] ' +
+  'bg-white px-3 py-1 text-sm text-[var(--ink)] shadow-sm transition-colors ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ' +
+  'focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-55';
+
 export const Select = forwardRef(function Select(
   { label, error, hint, size = 'md', id, className = '', children, ...rest },
   ref
@@ -17,31 +22,52 @@ export const Select = forwardRef(function Select(
       .join(' ') || undefined;
 
   return (
-    <div className={`ui-field ui-field--${size}`}>
+    <div className="space-y-1.5">
       {label && (
-        <label className="ui-field__label" htmlFor={selectId}>{label}</label>
+        <label className="text-sm font-medium text-[var(--ink)]" htmlFor={selectId}>
+          {label}
+        </label>
       )}
-      <div className="ui-select-wrap">
+      <div className="relative">
         <select
           ref={ref}
           id={selectId}
           className={[
-            'ui-select',
-            error ? 'ui-select--error' : '',
+            selectCls,
+            error ? 'border-danger focus-visible:ring-danger' : '',
+            size === 'lg' ? 'h-11' : size === 'sm' ? 'h-8' : '',
             className,
-          ].filter(Boolean).join(' ')}
+          ]
+            .filter(Boolean)
+            .join(' ')}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           {...rest}
         >
           {children}
         </select>
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-muted)]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </div>
       {error && (
-        <div id={`${selectId}-error`} className="ui-field__error" role="alert">{error}</div>
+        <p id={`${selectId}-error`} className="text-xs font-medium text-danger" role="alert">
+          {error}
+        </p>
       )}
       {hint && !error && (
-        <div id={`${selectId}-hint`} className="ui-field__hint">{hint}</div>
+        <p id={`${selectId}-hint`} className="text-xs text-[var(--ink-faint)]">
+          {hint}
+        </p>
       )}
     </div>
   );

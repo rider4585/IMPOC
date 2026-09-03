@@ -1,18 +1,83 @@
 /* =============================================================================
-   IMPOC Theme — Design Tokens from DESIGN.md
+   IMPOC Revamp Design System — Tailwind v4 + shadcn-style (LIGHT MODE ONLY)
 
-   Light palette as root defaults; dark-palette overrides via prefers-color-scheme.
-   This is the single source of truth for every color, font, shadow, and surface
-   treatment in the app. No component should hard-code a hex value or font size
-   that appears here.
+   This is the single source of truth for the design system.
+   - Tailwind v4 entry: @import "tailwindcss"
+   - Light-mode-ONLY token set: no dark-mode variations anywhere.
+   - bmad SEMANTIC colours (unit status + money in/out/held) are preserved and
+     mapped into Tailwind theme variables so money/status meaning is unchanged.
+   - Legacy CSS custom properties are kept (light values only) so screens that
+     still reference var(--...) keep resolving until restyled in later R-stories.
    ========================================================================== */
 
-/* Import self-hosted fonts from @fontsource */
+/* Self-hosted fonts (unchanged) */
 @import '@fontsource-variable/bricolage-grotesque';
 @import '@fontsource-variable/instrument-sans';
 
+/* Tailwind v4 entry — generates utilities + theme from @theme below */
+@import 'tailwindcss';
+
 /* =============================================================================
-   CSS Custom Properties — Light Palette (root defaults)
+   Tailwind theme tokens (LIGHT ONLY)
+   ========================================================================== */
+@theme {
+  /* Brand */
+  --color-primary: #7B2D4E;
+  --color-primary-foreground: #FFF7F9;
+  --color-accent: #B8791F;
+  --color-accent-foreground: #201404;
+
+  /* Warm neutral surfaces (light) */
+  --color-surface-base: #FBF7F3;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-sunken: #F1E9E0;
+  --color-surface-scan: #1C1512;
+
+  /* Text / ink (light) */
+  --color-ink: #2A211C;
+  --color-ink-muted: #6B5D54;
+  --color-ink-faint: #9C8E83;
+
+  /* Borders (light) */
+  --color-border: #E4D9CD;
+  --color-border-strong: #CBBBAA;
+
+  /* Unit status (semantic, preserved from bmad) */
+  --color-status-in-stock: #2F6E4F;
+  --color-status-rented: #2B5C8A;
+  --color-status-overdue: #B3261E;
+  --color-status-sold: #6B5D54;
+  --color-status-maintenance: #8A5A1F;
+  --color-status-terminal: #5E4A46;
+
+  /* Money semantics (three kinds, preserved) */
+  --color-money-in: #2F6E4F;
+  --color-money-out: #B3261E;
+  --color-money-held: #5B4B8A;
+  --color-money-reversed: #9C8E83;
+
+  /* System feedback */
+  --color-waking: #8A5A1F;
+  --color-success: #2F6E4F;
+  --color-danger: #B3261E;
+  --color-focus-ring: #7B2D4E;
+
+  /* Fonts */
+  --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Bricolage Grotesque', serif;
+
+  /* Radii — shadcn-friendly scale overlaid on bmad */
+  --radius-sm: 0.375rem;
+  --radius: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-full: 9999px;
+}
+
+/* =============================================================================
+   Legacy CSS Custom Properties — Light Palette (root defaults, LIGHT ONLY)
+   Kept so existing screens resolve tokens; no dark-mode overrides exist.
    ========================================================================== */
 
 :root {
@@ -31,13 +96,13 @@
   --border: #E4D9CD;
   --border-strong: #CBBBAA;
 
-  /* Brand: primary (jewel plum) and accent (warm gold) */
+  /* Brand */
   --primary: #7B2D4E;
   --primary-foreground: #FFF7F9;
   --accent: #B8791F;
   --accent-foreground: #201404;
 
-  /* Unit status (semantic colors for inventory state) */
+  /* Unit status (semantic, preserved) */
   --status-in-stock: #2F6E4F;
   --status-rented: #2B5C8A;
   --status-overdue: #B3261E;
@@ -45,7 +110,7 @@
   --status-maintenance: #8A5A1F;
   --status-terminal: #5E4A46;
 
-  /* Money semantics (three kinds, never two) */
+  /* Money semantics (three kinds) */
   --money-in: #2F6E4F;
   --money-out: #B3261E;
   --money-held: #5B4B8A;
@@ -69,7 +134,6 @@
   --spacing-12: 48px;
   --spacing-16: 64px;
 
-  /* Layout gutters and fixed dimensions */
   --spacing-gutter-phone: 16px;
   --spacing-gutter-wide: 24px;
   --spacing-thumb-bar-height: 72px;
@@ -82,119 +146,8 @@
   --rounded-xl: 20px;
   --rounded-full: 9999px;
 
-  /* Surface treatment fallback backgrounds (glass surfaces) */
+  /* Surface fallback */
   --surface-glass-fallback: #FFFFFF;
-}
-
-/* =============================================================================
-   Dark Palette Overrides — Three-State Theme System
-
-   Three states resolved via CSS cascade:
-   1. No data-theme + device prefers light → light palette (bare :root)
-   2. No data-theme + device prefers dark → dark palette (guarded media query)
-   3. data-theme="light" overrides device preference → light palette (bare :root)
-   4. data-theme="dark" overrides device preference → dark palette (attribute selector)
-
-   Guard the media query with :root:not([data-theme="light"]) so explicit light
-   choice always wins over device preference. Define dark palette again under
-   :root[data-theme="dark"] so explicit dark choice has higher specificity than
-   the media query and overrides both the bare :root and device preference.
-   ========================================================================== */
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    /* Warm neutral surfaces (dark) */
-    --surface-base: #191411;
-    --surface-raised: #231C18;
-    --surface-sunken: #100C0A;
-    --surface-scan: #0B0807;
-
-    /* Text / ink (dark) */
-    --ink: #F4EDE5;
-    --ink-muted: #B3A497;
-    --ink-faint: #7C6E64;
-
-    /* Borders (dark) */
-    --border: #382E28;
-    --border-strong: #4E4139;
-
-    /* Brand (dark) */
-    --primary: #E48BAB;
-    --primary-foreground: #2A0E1B;
-    --accent: #E9AE55;
-    --accent-foreground: #241703;
-
-    /* Unit status (dark) */
-    --status-in-stock: #6FC49A;
-    --status-rented: #7FB5E4;
-    --status-overdue: #F58C85;
-    --status-sold: #B3A497;
-    --status-maintenance: #DDA55A;
-    --status-terminal: #A08A85;
-
-    /* Money semantics (dark) */
-    --money-in: #6FC49A;
-    --money-out: #F58C85;
-    --money-held: #A99BD8;
-    --money-reversed: #7C6E64;
-
-    /* System feedback (dark) */
-    --waking: #DDA55A;
-    --success: #6FC49A;
-    --danger: #F58C85;
-    --focus-ring: #E48BAB;
-
-    /* Glass fallback (dark) */
-    --surface-glass-fallback: #231C18;
-  }
-}
-
-/* Explicit data-theme="dark" selector — always applies dark palette,
-   overriding device preference with higher specificity than media query */
-:root[data-theme="dark"] {
-  /* Warm neutral surfaces (dark) */
-  --surface-base: #191411;
-  --surface-raised: #231C18;
-  --surface-sunken: #100C0A;
-  --surface-scan: #0B0807;
-
-  /* Text / ink (dark) */
-  --ink: #F4EDE5;
-  --ink-muted: #B3A497;
-  --ink-faint: #7C6E64;
-
-  /* Borders (dark) */
-  --border: #382E28;
-  --border-strong: #4E4139;
-
-  /* Brand (dark) */
-  --primary: #E48BAB;
-  --primary-foreground: #2A0E1B;
-  --accent: #E9AE55;
-  --accent-foreground: #241703;
-
-  /* Unit status (dark) */
-  --status-in-stock: #6FC49A;
-  --status-rented: #7FB5E4;
-  --status-overdue: #F58C85;
-  --status-sold: #B3A497;
-  --status-maintenance: #DDA55A;
-  --status-terminal: #A08A85;
-
-  /* Money semantics (dark) */
-  --money-in: #6FC49A;
-  --money-out: #F58C85;
-  --money-held: #A99BD8;
-  --money-reversed: #7C6E64;
-
-  /* System feedback (dark) */
-  --waking: #DDA55A;
-  --success: #6FC49A;
-  --danger: #F58C85;
-  --focus-ring: #E48BAB;
-
-  /* Glass fallback (dark) */
-  --surface-glass-fallback: #231C18;
 }
 
 /* =============================================================================
@@ -217,13 +170,9 @@ body,
 }
 
 /* =============================================================================
-   Typography Classes
-
-   Each class applies font family, size, weight, line height, letter spacing,
-   and font-variant-numeric (tabular-nums for money/counter/barcode roles).
+   Typography Classes (unchanged roles)
    ========================================================================== */
 
-/* Display: Bricolage Grotesque, large headline (dashboard only) */
 .typography-display {
   font-family: 'Bricolage Grotesque', serif;
   font-size: 32px;
@@ -232,7 +181,6 @@ body,
   letter-spacing: -0.01em;
 }
 
-/* Heading: Instrument Sans, section titles */
 .typography-heading {
   font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 20px;
@@ -241,7 +189,6 @@ body,
   letter-spacing: -0.01em;
 }
 
-/* Subheading: Instrument Sans, subsection titles */
 .typography-subheading {
   font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
@@ -249,7 +196,6 @@ body,
   line-height: 1.4;
 }
 
-/* Body: Instrument Sans, default text */
 .typography-body {
   font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
@@ -257,7 +203,6 @@ body,
   line-height: 1.5;
 }
 
-/* Body small: Instrument Sans, secondary text */
 .typography-body-sm {
   font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
@@ -265,7 +210,6 @@ body,
   line-height: 1.45;
 }
 
-/* Label: Instrument Sans, smallest functional role (13px minimum floor) */
 .typography-label {
   font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
@@ -274,7 +218,6 @@ body,
   letter-spacing: 0.02em;
 }
 
-/* Money: Instrument Sans, rupee figures in carts/receipts (must be tabular) */
 .typography-money {
   font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 17px;
@@ -284,7 +227,6 @@ body,
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Money large: Instrument Sans, dashboard headline figures (must be tabular) */
 .typography-money-lg {
   font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 28px;
@@ -293,7 +235,6 @@ body,
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Money small: Instrument Sans, line-level figures in carts/receipts (must be tabular) */
 .typography-money-sm {
   font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
@@ -302,7 +243,6 @@ body,
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Counter: Instrument Sans, intake progress counter "8 of 12" (must be tabular) */
 .typography-counter {
   font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 40px;
@@ -312,7 +252,6 @@ body,
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Barcode: system monospace stack, not a webfont (must be tabular) */
 .typography-barcode {
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   font-size: 14px;
@@ -323,22 +262,15 @@ body,
 }
 
 /* =============================================================================
-   Surface Treatment Classes
-
-   Three named surface treatments per DESIGN.md's binding table:
-   - FLAT: solid surface, real border, full contrast (default, money-deciding, refusals)
-   - SOFT: gentle shadow + rounded card + real border (cards, navigation chrome)
-   - GLASS: translucent + blur + light edge + shadow (dashboard shell, scanner overlay, modal backdrops)
+   Surface Treatment Classes (LIGHT ONLY — no dark overrides)
    ========================================================================== */
 
-/* Surface FLAT: default, full contrast (money screens, refusals, most lists) */
 .surface-flat {
   background-color: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--rounded-md);
 }
 
-/* Surface SOFT: cards and navigation chrome with gentle shadow */
 .surface-soft {
   background-color: var(--surface-raised);
   border: 1px solid var(--border);
@@ -346,13 +278,6 @@ body,
   box-shadow: 0 2px 8px rgba(42, 33, 28, 0.1), 0 1px 2px rgba(42, 33, 28, 0.06);
 }
 
-@media (prefers-color-scheme: dark) {
-  .surface-soft {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.38), 0 1px 2px rgba(0, 0, 0, 0.24);
-  }
-}
-
-/* Surface GLASS: dashboard shell, scanner overlay, modal backdrops (blur required) */
 .surface-glass {
   background-color: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.4);
@@ -361,15 +286,6 @@ body,
   backdrop-filter: blur(20px) saturate(160%);
 }
 
-@media (prefers-color-scheme: dark) {
-  .surface-glass {
-    background-color: rgba(35, 28, 24, 0.55);
-    border: 1px solid rgba(244, 237, 229, 0.1);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
-  }
-}
-
-/* Fallback for surface-glass when backdrop-filter or transparency is not supported */
 @supports not (backdrop-filter: blur(1px)) {
   .surface-glass {
     background-color: var(--surface-glass-fallback);
