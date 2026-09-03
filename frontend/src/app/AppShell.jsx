@@ -115,7 +115,7 @@ function iconFor(name) {
 }
 
 const itemIcon = {
-  '/intake': 'intake',
+  '/trips': 'intake',
   '/vendors': 'vendors',
   '/barcode-sheets': 'barcode',
   '/pos': 'cart',

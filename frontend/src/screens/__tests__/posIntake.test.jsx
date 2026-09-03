@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '../../components/ui/index.js';
 import * as authModule from '../../auth/useAuth.js';
 import * as unitsService from '../../services/unitsApi.js';
@@ -20,7 +21,7 @@ vi.mock('../../services/picklistsApi.js', () => ({
 }));
 
 import { POSScreen } from '../pos/POSScreen.jsx';
-import { IntakeScreen } from '../intake/IntakeScreen.jsx';
+import { TripsScreen } from '../inventory/TripsScreen.jsx';
 
 const FULL = {
   INVENTORY: { VIEW: 'inventory.view', CREATE: 'inventory.create', UPDATE: 'inventory.update' },
@@ -112,7 +113,7 @@ describe('POSScreen (T-09)', () => {
   });
 });
 
-describe('IntakeScreen (T-07)', () => {
+describe('TripsScreen (R-07 rewrite of T-07)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authModule.useAuth.mockReturnValue({ permissions: [FULL.INVENTORY.VIEW, FULL.INVENTORY.CREATE] });
@@ -130,7 +131,7 @@ describe('IntakeScreen (T-07)', () => {
   });
 
   it('renders trips list with vendor and paid amount', async () => {
-    renderWithToast(<IntakeScreen />);
+    renderWithToast(<MemoryRouter><TripsScreen /></MemoryRouter>);
     await waitFor(() => {
       expect(screen.getByText(/Sharma Fabrics/)).toBeInTheDocument();
     });
@@ -138,11 +139,12 @@ describe('IntakeScreen (T-07)', () => {
   });
 
   it('opens the create-trip dialog', async () => {
-    renderWithToast(<IntakeScreen />);
-    fireEvent.click(screen.getByTestId('intake-create-trip'));
+    renderWithToast(<MemoryRouter><TripsScreen /></MemoryRouter>);
+    fireEvent.click(screen.getByTestId('trips-create'));
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
-    expect(screen.getByText(/create intake trip/i)).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: /create trip/i })).toBeInTheDocument();
   });
 });
