@@ -14,7 +14,7 @@ import POSScreen from '../screens/pos/POSScreen';
 import SalesListScreen from '../screens/pos/SalesListScreen';
 import RentalsScreen from '../screens/rentals/RentalsScreen';
 import ExpensesScreen from '../screens/expenses/ExpensesScreen';
-import DashboardPlaceholder from './DashboardPlaceholder';
+import Dashboard from './Dashboard';
 
 /**
  * Flat navigation registry — one entry per accessible screen. Used by App.jsx to
@@ -38,7 +38,7 @@ export const navigationRegistry = [
   { permission: PERMISSIONS.SALES.VIEW, label: 'Sales', path: '/sales', element: SalesListScreen },
   { permission: PERMISSIONS.RENTALS.VIEW, label: 'Rentals', path: '/rentals', element: RentalsScreen },
   { permission: PERMISSIONS.EXPENSES.VIEW, label: 'Expenses', path: '/expenses', element: ExpensesScreen },
-  { permission: PERMISSIONS.REPORTS.VIEW, label: 'Dashboard', path: '/dashboard', element: DashboardPlaceholder },
+  { permission: PERMISSIONS.REPORTS.VIEW, label: 'Dashboard', path: '/dashboard', element: Dashboard },
 ];
 
 /**

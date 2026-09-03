@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { navigationRegistry, navigationSections } from '../navigation';
-import { DashboardPlaceholder } from '../DashboardPlaceholder';
+import { Dashboard } from '../Dashboard';
 import { PERMISSIONS } from '../../constants/permissions';
 
 /**
@@ -44,10 +44,10 @@ describe('navigationSections — grouped, labelled, iconed', () => {
     expect(sectionItems.dashboard).toEqual(['/dashboard']);
   });
 
-  it('should reserve the Dashboard section for T-15 with a placeholder', () => {
+  it('should render Dashboard at /dashboard with reports.view gate', () => {
     const dashboard = navigationSections.find((s) => s.key === 'dashboard');
     expect(dashboard.items[0].path).toBe('/dashboard');
-    expect(typeof DashboardPlaceholder).toBe('function');
+    expect(typeof Dashboard).toBe('function');
   });
 });
 
