@@ -1,7 +1,7 @@
 'use strict';
 
 export async function up(queryInterface, Sequelize) {
-    await queryInterface.createTable('stock_intake_lines', {
+    await queryInterface.createTable('stocks', {
         id: {
             type: Sequelize.INTEGER,
             autoIncrement: true,
@@ -14,14 +14,34 @@ export async function up(queryInterface, Sequelize) {
             allowNull: false,
         },
 
-        stock_intake_id: {
+        trip_id: {
             type: Sequelize.INTEGER,
-            allowNull: true,
+            allowNull: false,
             references: {
-                model: 'stock_intakes',
+                model: 'trips',
                 key: 'id',
             },
-            onDelete: 'SET NULL',
+            onDelete: 'RESTRICT',
+        },
+
+        trip_vendor_id: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'trip_vendors',
+                key: 'id',
+            },
+            onDelete: 'RESTRICT',
+        },
+
+        vendor_id: {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'vendors',
+                key: 'id',
+            },
+            onDelete: 'RESTRICT',
         },
 
         product_type_id: {
@@ -31,6 +51,7 @@ export async function up(queryInterface, Sequelize) {
                 model: 'product_types',
                 key: 'id',
             },
+            onDelete: 'RESTRICT',
         },
 
         quantity: {
@@ -93,52 +114,52 @@ export async function up(queryInterface, Sequelize) {
 
     // CHECK constraint: quantity > 0
     await queryInterface.sequelize.query(
-        'ALTER TABLE stock_intake_lines ADD CONSTRAINT stock_intake_lines_quantity_check CHECK (quantity > 0)'
+        'ALTER TABLE stocks ADD CONSTRAINT stocks_quantity_check CHECK (quantity > 0)'
     );
 
     // CHECK constraint: buying_price_paise >= 0
     await queryInterface.sequelize.query(
-        'ALTER TABLE stock_intake_lines ADD CONSTRAINT stock_intake_lines_buying_price_paise_check CHECK (buying_price_paise >= 0)'
+        'ALTER TABLE stocks ADD CONSTRAINT stocks_buying_price_paise_check CHECK (buying_price_paise >= 0)'
     );
 
     // CHECK constraint: selling_price_paise >= 0
     await queryInterface.sequelize.query(
-        'ALTER TABLE stock_intake_lines ADD CONSTRAINT stock_intake_lines_selling_price_paise_check CHECK (selling_price_paise >= 0)'
+        'ALTER TABLE stocks ADD CONSTRAINT stocks_selling_price_paise_check CHECK (selling_price_paise >= 0)'
     );
 
     // CHECK constraint: floor_price_paise >= 0 AND floor_price_paise <= selling_price_paise
     await queryInterface.sequelize.query(
-        'ALTER TABLE stock_intake_lines ADD CONSTRAINT stock_intake_lines_floor_price_paise_check CHECK (floor_price_paise >= 0 AND floor_price_paise <= selling_price_paise)'
+        'ALTER TABLE stocks ADD CONSTRAINT stocks_floor_price_paise_check CHECK (floor_price_paise >= 0 AND floor_price_paise <= selling_price_paise)'
     );
 
     // CHECK constraint: channel is RETAIL or RENTAL
     await queryInterface.sequelize.query(
-        "ALTER TABLE stock_intake_lines ADD CONSTRAINT stock_intake_lines_channel_check CHECK (channel IN ('RETAIL', 'RENTAL'))"
+        "ALTER TABLE stocks ADD CONSTRAINT stocks_channel_check CHECK (channel IN ('RETAIL', 'RENTAL'))"
     );
 
     // CHECK constraint: rent_per_day_paise >= 0
     await queryInterface.sequelize.query(
-        'ALTER TABLE stock_intake_lines ADD CONSTRAINT stock_intake_lines_rent_per_day_paise_check CHECK (rent_per_day_paise >= 0)'
+        'ALTER TABLE stocks ADD CONSTRAINT stocks_rent_per_day_paise_check CHECK (rent_per_day_paise >= 0)'
     );
 
     // CHECK constraint: deposit_paise >= 0
     await queryInterface.sequelize.query(
-        'ALTER TABLE stock_intake_lines ADD CONSTRAINT stock_intake_lines_deposit_paise_check CHECK (deposit_paise >= 0)'
+        'ALTER TABLE stocks ADD CONSTRAINT stocks_deposit_paise_check CHECK (deposit_paise >= 0)'
     );
 
     // CHECK constraint: overdue_per_day_paise > 0 (for read-side division)
     await queryInterface.sequelize.query(
-        'ALTER TABLE stock_intake_lines ADD CONSTRAINT stock_intake_lines_overdue_per_day_paise_check CHECK (overdue_per_day_paise > 0)'
+        'ALTER TABLE stocks ADD CONSTRAINT stocks_overdue_per_day_paise_check CHECK (overdue_per_day_paise > 0)'
     );
 
-    // Partial unique index on (stock_intake_id, uuid) WHERE deleted_at IS NULL
-    // Ensures uniqueness within a trip for non-deleted lines only
-    // Global uuid uniqueness NOT enforced to allow restoration of soft-deleted lines
+    // Partial unique index on (trip_id, uuid) WHERE deleted_at IS NULL
+    // Ensures uniqueness within a trip for non-deleted stocks only
+    // Global uuid uniqueness NOT enforced to allow restoration of soft-deleted stocks
     await queryInterface.sequelize.query(
-        'CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_intake_lines_stock_intake_uuid ON stock_intake_lines (stock_intake_id, uuid) WHERE deleted_at IS NULL'
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_stocks_trip_uuid ON stocks (trip_id, uuid) WHERE deleted_at IS NULL'
     );
 }
 
 export async function down(queryInterface) {
-    await queryInterface.dropTable('stock_intake_lines');
+    await queryInterface.dropTable('stocks');
 }

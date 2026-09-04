@@ -1,4 +1,4 @@
-import { Vendor, StockIntake, StockIntakeLine, Unit, ProductType, Colour, Size, sequelize } from '../../../database/models/index.js';
+import { Vendor, Trip, TripVendor, Stock, Unit, ProductType, Colour, Size, sequelize } from '../../../database/models/index.js';
 import { Sequelize } from 'sequelize';
 
 export const getVendors = async () => {
@@ -117,30 +117,37 @@ export const updateVendor = async (uuid, data) => {
 };
 
 /**
- * Get vendor history: vendor with nested trips, lots, and units
- * Trips sorted by purchasedOn DESC, lots sorted by createdAt ASC, units sorted by createdAt ASC
- * Variance computed per trip (totalPaidPaise - sum of lot quantities × buying prices)
+ * Get vendor history: vendor with nested trip_vendors, stocks, and units
+ * Per-vendor purchase history: sorted by trip purchasedOn DESC, stocks by createdAt ASC, units by createdAt ASC
+ * Variance computed per trip_vendor (total_paid_paise - sum of stock quantities × buying prices)
  * All money fields returned as strings, UUIDs only (no internal id)
  * @param {string} vendorUuid - The vendor UUID
- * @returns {Object} DTO with vendor and nested trips/lots/units
+ * @returns {Object} DTO with vendor and trips array (one entry per trip_vendor bill)
  */
 export const getVendorHistory = async (vendorUuid) => {
     try {
-        // Query vendor with nested trips, lots, and units
+        // Query vendor with nested trip_vendors -> trip + stocks + units
         const vendor = await Vendor.findOne({
             where: { uuid: vendorUuid },
             attributes: ['uuid', 'name', 'phone', 'address', 'notes', 'isActive', 'createdAt', 'updatedAt'],
             include: [
                 {
-                    model: StockIntake,
-                    as: 'stockIntakes',
+                    model: TripVendor,
+                    as: 'tripVendors',
                     where: { deletedAt: { [Sequelize.Op.is]: null } },
-                    attributes: ['uuid', 'purchasedOn', 'totalPaidPaise', 'createdAt', 'updatedAt'],
+                    attributes: ['uuid', 'tripId', 'billReference', 'totalPaidPaise', 'notes', 'createdAt'],
                     required: false,
                     include: [
                         {
-                            model: StockIntakeLine,
-                            as: 'lines',
+                            model: Trip,
+                            as: 'trip',
+                            where: { deletedAt: { [Sequelize.Op.is]: null } },
+                            attributes: ['uuid', 'name', 'purchasedOn'],
+                            required: false,
+                        },
+                        {
+                            model: Stock,
+                            as: 'stocks',
                             where: { deletedAt: { [Sequelize.Op.is]: null } },
                             attributes: ['uuid', 'productTypeId', 'quantity', 'buyingPricePaise', 'sellingPricePaise', 'floorPricePaise', 'channel', 'rentPerDayPaise', 'depositPaise', 'overduePerDayPaise', 'createdAt'],
                             required: false,
@@ -197,70 +204,74 @@ export const getVendorHistory = async (vendorUuid) => {
 
 /**
  * Compute variance for a specific trip
- * variance = totalPaidPaise - sum(line.quantity * line.buyingPricePaise) for non-deleted lines
- * @param {number} stockIntakeId - The stock intake ID
+ * variance = totalPaidPaise - sum(stock.quantity * stock.buyingPricePaise) for non-deleted stocks
  * @param {number} totalPaidPaise - The total paid amount
- * @param {Array} lines - The lot lines for this trip
+ * @param {Array} stocks - The stock lines for this trip
  * @returns {number} The variance in paise
  */
-export function computeVarianceForTrip(totalPaidPaise, lines) {
-    if (!lines || lines.length === 0) {
+export function computeVarianceForTrip(totalPaidPaise, stocks) {
+    if (!stocks || stocks.length === 0) {
         return totalPaidPaise;
     }
 
-    const lotSum = lines.reduce((sum, line) => {
-        return sum + (line.quantity * Number(line.buyingPricePaise));
+    const stockSum = stocks.reduce((sum, stock) => {
+        return sum + (stock.quantity * Number(stock.buyingPricePaise));
     }, 0);
 
-    return totalPaidPaise - lotSum;
+    return totalPaidPaise - stockSum;
 }
 
 /**
  * Map vendor and nested data to history DTO
- * Money fields returned as strings, UUIDs only, variance computed per trip
- * Ensures trips are sorted by purchasedOn DESC, lines by createdAt ASC, units by createdAt ASC
- * @param {Object} vendor - Vendor with nested stockIntakes/lines/units
+ * Money fields returned as strings, UUIDs only, variance computed per trip_vendor
+ * Ensures trips are sorted by purchasedOn DESC, stocks by createdAt ASC, units by createdAt ASC
+ * @param {Object} vendor - Vendor with nested tripVendors/stocks/units
  * @returns {Object} DTO with vendor and trips array
  */
 function mapVendorHistoryDTO(vendor) {
-    let trips = (vendor.stockIntakes || []);
+    let tripVendors = (vendor.tripVendors || []);
 
-    // Sort trips by purchasedOn DESC (most recent first)
-    trips = trips.sort((a, b) => {
-        const dateA = new Date(a.purchasedOn);
-        const dateB = new Date(b.purchasedOn);
+    // Sort by trip purchasedOn DESC (most recent first)
+    tripVendors = tripVendors.sort((a, b) => {
+        const dateA = new Date(a.trip?.purchasedOn || 0);
+        const dateB = new Date(b.trip?.purchasedOn || 0);
         return dateB - dateA;
     });
 
-    const mappedTrips = trips.map(trip => {
-        // Sort lines by createdAt ASC (creation order)
-        let lines = (trip.lines || []);
-        lines = lines.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const mappedTrips = tripVendors.map(tv => {
+        // Sort stocks by createdAt ASC (creation order)
+        let stocks = (tv.stocks || []);
+        stocks = stocks.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-        // Compute variance for this trip
-        const variancePaise = computeVarianceForTrip(Number(trip.totalPaidPaise), lines);
+        // Compute variance for this vendor's bill on this trip
+        const variancePaise = computeVarianceForTrip(Number(tv.totalPaidPaise), stocks);
 
         return {
-            uuid: trip.uuid,
-            purchasedOn: trip.purchasedOn,
-            totalPaidPaise: String(trip.totalPaidPaise),
+            uuid: tv.trip?.uuid || tv.uuid,
+            tripVendorUuid: tv.uuid,
+            name: tv.trip?.name || null,
+            purchasedOn: tv.trip?.purchasedOn || null,
+            billReference: tv.billReference,
+            totalPaidPaise: String(tv.totalPaidPaise),
             variancePaise: String(variancePaise),
-            lines: lines.map(line => {
+            notes: tv.notes,
+            createdAt: tv.createdAt,
+            stocks: stocks.map(stock => {
                 // Sort units by createdAt ASC (scan order)
-                let units = (line.units || []);
+                let units = (stock.units || []);
                 units = units.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
                 return {
-                    uuid: line.uuid,
-                    productTypeUuid: line.productType?.uuid || null,
-                    quantity: line.quantity,
-                    buyingPricePaise: String(line.buyingPricePaise),
-                    sellingPricePaise: String(line.sellingPricePaise),
-                    floorPricePaise: String(line.floorPricePaise),
-                    channel: line.channel,
-                    rentPerDayPaise: line.rentPerDayPaise !== null ? String(line.rentPerDayPaise) : null,
-                    depositPaise: line.depositPaise !== null ? String(line.depositPaise) : null,
-                    overduePerDayPaise: line.overduePerDayPaise !== null ? String(line.overduePerDayPaise) : null,
+                    uuid: stock.uuid,
+                    productTypeUuid: stock.productType?.uuid || null,
+                    quantity: stock.quantity,
+                    buyingPricePaise: String(stock.buyingPricePaise),
+                    sellingPricePaise: String(stock.sellingPricePaise),
+                    floorPricePaise: String(stock.floorPricePaise),
+                    channel: stock.channel,
+                    rentPerDayPaise: stock.rentPerDayPaise !== null ? String(stock.rentPerDayPaise) : null,
+                    depositPaise: stock.depositPaise !== null ? String(stock.depositPaise) : null,
+                    overduePerDayPaise: stock.overduePerDayPaise !== null ? String(stock.overduePerDayPaise) : null,
                     units: units.map(unit => ({
                         uuid: unit.uuid,
                         barcode: unit.barcode,

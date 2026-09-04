@@ -119,7 +119,7 @@ function getExpectedFromStatus(channel, cause, to) {
  * Delegates from intake.service to preserve AD-8: units.service is the sole writer of units.status
  *
  * @param {Object} params
- * @param {Object} params.lot - StockIntakeLine object (the lot)
+ * @param {Object} params.stock - Stock object (the stock line the unit belongs to)
  * @param {Object} params.colour - Colour object
  * @param {Object} params.size - Size object
  * @param {string} params.barcode - Barcode string (1-12 chars)
@@ -129,7 +129,7 @@ function getExpectedFromStatus(channel, cause, to) {
  * @throws {Error} with statusCode property for HTTP mapping
  */
 export const createUnitFromScan = async ({
-    lot,
+    stock,
     colour,
     size,
     barcode,
@@ -137,21 +137,21 @@ export const createUnitFromScan = async ({
     transaction,
 }) => {
     try {
-        // Create the unit row with prices copied from lot at scan time (AD-24 tier 1)
+        // Create the unit row with prices copied from stock at scan time (AD-24 tier 1)
         const unit = await Unit.create(
             {
                 barcode,
-                stockIntakeLineId: lot.id,
+                stockId: stock.id,
                 colourId: colour.id,
                 sizeId: size.id,
                 status: 'in_stock',
-                channel: lot.channel,
-                buyingPricePaise: lot.buyingPricePaise,
-                sellingPricePaise: lot.sellingPricePaise,
-                floorPricePaise: lot.floorPricePaise,
-                rentPerDayPaise: lot.rentPerDayPaise,
-                depositPaise: lot.depositPaise,
-                overduePerDayPaise: lot.overduePerDayPaise,
+                channel: stock.channel,
+                buyingPricePaise: stock.buyingPricePaise,
+                sellingPricePaise: stock.sellingPricePaise,
+                floorPricePaise: stock.floorPricePaise,
+                rentPerDayPaise: stock.rentPerDayPaise,
+                depositPaise: stock.depositPaise,
+                overduePerDayPaise: stock.overduePerDayPaise,
             },
             { transaction }
         );
@@ -173,7 +173,7 @@ export const createUnitFromScan = async ({
         const fullUnit = await Unit.findByPk(unit.id, {
             transaction,
             include: [
-                { association: 'lot', attributes: ['uuid'] },
+                { association: 'stock', attributes: ['uuid'] },
                 { association: 'colour', attributes: ['uuid'] },
                 { association: 'size', attributes: ['uuid'] },
             ],
@@ -340,7 +340,7 @@ export const transitionUnit = async (
         const updatedUnit = await Unit.findByPk(unitId, {
             transaction,
             include: [
-                { association: 'lot', attributes: ['uuid'] },
+                { association: 'stock', attributes: ['uuid'] },
                 { association: 'colour', attributes: ['uuid'] },
                 { association: 'size', attributes: ['uuid'] },
             ],

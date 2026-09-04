@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
-import { sequelize, Unit, UnitStatusEvent, User, Colour, Size, StockIntakeLine, StockIntake } from '../../../database/models/index.js';
+import { sequelize, Unit, UnitStatusEvent, User, Colour, Size, Vendor, Trip, TripVendor, Stock, ProductType } from '../../../database/models/index.js';
 import { transitionUnit, createUnitFromScan, getUnitStatusEvents } from '../units.service.js';
 import { CHANNEL } from '../../../constants/channel.js';
 
@@ -7,9 +7,10 @@ describe('Unit State Machine - transitionUnit()', () => {
     let testUser;
     let testColour;
     let testSize;
-    let testStockIntake;
-    let testLot;
-    let testUnit;
+    let testVendor;
+    let testTrip;
+    let testStock;
+    let testStockId;
 
     beforeAll(async () => {
         // Ensure database is initialized
@@ -25,37 +26,54 @@ describe('Unit State Machine - transitionUnit()', () => {
             testUser = await User.create({
                 email: `test-${Date.now()}@test.com`,
                 passwordHash: 'dummy',
-                name: 'Test User',
-                status: 'ACTIVE',
+                username: `test-${Date.now()}`,
             }, { transaction });
 
             testColour = await Colour.create({
                 name: 'Red',
-                code: 'RED',
+                isActive: true,
             }, { transaction });
 
             testSize = await Size.create({
                 name: 'Standard',
-                code: 'STD',
+                isActive: true,
             }, { transaction });
 
-            testStockIntake = await StockIntake.create({
-                vendorId: 1, // Dummy vendor ID
-                notes: 'Test intake',
+            testVendor = await Vendor.create({
+                name: `Vendor ${Date.now()}`,
             }, { transaction });
 
-            testLot = await StockIntakeLine.create({
-                stockIntakeId: testStockIntake.id,
+            testTrip = await Trip.create({
+                name: `Trip ${Date.now()}`,
+                purchasedOn: new Date().toISOString().split('T')[0],
+            }, { transaction });
+
+            const tripVendor = await TripVendor.create({
+                tripId: testTrip.id,
+                vendorId: testVendor.id,
+                totalPaidPaise: 100000,
+            }, { transaction });
+
+            const productType = await ProductType.create({
+                name: `PT ${Date.now()}`,
+            }, { transaction });
+
+            testStock = await Stock.create({
+                tripId: testTrip.id,
+                tripVendorId: tripVendor.id,
+                vendorId: testVendor.id,
+                productTypeId: productType.id,
                 channel: CHANNEL.RETAIL,
                 quantity: 10,
                 buyingPricePaise: '10000',
                 sellingPricePaise: '20000',
                 floorPricePaise: '18000',
             }, { transaction });
+            testStockId = testStock.id;
 
             // Create a unit via createUnitFromScan
             testUnit = await createUnitFromScan({
-                lot: testLot,
+                stock: testStock,
                 colour: testColour,
                 size: testSize,
                 barcode: `TEST-${Date.now()}`,
@@ -406,20 +424,23 @@ describe('Unit State Machine - transitionUnit()', () => {
             // Create a rental unit
             const transaction = await sequelize.transaction();
             try {
-                const rentalLot = await StockIntakeLine.create({
-                    stockIntakeId: testStockIntake.id,
+                const rentalStock = await Stock.create({
+                    tripId: testTrip.id,
+                    tripVendorId: (await TripVendor.findOne({ where: { tripId: testTrip.id } }, { transaction })).id,
+                    vendorId: testVendor.id,
+                    productTypeId: (await ProductType.findOne({}, { transaction })).id,
                     channel: CHANNEL.RENTAL,
                     quantity: 5,
                     buyingPricePaise: '50000',
-                    sellingPricePaise: null,
-                    floorPricePaise: null,
+                    sellingPricePaise: '0',
+                    floorPricePaise: '0',
                     rentPerDayPaise: '100000',
                     depositPaise: '200000',
                     overduePerDayPaise: '50000',
                 }, { transaction });
 
                 const rentalUnit = await createUnitFromScan({
-                    lot: rentalLot,
+                    stock: rentalStock,
                     colour: testColour,
                     size: testSize,
                     barcode: `RENTAL-${Date.now()}`,
@@ -460,7 +481,7 @@ describe('Unit State Machine - transitionUnit()', () => {
             const transaction = await sequelize.transaction();
             try {
                 const newUnit = await createUnitFromScan({
-                    lot: testLot,
+                    stock: testStock,
                     colour: testColour,
                     size: testSize,
                     barcode: `NEW-${Date.now()}`,

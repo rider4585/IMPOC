@@ -1,7 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import * as db from '../../database/models/index.js';
-import { initializeTestDatabase, generateTestUser, closeDatabase } from '../utils/test-setup.js';
+import { initializeTestDatabase, generateTestUser, closeDatabase, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
 import argon2 from 'argon2';
 import app from '../../app.js';
 import rentalRoutes from '../../src/modules/rentals/rental-agreement.routes.js';
@@ -25,7 +25,9 @@ describe('Rental agreements module (T-10)', () => {
     let managerToken;
     let cashierToken;
     let trip;
-    let lot;
+    let tripVendor;
+    let vendor;
+    let stock;
     let colour;
     let size;
     let productType;
@@ -34,11 +36,10 @@ describe('Rental agreements module (T-10)', () => {
 
     async function scanUnit(barcode) {
         const res = await request(app)
-            .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
+            .post(`/api/trips/${trip.uuid}/stocks/${stock.uuid}/scan`)
             .set('Authorization', `Bearer ${managerToken}`)
             .send({
                 barcode,
-                stockIntakeLineUuid: lot.uuid,
                 colourUuid: colour.uuid,
                 sizeUuid: size.uuid,
             })
@@ -92,23 +93,31 @@ describe('Rental agreements module (T-10)', () => {
         colour = await db.Colour.create({ name: 'Blue', hexValue: '#0000FF', isActive: true });
         size = await db.Size.create({ name: 'L', isActive: true });
         productType = await db.ProductType.create({ name: `PT_${Date.now()}` });
-        const vendor = await db.Vendor.create({ name: 'Test Vendor' });
-        trip = await db.StockIntake.create({
-            vendorId: vendor.id,
-            purchasedOn: new Date().toISOString().split('T')[0],
+        vendor = await db.Vendor.create({ name: 'Test Vendor' });
+
+        const pair = await createTripWithVendor({
+            vendor,
+            name: 'TEST Rental Trip',
             totalPaidPaise: 1000000,
         });
-        lot = await db.StockIntakeLine.create({
-            stockIntakeId: trip.id,
-            productTypeId: productType.id,
-            quantity: 20,
-            buyingPricePaise: 100000,
-            sellingPricePaise: 30000,
-            floorPricePaise: 25000,
-            channel: 'RENTAL',
-            rentPerDayPaise: 10000,
-            depositPaise: 5000,
-            overduePerDayPaise: 2000,
+        trip = pair.trip;
+        tripVendor = pair.tripVendor;
+
+        stock = await createTestStock({
+            trip,
+            tripVendor,
+            vendor,
+            productType,
+            overrides: {
+                quantity: 20,
+                buyingPricePaise: 100000,
+                sellingPricePaise: 30000,
+                floorPricePaise: 25000,
+                channel: 'RENTAL',
+                rentPerDayPaise: 10000,
+                depositPaise: 5000,
+                overduePerDayPaise: 2000,
+            },
         });
 
         gradeMaintenance = await db.DamageGrade.create({
@@ -127,6 +136,10 @@ describe('Rental agreements module (T-10)', () => {
         await db.User.destroy({
             where: { username: { [db.Sequelize.Op.like]: 'testuser_%' } },
         });
+        await db.Unit.destroy({ where: { stockId: stock.id }, force: true });
+        await db.Stock.destroy({ where: { id: stock.id }, force: true });
+        await db.TripVendor.destroy({ where: { tripId: trip.id }, force: true });
+        await db.Trip.destroy({ where: { id: trip.id }, force: true });
         await closeDatabase();
     });
 

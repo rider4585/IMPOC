@@ -39,8 +39,10 @@ import ColourModel from './Colour.js';
 import SizeModel from './Size.js';
 import DamageGradeModel from './DamageGrade.js';
 import VendorModel from './Vendor.js';
-import StockIntakeModel from './StockIntake.js';
-import StockIntakeLineModel from './StockIntakeLine.js';
+import TripModel from './Trip.js';
+import TripVendorModel from './TripVendor.js';
+import StockModel from './Stock.js';
+import StockTemplateModel from './StockTemplate.js';
 import UnitModel from './Unit.js';
 import UnitStatusEventModel from './UnitStatusEvent.js';
 import SaleModel from './Sale.js';
@@ -52,8 +54,6 @@ import RentalReturnModel from './RentalReturn.js';
 import RentalReversalModel from './RentalReversal.js';
 import ExpenseModel from './Expense.js';
 import ExpenseReversalModel from './ExpenseReversal.js';
-import IntakeRecordModel from './IntakeRecord.js';
-import IntakeTemplateModel from './IntakeTemplate.js';
 
 const User = UserModel(sequelize);
 const Role = RoleModel(sequelize);
@@ -68,8 +68,10 @@ const Colour = ColourModel(sequelize);
 const Size = SizeModel(sequelize);
 const DamageGrade = DamageGradeModel(sequelize);
 const Vendor = VendorModel(sequelize);
-const StockIntake = StockIntakeModel(sequelize);
-const StockIntakeLine = StockIntakeLineModel(sequelize);
+const Trip = TripModel(sequelize);
+const TripVendor = TripVendorModel(sequelize);
+const Stock = StockModel(sequelize);
+const StockTemplate = StockTemplateModel(sequelize);
 const Unit = UnitModel(sequelize);
 const UnitStatusEvent = UnitStatusEventModel(sequelize);
 const Sale = SaleModel(sequelize);
@@ -81,8 +83,6 @@ const RentalReturn = RentalReturnModel(sequelize);
 const RentalReversal = RentalReversalModel(sequelize);
 const Expense = ExpenseModel(sequelize);
 const ExpenseReversal = ExpenseReversalModel(sequelize);
-const IntakeRecord = IntakeRecordModel(sequelize);
-const IntakeTemplate = IntakeTemplateModel(sequelize);
 
 /*
  * User ↔ Role
@@ -195,50 +195,100 @@ ProductType.belongsTo(ProductType, {
 });
 
 /*
- * StockIntake ↔ Vendor
+ * Trip ↔ Vendor (via TripVendor junction)
  */
-Vendor.hasMany(StockIntake, {
-    foreignKey: 'vendor_id',
-    as: 'stockIntakes',
+Trip.belongsToMany(Vendor, {
+    through: TripVendor,
+    foreignKey: 'tripId',
+    otherKey: 'vendorId',
+    as: 'vendors',
 });
 
-StockIntake.belongsTo(Vendor, {
+Vendor.belongsToMany(Trip, {
+    through: TripVendor,
+    foreignKey: 'vendorId',
+    otherKey: 'tripId',
+    as: 'trips',
+});
+
+Trip.hasMany(TripVendor, {
+    foreignKey: 'trip_id',
+    as: 'tripVendors',
+});
+
+TripVendor.belongsTo(Trip, {
+    foreignKey: 'trip_id',
+    as: 'trip',
+});
+
+Vendor.hasMany(TripVendor, {
+    foreignKey: 'vendor_id',
+    as: 'tripVendors',
+});
+
+TripVendor.belongsTo(Vendor, {
     foreignKey: 'vendor_id',
     as: 'vendor',
 });
 
 /*
- * StockIntake ↔ StockIntakeLine
+ * TripVendor ↔ Stock
  */
-StockIntake.hasMany(StockIntakeLine, {
-    foreignKey: 'stock_intake_id',
-    as: 'lines',
+TripVendor.hasMany(Stock, {
+    foreignKey: 'trip_vendor_id',
+    as: 'stocks',
 });
 
-StockIntakeLine.belongsTo(StockIntake, {
-    foreignKey: 'stock_intake_id',
+Stock.belongsTo(TripVendor, {
+    foreignKey: 'trip_vendor_id',
+    as: 'tripVendor',
+});
+
+/*
+ * Trip ↔ Stock
+ */
+Trip.hasMany(Stock, {
+    foreignKey: 'trip_id',
+    as: 'stocks',
+});
+
+Stock.belongsTo(Trip, {
+    foreignKey: 'trip_id',
     as: 'trip',
 });
 
 /*
- * StockIntakeLine ↔ ProductType
+ * Vendor ↔ Stock
  */
-StockIntakeLine.belongsTo(ProductType, {
+Vendor.hasMany(Stock, {
+    foreignKey: 'vendor_id',
+    as: 'stocks',
+});
+
+Stock.belongsTo(Vendor, {
+    foreignKey: 'vendor_id',
+    as: 'vendor',
+});
+
+/*
+ * Stock ↔ ProductType
+ */
+Stock.belongsTo(ProductType, {
     foreignKey: 'product_type_id',
     as: 'productType',
 });
 
 /*
- * Unit ↔ StockIntakeLine (lot)
+ * Stock ↔ Unit
  */
-StockIntakeLine.hasMany(Unit, {
-    foreignKey: 'stock_intake_line_id',
+Stock.hasMany(Unit, {
+    foreignKey: 'stock_id',
     as: 'units',
 });
 
-Unit.belongsTo(StockIntakeLine, {
-    foreignKey: 'stock_intake_line_id',
-    as: 'lot',
+Unit.belongsTo(Stock, {
+    foreignKey: 'stock_id',
+    as: 'stock',
 });
 
 /*
@@ -271,7 +321,7 @@ Unit.hasMany(UnitStatusEvent, {
 });
 
 /*
- * Sale �+" SaleLine
+ * Sale ↔ SaleLine
  */
 Sale.hasMany(SaleLine, {
     foreignKey: 'sale_id',
@@ -284,7 +334,7 @@ SaleLine.belongsTo(Sale, {
 });
 
 /*
- * SaleLine �+" Unit
+ * SaleLine ↔ Unit
  */
 SaleLine.belongsTo(Unit, {
     foreignKey: 'unit_id',
@@ -297,7 +347,7 @@ Unit.hasMany(SaleLine, {
 });
 
 /*
- * Sale �+" SaleReversal
+ * Sale ↔ SaleReversal
  */
 Sale.hasMany(SaleReversal, {
     foreignKey: 'sale_id',
@@ -310,7 +360,7 @@ SaleReversal.belongsTo(Sale, {
 });
 
 /*
- * RentalAgreement �+" RentalLine
+ * RentalAgreement ↔ RentalLine
  */
 RentalAgreement.hasMany(RentalLine, {
     foreignKey: 'agreement_id',
@@ -323,7 +373,7 @@ RentalLine.belongsTo(RentalAgreement, {
 });
 
 /*
- * RentalLine �+" Unit
+ * RentalLine ↔ Unit
  */
 RentalLine.belongsTo(Unit, {
     foreignKey: 'unit_id',
@@ -336,7 +386,7 @@ Unit.hasMany(RentalLine, {
 });
 
 /*
- * RentalAgreement �+" RentalReturn
+ * RentalAgreement ↔ RentalReturn
  */
 RentalAgreement.hasMany(RentalReturn, {
     foreignKey: 'agreement_id',
@@ -349,7 +399,7 @@ RentalReturn.belongsTo(RentalAgreement, {
 });
 
 /*
- * RentalLine �+" RentalReturn
+ * RentalLine ↔ RentalReturn
  */
 RentalLine.hasMany(RentalReturn, {
     foreignKey: 'rental_line_id',
@@ -362,7 +412,7 @@ RentalReturn.belongsTo(RentalLine, {
 });
 
 /*
- * RentalAgreement �+" RentalReversal
+ * RentalAgreement ↔ RentalReversal
  */
 RentalAgreement.hasMany(RentalReversal, {
     foreignKey: 'agreement_id',
@@ -375,7 +425,7 @@ RentalReversal.belongsTo(RentalAgreement, {
 });
 
 /*
- * Expense �+" ExpenseReversal
+ * Expense ↔ ExpenseReversal
  */
 Expense.hasMany(ExpenseReversal, {
     foreignKey: 'expense_id',
@@ -388,35 +438,22 @@ ExpenseReversal.belongsTo(Expense, {
 });
 
 /*
- * IntakeRecord ↔ Vendor (optional)
+ * StockTemplate ↔ Vendor
  */
-Vendor.hasMany(IntakeRecord, {
+Vendor.hasMany(StockTemplate, {
     foreignKey: 'vendor_id',
-    as: 'intakeRecords',
+    as: 'stockTemplates',
 });
 
-IntakeRecord.belongsTo(Vendor, {
+StockTemplate.belongsTo(Vendor, {
     foreignKey: 'vendor_id',
     as: 'vendor',
 });
 
 /*
- * IntakeRecord ↔ IntakeTemplate
+ * StockTemplate ↔ ProductType
  */
-IntakeRecord.hasMany(IntakeTemplate, {
-    foreignKey: 'intake_record_id',
-    as: 'templates',
-});
-
-IntakeTemplate.belongsTo(IntakeRecord, {
-    foreignKey: 'intake_record_id',
-    as: 'intakeRecord',
-});
-
-/*
- * IntakeTemplate ↔ ProductType (subtype)
- */
-IntakeTemplate.belongsTo(ProductType, {
+StockTemplate.belongsTo(ProductType, {
     foreignKey: 'product_type_id',
     as: 'productType',
 });
@@ -437,8 +474,10 @@ export {
     Size,
     DamageGrade,
     Vendor,
-    StockIntake,
-    StockIntakeLine,
+    Trip,
+    TripVendor,
+    Stock,
+    StockTemplate,
     Unit,
     UnitStatusEvent,
     Sale,
@@ -450,6 +489,4 @@ export {
     RentalReversal,
     Expense,
     ExpenseReversal,
-    IntakeRecord,
-    IntakeTemplate,
 };

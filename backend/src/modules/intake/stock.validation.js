@@ -1,11 +1,15 @@
 import { z } from 'zod';
 import { CHANNEL } from '../../constants/channel.js';
 
-export const createStockIntakeLineSchema = z
+export const createStockSchema = z
     .object({
         tripUuid: z
             .string()
             .uuid('Invalid trip UUID format'),
+
+        vendorUuid: z
+            .string()
+            .uuid('Invalid vendor UUID format'),
 
         productTypeUuid: z
             .string()
@@ -122,7 +126,7 @@ export const createStockIntakeLineSchema = z
         }
     );
 
-export const updateStockIntakeLineSchema = z
+export const updateStockSchema = z
     .object({
         quantity: z
             .number()
@@ -175,8 +179,39 @@ export const updateStockIntakeLineSchema = z
             .max(9223372036854775807, 'Overdue per day exceeds maximum BIGINT value')
             .nullable()
             .optional(),
-    });
+    })
+    .refine(
+        (data) => {
+            // When both defined, floor price cannot exceed selling price
+            if (data.floorPricePaise !== undefined && data.sellingPricePaise !== undefined) {
+                return data.floorPricePaise <= data.sellingPricePaise;
+            }
+            return true;
+        },
+        {
+            message: 'Floor price cannot exceed selling price',
+            path: ['floorPricePaise'],
+        }
+    );
 
-export const stockIntakeLineUuidParamSchema = z.object({
+export const stockUuidParamSchema = z.object({
     uuid: z.string().uuid('Invalid UUID format'),
+});
+
+/**
+ * Schema for POST /api/trips/:tripUuid/stocks/:uuid/scan
+ */
+export const scanIntoStockSchema = z.object({
+    barcode: z
+        .string()
+        .min(1, 'Barcode must be at least 1 character')
+        .max(12, 'Barcode must be at most 12 characters'),
+
+    colourUuid: z
+        .string()
+        .uuid('Invalid colour UUID format'),
+
+    sizeUuid: z
+        .string()
+        .uuid('Invalid size UUID format'),
 });

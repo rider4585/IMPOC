@@ -1,8 +1,8 @@
 import { DataTypes } from 'sequelize';
 
 export default (sequelize) => {
-    const IntakeRecord = sequelize.define(
-        'IntakeRecord',
+    const TripVendor = sequelize.define(
+        'TripVendor',
         {
             id: {
                 type: DataTypes.INTEGER,
@@ -17,32 +17,33 @@ export default (sequelize) => {
                 unique: true,
             },
 
-            name: {
-                type: DataTypes.STRING(200),
-                allowNull: false,
-            },
-
-            purchasedOn: {
-                type: DataTypes.DATEONLY,
-                field: 'purchased_on',
+            tripId: {
+                type: DataTypes.INTEGER,
+                field: 'trip_id',
                 allowNull: false,
             },
 
             vendorId: {
                 type: DataTypes.INTEGER,
                 field: 'vendor_id',
+                allowNull: false,
+            },
+
+            billReference: {
+                type: DataTypes.STRING(100),
+                field: 'bill_reference',
                 allowNull: true,
+            },
+
+            totalPaidPaise: {
+                type: DataTypes.BIGINT,
+                field: 'total_paid_paise',
+                allowNull: false,
             },
 
             notes: {
                 type: DataTypes.TEXT,
                 allowNull: true,
-            },
-
-            status: {
-                type: DataTypes.STRING(20),
-                allowNull: false,
-                defaultValue: 'active',
             },
 
             deletedAt: {
@@ -61,12 +62,12 @@ export default (sequelize) => {
             },
         },
         {
-            tableName: 'intake_records',
+            tableName: 'trip_vendors',
             timestamps: true,
             underscored: true,
             paranoid: true,
         }
     );
 
-    return IntakeRecord;
+    return TripVendor;
 };

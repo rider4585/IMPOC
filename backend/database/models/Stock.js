@@ -1,8 +1,8 @@
 import { DataTypes } from 'sequelize';
 
 export default (sequelize) => {
-    const StockIntakeLine = sequelize.define(
-        'StockIntakeLine',
+    const Stock = sequelize.define(
+        'Stock',
         {
             id: {
                 type: DataTypes.INTEGER,
@@ -16,10 +16,22 @@ export default (sequelize) => {
                 allowNull: false,
             },
 
-            stockIntakeId: {
+            tripId: {
                 type: DataTypes.INTEGER,
-                field: 'stock_intake_id',
-                allowNull: true,
+                field: 'trip_id',
+                allowNull: false,
+            },
+
+            tripVendorId: {
+                type: DataTypes.INTEGER,
+                field: 'trip_vendor_id',
+                allowNull: false,
+            },
+
+            vendorId: {
+                type: DataTypes.INTEGER,
+                field: 'vendor_id',
+                allowNull: false,
             },
 
             productTypeId: {
@@ -90,12 +102,12 @@ export default (sequelize) => {
             },
         },
         {
-            tableName: 'stock_intake_lines',
+            tableName: 'stocks',
             timestamps: true,
             underscored: true,
             paranoid: true,
         }
     );
 
-    return StockIntakeLine;
+    return Stock;
 };

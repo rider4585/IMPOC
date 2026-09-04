@@ -1,8 +1,8 @@
 import { DataTypes } from 'sequelize';
 
 export default (sequelize) => {
-    const IntakeTemplate = sequelize.define(
-        'IntakeTemplate',
+    const StockTemplate = sequelize.define(
+        'StockTemplate',
         {
             id: {
                 type: DataTypes.INTEGER,
@@ -17,21 +17,21 @@ export default (sequelize) => {
                 unique: true,
             },
 
-            intakeRecordId: {
+            vendorId: {
                 type: DataTypes.INTEGER,
-                field: 'intake_record_id',
+                field: 'vendor_id',
                 allowNull: false,
-            },
-
-            name: {
-                type: DataTypes.STRING(200),
-                allowNull: true,
             },
 
             productTypeId: {
                 type: DataTypes.INTEGER,
                 field: 'product_type_id',
                 allowNull: false,
+            },
+
+            name: {
+                type: DataTypes.STRING(200),
+                allowNull: true,
             },
 
             buyingPricePaise: {
@@ -74,12 +74,12 @@ export default (sequelize) => {
             },
         },
         {
-            tableName: 'intake_templates',
+            tableName: 'stock_templates',
             timestamps: true,
             underscored: true,
             paranoid: true,
         }
     );
 
-    return IntakeTemplate;
+    return StockTemplate;
 };
