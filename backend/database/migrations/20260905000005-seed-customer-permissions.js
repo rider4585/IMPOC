@@ -11,8 +11,8 @@ export async function up(queryInterface) {
     for (const [name, description] of CUSTOMER_PERMISSIONS) {
         await queryInterface.sequelize.query(
             `
-            INSERT INTO permissions (name, description, created_at, updated_at)
-            VALUES (:name, :description, NOW(), NOW())
+            INSERT INTO permissions (uuid, name, description, created_at, updated_at)
+            VALUES (gen_random_uuid(), :name, :description, NOW(), NOW())
             ON CONFLICT (name) DO UPDATE SET
                 description = EXCLUDED.description,
                 updated_at = NOW()
@@ -38,8 +38,8 @@ export async function up(queryInterface) {
         for (const permission of permissions) {
             await queryInterface.sequelize.query(
                 `
-                INSERT INTO role_permissions (role_id, permission_id, created_at, updated_at)
-                VALUES (:roleId, :permissionId, NOW(), NOW())
+                INSERT INTO role_permissions (uuid, role_id, permission_id, created_at, updated_at)
+                VALUES (gen_random_uuid(), :roleId, :permissionId, NOW(), NOW())
                 ON CONFLICT (role_id, permission_id) DO NOTHING
                 `,
                 { replacements: { roleId: roleIds[roleName], permissionId: permission.id } }
