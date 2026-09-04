@@ -3,6 +3,7 @@ import {
     SaleLine,
     SaleReversal,
     RentalAgreement,
+    RentalLine,
     RentalReturn,
     RentalReversal,
     Expense,
