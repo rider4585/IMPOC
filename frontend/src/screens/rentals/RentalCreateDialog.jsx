@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Dialog, Button, Input, Card, CardContent, useToast } from '../../components/ui';
 import { getUnitByBarcode } from '../../services/unitsApi.js';
 import { formatPaise } from '../../platform/money.js';
+import { CustomerPicker } from '../../components/customers/CustomerPicker.jsx';
 
 function todayISO() {
   const d = new Date();
@@ -13,11 +14,11 @@ function todayISO() {
 export function RentalCreateDialog({ open, onClose, onSave, saving }) {
   const toast = useToast();
   const [form, setForm] = useState({
-    customerName: '',
     startDate: todayISO(),
     rentalDays: '3',
     notes: '',
   });
+  const [customer, setCustomer] = useState(null);
   const [barcode, setBarcode] = useState('');
   const [items, setItems] = useState([]);
   const [lookupError, setLookupError] = useState('');
@@ -73,8 +74,8 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
     setBarcode('');
     setLookupError('');
     setError('');
+    setCustomer(null);
     setForm({
-      customerName: '',
       startDate: todayISO(),
       rentalDays: '3',
       notes: '',
@@ -94,7 +95,8 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
       return;
     }
     onSave({
-      customerName: form.customerName.trim() || undefined,
+      customerName: customer?.name || undefined,
+      customerUuid: customer?.uuid,
       startDate: form.startDate || undefined,
       rentalDays: days,
       notes: form.notes.trim() || undefined,
@@ -121,13 +123,7 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
       <Card>
         <CardContent className="p-4">
           <form id="rental-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <Input
-              label="Customer name"
-              value={form.customerName}
-              onChange={set('customerName')}
-              placeholder="Optional"
-              maxLength={255}
-            />
+            <CustomerPicker value={customer} onChange={setCustomer} />
             <div className="flex flex-wrap items-end gap-2">
               <Input
                 label="Scan or enter barcode"

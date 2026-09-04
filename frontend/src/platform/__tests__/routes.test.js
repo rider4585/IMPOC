@@ -8,6 +8,8 @@ import {
   RENTAL_ROUTES,
   EXPENSE_ROUTES,
   UNIT_ROUTES,
+  CUSTOMER_ROUTES,
+  RECEIPT_ROUTES,
 } from '../routes.js';
 
 describe('BARCODE_ROUTES', () => {
@@ -155,5 +157,33 @@ describe('EXPENSE_ROUTES', () => {
     expect(EXPENSE_ROUTES.UPDATE(uuid)).toBe(`/expenses/${uuid}`);
     expect(EXPENSE_ROUTES.CANCEL(uuid)).toBe(`/expenses/${uuid}/cancel`);
     expect(EXPENSE_ROUTES.CANCEL(uuid)).not.toContain('/api/');
+  });
+});
+
+describe('CUSTOMER_ROUTES', () => {
+  it('list/create are constants', () => {
+    expect(CUSTOMER_ROUTES.LIST).toBe('/customers');
+    expect(CUSTOMER_ROUTES.CREATE).toBe('/customers');
+    expect(CUSTOMER_ROUTES.LIST).not.toContain('/api/');
+  });
+
+  it('builds GET/UPDATE/CONSENT paths for a customer uuid', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(CUSTOMER_ROUTES.GET(uuid)).toBe(`/customers/${uuid}`);
+    expect(CUSTOMER_ROUTES.UPDATE(uuid)).toBe(`/customers/${uuid}`);
+    expect(CUSTOMER_ROUTES.CONSENT(uuid)).toBe(`/customers/${uuid}/consent`);
+    expect(CUSTOMER_ROUTES.CONSENT(uuid)).not.toContain('/api/');
+  });
+
+  it('encodes special characters in the uuid param', () => {
+    expect(CUSTOMER_ROUTES.CONSENT('a b')).toBe('/customers/a%20b/consent');
+  });
+});
+
+describe('RECEIPT_ROUTES', () => {
+  it('exposes preview + print constants', () => {
+    expect(RECEIPT_ROUTES.PREVIEW).toBe('/receipts/preview');
+    expect(RECEIPT_ROUTES.PRINT).toBe('/receipts/print');
+    expect(RECEIPT_ROUTES.PRINT).not.toContain('/api/');
   });
 });

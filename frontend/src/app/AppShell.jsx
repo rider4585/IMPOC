@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Wallet,
+  Users,
   UserCog,
   KeyRound,
   ListChecks,
@@ -47,6 +48,7 @@ const ICONS = {
   roles: <KeyRound {...iconProps} />,
   permissions: <ShieldCheck {...iconProps} />,
   picklists: <ListChecks {...iconProps} />,
+  customers: <Users {...iconProps} />,
   dashboardItem: <Layers {...iconProps} />,
 };
 
@@ -66,6 +68,7 @@ const itemIcon = {
   '/roles': 'roles',
   '/permissions': 'permissions',
   '/picklists': 'picklists',
+  '/customers': 'customers',
   '/dashboard': 'dashboardItem',
 };
 

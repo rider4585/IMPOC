@@ -37,8 +37,9 @@ export async function listSales() {
 
 /**
  * POST /sales - Checkout a RETAIL sale
- * @param {{customerName?, soldAt?, notes?, items: Array<{unitUuid?|barcode?}>}} payload
- * @returns {Promise<Object>} sale DTO with lines[]
+ * @param {{customerName?, customerUuid?, soldAt?, notes?, items: Array<{unitUuid?|barcode?}>}} payload
+ * customerUuid (Schema V2) links a customers entity; customerName free text stays supported.
+ * @returns {Promise<Object>} sale DTO with lines[] and optional customer object
  */
 export async function createSale(payload) {
   try {
