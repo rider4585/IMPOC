@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
 /**
- * Dialog — shadcn-style base modal primitive (light mode, Tailwind).
+ * Dialog â€” shadcn-style base modal primitive (light mode, Tailwind).
  *
  * Props:
  * - open: boolean
@@ -48,7 +48,7 @@ export const Dialog = ({
             onClick={onClose}
           />
           <motion.div
-            className={`fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border)] bg-white p-6 shadow-lg ${className}`.trim()}
+            className={`fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg ${className}`.trim()}
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}

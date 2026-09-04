@@ -148,7 +148,7 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
               </Button>
             </div>
             {lookupError && (
-              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{lookupError}</div>
+              <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{lookupError}</div>
             )}
 
             {items.length > 0 && (
@@ -156,7 +156,7 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
                 {items.map((i) => (
                   <li
                     key={i.uuid}
-                    className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                    className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                   >
                     <span className="font-semibold">{i.barcode}</span>
                     <span className="ml-auto text-[var(--ink-muted)]">
@@ -195,7 +195,7 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
               maxLength={2000}
             />
             {error && (
-              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+              <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

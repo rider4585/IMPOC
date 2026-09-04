@@ -2,112 +2,52 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { navigationSections } from './navigation';
+import { ShopLogo } from '../components/ShopLogo';
+import { SettingsDrawer } from '../theme/index.js';
+import {
+  Boxes,
+  ScanBarcode,
+  Store,
+  MapPin,
+  NotebookPen,
+  LayoutDashboard,
+  Truck,
+  ShoppingCart,
+  ChartLine,
+  CalendarRange,
+  ListOrdered,
+  ShieldCheck,
+  ShoppingBag,
+  Wallet,
+  UserCog,
+  KeyRound,
+  ListChecks,
+  Settings,
+  Layers,
+} from 'lucide-react';
 
-/**
- * Section / item icon set — lightweight inline SVGs (no extra dependency).
- * Keyed by the `icon` strings set on navigationSections + nav items.
- */
+const iconClass = 'h-4 w-4';
+const iconProps = { className: iconClass, 'aria-hidden': true };
+
 const ICONS = {
-  inventory: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <path d="m3.3 7 8.7 5 8.7-5" />
-      <path d="M12 22V12" />
-    </svg>
-  ),
-  pos: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <rect width="20" height="14" x="2" y="5" rx="2" />
-      <line x1="6" x2="10" y1="10" y2="10" />
-      <path d="M6 15h4" />
-    </svg>
-  ),
-  rentals: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M8 6v6" /><path d="M15 6v6" />
-      <rect width="18" height="18" x="3" y="3" rx="2" />
-    </svg>
-  ),
-  expenses: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-    </svg>
-  ),
-  admin: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  ),
-  dashboard: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <rect width="7" height="9" x="3" y="3" rx="1" />
-      <rect width="7" height="5" x="14" y="3" rx="1" />
-      <rect width="7" height="9" x="14" y="12" rx="1" />
-      <rect width="7" height="5" x="3" y="16" rx="1" />
-    </svg>
-  ),
-  intake: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-    </svg>
-  ),
-  vendors: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M6 22 4 3H3" /><path d="M18 22 20 3h1" /><path d="M5 16h14" /><path d="M5 8h14" />
-    </svg>
-  ),
-  barcode: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M3 5v14" /><path d="M7 5v14" /><path d="M11 5v14" /><path d="M15 5v14" /><path d="M19 5v14" />
-    </svg>
-  ),
-  sales: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M3 3v18h18" /><path d="m7 15 4-4 4 3 5-6" />
-    </svg>
-  ),
-  cart: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" />
-      <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
-    </svg>
-  ),
-  rentalsItem: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <rect width="18" height="18" x="3" y="3" rx="2" /><path d="M8 21v-9a4 4 0 0 1 8 0v9" />
-    </svg>
-  ),
-  expensesItem: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-    </svg>
-  ),
-  users: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  ),
-  roles: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
-    </svg>
-  ),
-  permissions: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" />
-    </svg>
-  ),
-  picklists: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <path d="M11 17H3" /><path d="M11 7H3" /><path d="m13 5 4 4 5-6" /><path d="M13 19h8" />
-    </svg>
-  ),
-  dashboardItem: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-      <rect width="18" height="13" x="3" y="3" rx="2" /><path d="M3 10h18" /><path d="M7 15h2" /><path d="M11 15h6" />
-    </svg>
-  ),
+  inventory: <Boxes {...iconProps} />,
+  pos: <Store {...iconProps} />,
+  rentals: <CalendarRange {...iconProps} />,
+  expenses: <NotebookPen {...iconProps} />,
+  admin: <ShieldCheck {...iconProps} />,
+  dashboard: <LayoutDashboard {...iconProps} />,
+  intake: <Truck {...iconProps} />,
+  vendors: <MapPin {...iconProps} />,
+  barcode: <ScanBarcode {...iconProps} />,
+  sales: <ChartLine {...iconProps} />,
+  cart: <ShoppingCart {...iconProps} />,
+  rentalsItem: <CalendarRange {...iconProps} />,
+  expensesItem: <ListOrdered {...iconProps} />,
+  users: <UserCog {...iconProps} />,
+  roles: <KeyRound {...iconProps} />,
+  permissions: <ShieldCheck {...iconProps} />,
+  picklists: <ListChecks {...iconProps} />,
+  dashboardItem: <Layers {...iconProps} />,
 };
 
 function iconFor(name) {
@@ -130,9 +70,13 @@ const itemIcon = {
   '/dashboard': 'dashboardItem',
 };
 
+// Desktop shell kicks in at/above this many CSS pixels (mobile-first default).
+const DESKTOP_BREAKPOINT = 768;
+
 /**
- * AppShell — renders grouped, labelled, icon'd navigation chrome with an
- * active-route indicator and sign-out. Desktop: left rail. Mobile: bottom tab bar.
+ * AppShell — grouped, labelled, icon'd navigation chrome with active-route
+ * indicator and sign-out. Mobile-first: a compact top brand bar + bottom tab
+ * bar by default; a minimals-style left sidebar + top header on larger screens.
  *
  * Role-gating: only sections/items whose permission is held by the user render
  * (absent-not-disabled — nothing is ever shown greyed-out).
@@ -141,8 +85,9 @@ export function AppShell({ children }) {
   const { permissions, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= DESKTOP_BREAKPOINT);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const resizeObserverRef = useRef(null);
 
   const perms = permissions ?? [];
@@ -160,7 +105,7 @@ export function AppShell({ children }) {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 600);
+      setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
     };
     if (typeof ResizeObserver !== 'undefined') {
       try {
@@ -197,11 +142,11 @@ export function AppShell({ children }) {
     }
   };
 
-  // Flatten accessible items for mobile tab-bar keyboard navigation.
+  // Flatten accessible items for the mobile tab bar + keyboard navigation.
   const flatItems = accessibleSections.flatMap((section) => section.items);
 
   const handleKeyDown = (e, entries) => {
-    if (!isMobile || entries.length === 0) return;
+    if (isDesktop || entries.length === 0) return;
     const currentIndex = entries.findIndex((entry) => location.pathname === entry.path);
     let nextIndex = currentIndex;
     if (e.key === 'ArrowRight') {
@@ -217,6 +162,11 @@ export function AppShell({ children }) {
   };
 
   const isActive = (path) => location.pathname === path;
+
+  // Derive the current page title from the flat registry for the header.
+  const currentTitle = flatItems.find(
+    (entry) => location.pathname === entry.path || location.pathname.startsWith(`${entry.path}/`)
+  )?.label;
 
   const railItem = (entry) => (
     <button
@@ -249,12 +199,44 @@ export function AppShell({ children }) {
   );
 
   return (
-    <div className={`flex ${isMobile ? 'flex-col' : ''} h-screen w-full`}>
-      {!isMobile && (
+    <div className={`flex h-dvh w-full ${isDesktop ? '' : 'flex-col'}`}>
+      {/* Mobile-first compact brand header (shown by default, hidden on desktop) */}
+      {!isDesktop && (
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--surface-raised)] px-3">
+          <ShopLogo size={{ logo: 28, text: 'text-base' }} />
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              className="rounded-md p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)]"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Open theme settings"
+              title="Theme settings"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-[var(--border-strong)] px-2.5 py-1.5 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-60"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+              aria-busy={isSigningOut}
+              title={isSigningOut ? 'Signing out...' : 'Sign Out'}
+            >
+              {isSigningOut ? '⋯' : 'Sign out'}
+            </button>
+          </div>
+        </header>
+      )}
+
+      {/* Desktop left sidebar */}
+      {isDesktop && (
         <nav
           className="flex w-60 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface-raised)]"
           aria-label="Main Navigation"
         >
+          <div className="flex h-16 shrink-0 items-center border-b border-[var(--border)] px-4">
+            <ShopLogo size={{ logo: 32, text: 'text-lg' }} />
+          </div>
           <div className="flex flex-1 flex-col overflow-y-auto p-3">
             {accessibleSections.length > 0 ? (
               accessibleSections.map(railSection)
@@ -279,11 +261,32 @@ export function AppShell({ children }) {
         </nav>
       )}
 
-      <main className="flex-1 overflow-y-auto p-4">{children}</main>
+      {/* Content area + desktop top header */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {isDesktop && (
+          <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--surface-raised)] px-6">
+            <h1 className="typography-heading mb-0">{currentTitle || 'SHREE Fashion Store'}</h1>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-[var(--ink-muted)]">SHREE Fashion Store</span>
+              <button
+                type="button"
+                className="rounded-md p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)]"
+                onClick={() => setSettingsOpen(true)}
+                aria-label="Open theme settings"
+                title="Theme settings"
+              >
+                <Settings className="h-5 w-5" />
+              </button>
+            </div>
+          </header>
+        )}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+      </div>
 
-      {isMobile && (
+      {/* Mobile bottom tab bar */}
+      {!isDesktop && (
         <nav
-          className="fixed inset-x-0 bottom-0 z-20 flex h-14 items-center border-t border-[var(--border)] bg-[var(--surface-raised)] px-2"
+          className="fixed inset-x-0 bottom-0 z-20 flex h-16 items-center border-t border-[var(--border)] bg-[var(--surface-raised)] px-2"
           aria-label="Main Navigation"
           onKeyDown={(e) => handleKeyDown(e, flatItems)}
         >
@@ -293,7 +296,7 @@ export function AppShell({ children }) {
                 <button
                   key={entry.path}
                   type="button"
-                  className={`flex min-w-[72px] flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-2 py-1 text-[11px] font-medium ${
+                  className={`flex min-w-[64px] flex-1 flex-col items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium ${
                     isActive(entry.path)
                       ? 'text-primary'
                       : 'text-[var(--ink-muted)]'
@@ -312,18 +315,10 @@ export function AppShell({ children }) {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            className="ml-1 shrink-0 rounded-md border border-[var(--border-strong)] px-2.5 py-1 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-60"
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-            aria-busy={isSigningOut}
-            title={isSigningOut ? 'Signing out...' : 'Sign Out'}
-          >
-            {isSigningOut ? '⋯' : '✕'}
-          </button>
         </nav>
       )}
+
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

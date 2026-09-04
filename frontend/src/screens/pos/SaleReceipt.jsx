@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Badge } from '../../components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '../../components/ui';
 import { formatPaise } from '../../platform/money.js';
 
 /**
@@ -17,27 +17,27 @@ export function SaleReceipt({ sale }) {
           {sale.customerName ? `${sale.customerName} · ` : ''}
           {new Date(sale.soldAt || sale.createdAt).toLocaleDateString()} · {sale.status}
         </p>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="border-b border-[var(--border)] p-2 text-left">Barcode</th>
-              <th className="border-b border-[var(--border)] p-2 text-left">Price</th>
-              <th className="border-b border-[var(--border)] p-2 text-left">Unit status</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHead>
+            <TableRow className="hover:bg-transparent">
+              <TableHeaderCell>Barcode</TableHeaderCell>
+              <TableHeaderCell>Price</TableHeaderCell>
+              <TableHeaderCell>Unit status</TableHeaderCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {sale.lines.map((line) => (
-              <tr key={line.uuid}>
-                <td className="border-b border-[var(--border)] p-2">{line.barcode}</td>
-                <td className="border-b border-[var(--border)] p-2">{formatPaise(Number(line.sellingPricePaise))}</td>
-                <td className="border-b border-[var(--border)] p-2"><Badge variant="neutral">{line.unitStatus}</Badge></td>
-              </tr>
+              <TableRow key={line.uuid}>
+                <TableCell>{line.barcode}</TableCell>
+                <TableCell>{formatPaise(Number(line.sellingPricePaise))}</TableCell>
+                <TableCell><Badge variant="neutral">{line.unitStatus}</Badge></TableCell>
+              </TableRow>
             ))}
             {sale.lines.length === 0 && (
-              <tr><td colSpan={3} className="p-2 text-sm text-[var(--ink-muted)]">No lines.</td></tr>
+              <TableRow><TableCell colSpan={3} className="text-sm text-[var(--ink-muted)]">No lines.</TableCell></TableRow>
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
         <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3 text-lg">
           <span>Total</span>
           <strong>{formatPaise(Number(sale.totalPaise))}</strong>

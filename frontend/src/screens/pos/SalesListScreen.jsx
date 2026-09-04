@@ -60,7 +60,7 @@ export function SalesListScreen() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
       )}
 
       <Card>
@@ -81,7 +81,7 @@ export function SalesListScreen() {
               {sales.map((s) => (
                 <li
                   key={s.uuid}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                 >
                   <div>
                     <div className="font-semibold">

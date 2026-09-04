@@ -153,7 +153,7 @@ export function BarcodePrintScreen() {
 
           {/* Error message  -  shown inline on validation or server errors */}
           {error && (
-            <div className="mb-6 rounded-md border-l-4 border-[var(--danger)] bg-[rgba(179,38,30,0.1)] p-4 text-sm leading-relaxed text-[var(--danger)]">
+            <div className="mb-6 rounded-md border-l-4 border-[var(--danger)] bg-[var(--danger)]/10 p-4 text-sm leading-relaxed text-[var(--danger)]">
               {error}
             </div>
           )}

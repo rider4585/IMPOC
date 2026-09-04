@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+﻿import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -14,7 +14,7 @@ const variantStyles = {
 };
 
 /**
- * ToastProvider — wraps the app and exposes `useToast()`.
+ * ToastProvider â€” wraps the app and exposes `useToast()`.
  * toast.push({ title?, description?, variant })
  * variant: 'success' | 'error' | 'info' | 'warning' (default 'info')
  */
@@ -62,7 +62,7 @@ export function ToastProvider({ children }) {
             {toasts.map((toast) => (
               <motion.div
                 key={toast.id}
-                className={`pointer-events-auto flex items-start gap-3 rounded-md border border-[var(--border)] border-l-4 bg-white p-4 shadow-lg ${variantStyles[toast.variant] || variantStyles.info}`}
+                className={`pointer-events-auto flex items-start gap-3 rounded-md border border-[var(--border)] border-l-4 bg-[var(--surface-raised)] p-4 shadow-lg ${variantStyles[toast.variant] || variantStyles.info}`}
                 initial={{ opacity: 0, x: 24 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 24 }}

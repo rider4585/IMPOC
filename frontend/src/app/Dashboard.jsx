@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card,
   CardHeader,
@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../auth/useAuth.js';
 import { PERMISSIONS } from '../constants/permissions.js';
 import { formatPaise } from '../platform/money.js';
+import { ShopLogo } from '../components/ShopLogo';
 import {
   getDashboard,
   getSalesReport,
@@ -62,9 +63,9 @@ const TABS = [
 function KpiCard({ label, value, color, testid }) {
   return (
     <Card>
-      <CardContent className="p-4">
+      <CardContent className="p-4 sm:p-5">
         <p className="typography-body-sm text-[var(--ink-muted)]">{label}</p>
-        <p className={`typography-money-lg mt-1 ${color || ''}`} data-testid={testid}>
+        <p className={`typography-money-lg mt-1.5 ${color || ''}`} data-testid={testid}>
           {value}
         </p>
       </CardContent>
@@ -93,7 +94,7 @@ function SalesTable({ data }) {
           <TableRow key={r.uuid}>
             <TableCell className="font-semibold">{r.saleNumber}</TableCell>
             <TableCell>{r.soldAt}</TableCell>
-            <TableCell>{r.customerName || '—'}</TableCell>
+            <TableCell>{r.customerName || 'â€”'}</TableCell>
             <TableCell>
               <Badge variant={r.status === 'completed' ? 'success' : 'neutral'}>{r.status}</Badge>
             </TableCell>
@@ -128,7 +129,7 @@ function RentalsTable({ data }) {
         {data.rows.map((r) => (
           <TableRow key={r.uuid}>
             <TableCell className="font-semibold">{r.agreementNumber}</TableCell>
-            <TableCell>{r.customerName || '—'}</TableCell>
+            <TableCell>{r.customerName || 'â€”'}</TableCell>
             <TableCell>{r.startDate}</TableCell>
             <TableCell>{r.dueDate}</TableCell>
             <TableCell>
@@ -170,7 +171,7 @@ function ExpensesTable({ data }) {
           <TableRow key={r.uuid}>
             <TableCell>{r.expenseDate}</TableCell>
             <TableCell className="font-semibold">{r.category}</TableCell>
-            <TableCell>{r.purpose || '—'}</TableCell>
+            <TableCell>{r.purpose || 'â€”'}</TableCell>
             <TableCell>
               <Badge variant={r.status === 'completed' ? 'success' : 'neutral'}>{r.status}</Badge>
             </TableCell>
@@ -191,11 +192,11 @@ function InventoryTable({ data }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-md border border-[var(--border)] bg-white p-3 text-center">
+        <div className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-center">
           <p className="text-xs text-[var(--ink-muted)]">Total units</p>
           <p className="typography-money-lg mt-1">{data.total}</p>
         </div>
-        <div className="rounded-md border border-[var(--border)] bg-white p-3 text-center">
+        <div className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-center">
           <p className="text-xs text-[var(--ink-muted)]">Retail in stock</p>
           <p className="typography-money-lg mt-1">{data.retailInStock}</p>
         </div>
@@ -340,6 +341,7 @@ export function Dashboard() {
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
       <div>
+        <ShopLogo size={{ logo: 40, text: 'text-2xl' }} className="mb-2" />
         <h1 className="typography-heading mb-1">Dashboard</h1>
         <p className="typography-body-sm text-[var(--ink-muted)]">
           Business overview and reports. Period: {from} to {to}
@@ -369,7 +371,7 @@ export function Dashboard() {
               className="w-[150px]"
               aria-label="From date"
             />
-            <span className="text-[var(--ink-muted)]">→</span>
+            <span className="text-[var(--ink-muted)]">â†’</span>
             <Input
               type="date"
               value={to}
@@ -405,14 +407,14 @@ export function Dashboard() {
 
       {/* Inventory summary row */}
       {inventoryData && (
-        <div className="flex flex-wrap items-center gap-4 rounded-md border border-[var(--border)] bg-white px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center gap-4 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-sm">
           <span className="font-semibold">Inventory:</span>
           <span>{inventoryData.total} total</span>
-          <span className="text-[var(--ink-muted)]">·</span>
+          <span className="text-[var(--ink-muted)]">Â·</span>
           <span>{inventoryData.retailInStock} retail in stock</span>
           {Object.entries(inventoryData.byChannel || {}).map(([ch, n]) => (
             <span key={ch} className="text-[var(--ink-muted)]">
-              · {ch}: {n}
+              Â· {ch}: {n}
             </span>
           ))}
         </div>

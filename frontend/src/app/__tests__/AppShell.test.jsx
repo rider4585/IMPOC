@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppShell } from '../AppShell';
+import { ThemeProvider } from '../../theme/index.js';
 
 // Provide a real permission set for a role-gated view of the grouped nav.
 const FULL_ADMIN = [
@@ -40,11 +41,13 @@ vi.mock('../../auth/useAuth', () => ({
 function renderShell(perms, path = '/') {
   window.__mockPermissions = perms;
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <AppShell>
-        <div>content</div>
-      </AppShell>
-    </MemoryRouter>
+    <ThemeProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <AppShell>
+          <div>content</div>
+        </AppShell>
+      </MemoryRouter>
+    </ThemeProvider>
   );
 }
 

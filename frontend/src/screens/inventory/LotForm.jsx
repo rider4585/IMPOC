@@ -170,7 +170,7 @@ export function LotForm() {
 
       <form id="lot-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
         {intakeRecords.length > 0 && (
-          <div className="rounded-lg border border-[var(--border)] bg-white p-4">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <p className="mb-2 text-sm font-medium text-[var(--ink)]">
               Pre-fill from an intake template
             </p>
@@ -245,7 +245,7 @@ export function LotForm() {
 
         {/* Size-run mode */}
         {sizes.filter((s) => s.isActive !== false).length > 0 && (
-          <div className="rounded-lg border border-[var(--border)] bg-white p-4">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <label className="flex items-center gap-3">
               <input
                 type="checkbox"
@@ -270,7 +270,7 @@ export function LotForm() {
                       'rounded-full border px-3 py-1 text-xs font-semibold transition-colors ' +
                       (form.sizeRun.includes(s.uuid)
                         ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]'
-                        : 'border-[var(--border-strong)] bg-white text-[var(--ink)] hover:bg-[var(--surface-sunken)]')
+                        : 'border-[var(--border-strong)] bg-[var(--surface-raised)] text-[var(--ink)] hover:bg-[var(--surface-sunken)]')
                     }
                     onClick={() => toggleSizeInRun(s.uuid)}
                   >
@@ -283,7 +283,7 @@ export function LotForm() {
         )}
 
         {error && (
-          <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+          <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
         )}
       </form>
 

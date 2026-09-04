@@ -8,7 +8,7 @@ export const Card = React.forwardRef(function Card({ className = '', children, .
   return (
     <div
       ref={ref}
-      className={`rounded-lg border border-[var(--border)] bg-white text-[var(--ink)] shadow-sm ${className}`.trim()}
+      className={`rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--ink)] shadow-sm ${className}`.trim()}
       {...rest}
     >
       {children}

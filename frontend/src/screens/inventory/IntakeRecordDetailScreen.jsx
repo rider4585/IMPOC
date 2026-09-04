@@ -243,7 +243,7 @@ export function IntakeRecordDetailScreen() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">
           {error}
         </div>
       )}
@@ -274,7 +274,7 @@ export function IntakeRecordDetailScreen() {
               {record.templates.map((t) => (
                 <li
                   key={t.uuid}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                 >
                   <div className="flex flex-col gap-1">
                     <span className="font-semibold text-[var(--ink)]">
@@ -380,7 +380,7 @@ export function IntakeRecordDetailScreen() {
           </div>
           {tplError && (
             <div
-              className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]"
+              className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]"
               role="alert"
             >
               {tplError}

@@ -57,7 +57,7 @@ export function VendorDetail() {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/vendors')}>&larr; Vendors</Button>
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Vendor not found'}</div>
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Vendor not found'}</div>
       </div>
     );
   }
@@ -82,13 +82,13 @@ export function VendorDetail() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
       )}
 
       <h2 className="text-lg font-semibold">Purchase history ({trips.length} trips)</h2>
 
       {trips.length === 0 ? (
-        <div className="rounded-lg border border-[var(--border)] bg-white p-6 text-center">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 text-center">
           <p className="text-sm text-[var(--ink-muted)]">Empty — no trips recorded for this vendor yet.</p>
         </div>
       ) : (
@@ -114,7 +114,7 @@ export function VendorDetail() {
                 ) : (
                   <div className="flex flex-col gap-3">
                     {trip.lines.map((line) => (
-                      <div key={line.uuid} className="rounded-md border border-[var(--border)] bg-white p-3">
+                      <div key={line.uuid} className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3">
                         <div className="flex items-baseline justify-between gap-2 text-sm">
                           <span className="font-semibold">{line.name || line.productTypeUuid || 'Lot'}</span>
                           <span className="text-[var(--ink-muted)]">qty {line.quantity} · {line.channel}</span>

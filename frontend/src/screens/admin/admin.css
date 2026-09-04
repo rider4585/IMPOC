@@ -16,7 +16,7 @@
 
 .admin-error {
   padding: var(--spacing-3);
-  background-color: rgba(179, 38, 30, 0.1);
+  background-color: color-mix(in srgb, var(--danger) 10%, transparent);
   color: var(--danger);
   border-radius: var(--rounded-md);
   font-size: 14px;

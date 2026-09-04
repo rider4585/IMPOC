@@ -14,21 +14,21 @@ const base =
   'disabled:pointer-events-none disabled:opacity-55';
 
 const variants = {
-  default: 'bg-primary text-primary-foreground hover:bg-[#6A2744] shadow-sm',
+  default: 'bg-primary text-primary-foreground hover:bg-[var(--primary-hover)] shadow-sm',
   secondary: 'bg-[var(--surface-sunken)] text-[var(--ink)] hover:bg-[var(--border-strong)]',
   outline:
     'border border-[var(--border-strong)] bg-[var(--surface-raised)] text-[var(--ink)] ' +
     'hover:bg-[var(--surface-sunken)]',
   ghost: 'text-[var(--ink)] hover:bg-[var(--surface-sunken)]',
-  danger: 'bg-danger text-white hover:bg-[#991E18]',
+  danger: 'bg-danger text-white hover:brightness-95',
   link: 'text-primary underline-offset-4 hover:underline',
 };
 
 const sizes = {
-  sm: 'h-7 px-3 text-xs',
-  md: 'h-9 px-4 py-2',
+  sm: 'h-8 px-3 text-xs',
+  md: 'h-10 px-4 py-2',
   lg: 'h-11 px-6',
-  icon: 'h-9 w-9',
+  icon: 'h-10 w-10',
 };
 
 export const Button = React.forwardRef(function Button(

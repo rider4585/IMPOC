@@ -1,11 +1,11 @@
-import React, { forwardRef } from 'react';
+﻿import React, { forwardRef } from 'react';
 
 /**
- * Input — shadcn-style base text field primitive (light mode, Tailwind).
+ * Input â€” shadcn-style base text field primitive (light mode, Tailwind).
  * Supports size variants and an optional `label`, `error`, and `hint`.
  */
 const fieldCls =
-  'flex h-9 w-full rounded-md border border-[var(--border-strong)] bg-white px-3 py-1 ' +
+  'flex h-9 w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 py-1 ' +
   'text-sm text-[var(--ink)] shadow-sm transition-colors ' +
   'placeholder:text-[var(--ink-faint)] focus-visible:outline-none ' +
   'focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:border-transparent ' +

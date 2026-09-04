@@ -123,7 +123,7 @@ export function UserFormDialog({ open, onClose, onSave, saving, user, roles }) {
             )}
 
             {error && (
-              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">
+              <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">
                 {error}
               </div>
             )}

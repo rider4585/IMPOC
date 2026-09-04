@@ -116,7 +116,7 @@ export function FlatPicklistManager({
           )}
         </div>
 
-        {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
+        {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
         {loading ? (
           <p className="text-sm text-[var(--ink-muted)]">Loading {singular.toLowerCase()}s…</p>
@@ -287,7 +287,7 @@ function FlatPicklistFormDialog({ open, onClose, onSave, saving, item, singular,
           <form id={`flat-form-${resourceName(singular)}`} onSubmit={handleSubmit} className="flex flex-col gap-4">
             {fields.map(renderControl)}
             {error && (
-              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+              <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

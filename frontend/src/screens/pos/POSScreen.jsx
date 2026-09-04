@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+﻿import React, { useState, useCallback, useMemo } from 'react';
 import {
   Card,
   CardHeader,
@@ -187,19 +187,19 @@ export function POSScreen() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>Receipt — {receipt.agreementNumber}</CardTitle>
+              <CardTitle>Receipt â€” {receipt.agreementNumber}</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
               <p className="mb-2 text-sm text-[var(--ink-muted)]">
-                {receipt.customerName ? `${receipt.customerName} · ` : ''}
-                {receipt.startDate} → due {receipt.dueDate} · {receipt.status}
+                {receipt.customerName ? `${receipt.customerName} Â· ` : ''}
+                {receipt.startDate} â†’ due {receipt.dueDate} Â· {receipt.status}
               </p>
               <ul className="flex flex-col gap-2">
                 {receipt.lines.map((line) => (
-                  <li key={line.uuid} className="flex items-center justify-between rounded-md border border-[var(--border)] bg-white p-3 text-sm">
+                  <li key={line.uuid} className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm">
                     <span className="font-semibold">{line.barcode}</span>
                     <span className="text-[var(--ink-muted)]">
-                      {formatPaise(Number(line.rentPerDayPaise))}/day · deposit {formatPaise(Number(line.depositPaise))}
+                      {formatPaise(Number(line.rentPerDayPaise))}/day Â· deposit {formatPaise(Number(line.depositPaise))}
                     </span>
                   </li>
                 ))}
@@ -234,7 +234,7 @@ export function POSScreen() {
             type="button"
             className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
               mode === 'sale'
-                ? 'bg-white text-[var(--ink)] shadow-sm'
+                ? 'bg-[var(--surface-raised)] text-[var(--ink)] shadow-sm'
                 : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
             }`}
             onClick={() => { setMode('sale'); clearCart(); }}
@@ -245,7 +245,7 @@ export function POSScreen() {
             type="button"
             className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
               mode === 'rental'
-                ? 'bg-white text-[var(--ink)] shadow-sm'
+                ? 'bg-[var(--surface-raised)] text-[var(--ink)] shadow-sm'
                 : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
             }`}
             onClick={() => { setMode('rental'); clearCart(); }}
@@ -256,7 +256,7 @@ export function POSScreen() {
       </div>
 
       {lookupError && (
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{lookupError}</div>
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{lookupError}</div>
       )}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px] items-start">
@@ -290,13 +290,13 @@ export function POSScreen() {
                   {cart.map((item) => (
                     <li
                       key={item.uuid}
-                      className="flex items-center gap-3 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                      className="flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                     >
                       <span className="font-semibold">{item.barcode}</span>
                       <span className="ml-auto text-[var(--ink-muted)]">
                         {mode === 'sale'
                           ? formatPaise(item.sellingPricePaise)
-                          : `${formatPaise(item.rentPerDayPaise)}/day · deposit ${formatPaise(item.depositPaise)}`}
+                          : `${formatPaise(item.rentPerDayPaise)}/day Â· deposit ${formatPaise(item.depositPaise)}`}
                       </span>
                       <Button variant="ghost" size="sm" onClick={() => removeItem(item.uuid)} aria-label={`Remove ${item.barcode}`}>
                         Remove

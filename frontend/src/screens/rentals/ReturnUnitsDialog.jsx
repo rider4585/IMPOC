@@ -111,7 +111,7 @@ export function ReturnUnitsDialog({ open, onClose, onSave, saving, agreement, da
                   return (
                     <li
                       key={line.uuid}
-                      className="rounded-md border border-[var(--border)] bg-white p-3"
+                      className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <label className="flex items-center gap-2 font-semibold text-sm">
@@ -164,7 +164,7 @@ export function ReturnUnitsDialog({ open, onClose, onSave, saving, agreement, da
             )}
 
             {error && (
-              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+              <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

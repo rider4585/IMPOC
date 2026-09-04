@@ -88,7 +88,7 @@ export function TripDetailScreen() {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/trips')}>&larr; All trips</Button>
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Trip not found'}</div>
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Trip not found'}</div>
       </div>
     );
   }
@@ -116,11 +116,11 @@ export function TripDetailScreen() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
       )}
 
       {/* Variance strip */}
-      <div className="rounded-lg border border-[var(--border)] bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-sm">
         {lots.length === 0 ? (
           <p className="text-sm text-[var(--ink-muted)]">No lots yet.</p>
         ) : (
@@ -171,7 +171,7 @@ export function TripDetailScreen() {
                 return (
                   <li
                     key={lot.uuid}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                   >
                     <div>
                       <div className="font-semibold">

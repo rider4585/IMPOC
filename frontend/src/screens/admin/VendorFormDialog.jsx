@@ -51,7 +51,7 @@ export function VendorFormDialog({ open, onClose, onSave, saving, vendor }) {
             <Input label="Address" value={form.address} onChange={set('address')} />
             <Input label="Notes" value={form.notes} onChange={set('notes')} />
             {error && (
-              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+              <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

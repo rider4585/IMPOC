@@ -1,12 +1,12 @@
-import React, { forwardRef } from 'react';
+﻿import React, { forwardRef } from 'react';
 
 /**
- * Select — shadcn-style base dropdown primitive (light mode, Tailwind).
+ * Select â€” shadcn-style base dropdown primitive (light mode, Tailwind).
  * Children should be <option> elements.
  */
 const selectCls =
   'flex h-9 w-full appearance-none rounded-md border border-[var(--border-strong)] ' +
-  'bg-white px-3 py-1 text-sm text-[var(--ink)] shadow-sm transition-colors ' +
+  'bg-[var(--surface-raised)] px-3 py-1 text-sm text-[var(--ink)] shadow-sm transition-colors ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ' +
   'focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-55';
 

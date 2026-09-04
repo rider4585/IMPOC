@@ -206,7 +206,7 @@ export function UsersScreen() {
         )}
       </div>
 
-      {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
+      {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.USERS.VIEW) && (
         <Card>

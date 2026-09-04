@@ -130,7 +130,7 @@ export function ProductTypesManager() {
           )}
         </div>
 
-        {error && <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
+        {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
         {loading ? (
           <p className="text-sm text-[var(--ink-muted)]">Loading product types…</p>
@@ -223,7 +223,7 @@ function ProductTypeFormDialog({ open, onClose, onSave, saving, type, allTypes }
               ))}
             </Select>
             {error && (
-              <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+              <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}
           </form>
         </CardContent>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, useToast } from '../../components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Dialog, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getStockIntakes, createStockIntake } from '../../services/intakeApi.js';
@@ -127,7 +127,7 @@ export function TripsScreen() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
       )}
 
       <Card>
@@ -149,7 +149,7 @@ export function TripsScreen() {
                 {trips.slice((page - 1) * pageSize, page * pageSize).map((t) => (
                   <li
                     key={t.uuid}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                   >
                     <button
                       type="button"
@@ -184,37 +184,32 @@ export function TripsScreen() {
         </CardContent>
       </Card>
 
-      {formOpen && (
-        <div className="relative z-50" role="dialog" aria-modal="true" aria-label="Create trip">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setFormOpen(false)} />
-          <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border)] bg-white p-6 shadow-lg">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold leading-none tracking-tight">Create trip</h2>
-              <button type="button" className="rounded-sm text-[var(--ink-muted)] hover:text-[var(--ink)]" onClick={() => setFormOpen(false)} aria-label="Close">
-                <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <form id="trip-create-form" onSubmit={handleCreateTrip} className="flex flex-col gap-4">
-              <Select label="Vendor" value={form.vendorUuid} onChange={set('vendorUuid')} required>
-                <option value="">Select a vendor…</option>
-                {vendors.filter((v) => v.isActive !== false).map((v) => (
-                  <option key={v.uuid} value={v.uuid}>{v.name}</option>
-                ))}
-              </Select>
-              <Input label="Purchased on" type="date" value={form.purchasedOn} onChange={set('purchasedOn')} required />
-              <Input label="Bill reference" value={form.billReference} onChange={set('billReference')} placeholder="Optional" maxLength={100} />
-              <Input label="Total paid (₹)" value={form.totalPaidPaise} onChange={set('totalPaidPaise')} placeholder="e.g. 14400" inputMode="decimal" hint="Enter in rupees; stored as whole paise." />
-              {formError && (
-                <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{formError}</div>
-              )}
-            </form>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancel</Button>
-              <Button type="submit" form="trip-create-form" loading={saving}>Create trip</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title="Create trip"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancel</Button>
+            <Button type="submit" form="trip-create-form" loading={saving}>Create trip</Button>
+          </>
+        }
+      >
+        <form id="trip-create-form" onSubmit={handleCreateTrip} className="flex flex-col gap-4">
+          <Select label="Vendor" value={form.vendorUuid} onChange={set('vendorUuid')} required>
+            <option value="">Select a vendor…</option>
+            {vendors.filter((v) => v.isActive !== false).map((v) => (
+              <option key={v.uuid} value={v.uuid}>{v.name}</option>
+            ))}
+          </Select>
+          <Input label="Purchased on" type="date" value={form.purchasedOn} onChange={set('purchasedOn')} required />
+          <Input label="Bill reference" value={form.billReference} onChange={set('billReference')} placeholder="Optional" maxLength={100} />
+          <Input label="Total paid (₹)" value={form.totalPaidPaise} onChange={set('totalPaidPaise')} placeholder="e.g. 14400" inputMode="decimal" hint="Enter in rupees; stored as whole paise." />
+          {formError && (
+            <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{formError}</div>
+          )}
+        </form>
+      </Dialog>
     </div>
   );
 }

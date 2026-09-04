@@ -186,7 +186,7 @@ export function RentalsScreen() {
           </div>
 
           {error && (
-            <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+            <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
           )}
 
           <Card>
@@ -219,7 +219,7 @@ export function RentalsScreen() {
                     return (
                       <li
                         key={r.uuid}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                       >
                         <div>
                           <div className="font-semibold">
@@ -283,7 +283,7 @@ export function RentalsScreen() {
             </div>
           )}
           {error && (
-            <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
+            <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
           )}
 
           <Card>
@@ -312,7 +312,7 @@ export function RentalsScreen() {
                 {activeRental.lines.map((line) => (
                   <li
                     key={line.uuid}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                   >
                     <div>
                       <div className="font-semibold">
@@ -340,7 +340,7 @@ export function RentalsScreen() {
                   {activeRental.returns.map((ret) => (
                     <li
                       key={ret.uuid}
-                      className="rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                      className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                     >
                       <div className="font-semibold">
                         Unit · returned{' '}
@@ -371,7 +371,7 @@ export function RentalsScreen() {
                   {activeRental.reversals.map((rev) => (
                     <li
                       key={rev.uuid}
-                      className="rounded-md border border-[var(--border)] bg-white p-3 text-sm"
+                      className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                     >
                       <div className="font-semibold">{rev.reversalType}</div>
                       <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
