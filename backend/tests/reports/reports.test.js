@@ -299,4 +299,20 @@ describe('Reports module (T-14)', () => {
             .set('Authorization', `Bearer ${managerToken}`)
             .expect(400);
     });
+
+    it('GET /api/reports/vendor-sell-through returns per-vendor sold/rented + revenue', async () => {
+        const res = await request(testApp)
+            .get('/api/reports/vendor-sell-through')
+            .set('Authorization', `Bearer ${managerToken}`)
+            .expect(200);
+
+        const vendRow = res.body.data.rows.find((r) => r.vendorUuid === vendor.uuid);
+        expect(vendRow).toBeTruthy();
+        // 2 completed retail sales + 2 rental lines (one returned, one active) for this vendor.
+        expect(vendRow.unitsSold).toBe(2);
+        expect(vendRow.unitsRented).toBe(2);
+        expect(vendRow.salesRevenuePaise).toBe('500000');
+        // Rented days(2) * 1000/day + damage charge 50 (only the returned line earns).
+        expect(vendRow.rentalEarnedPaise).toBe('2050');
+    });
 });

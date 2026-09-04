@@ -449,7 +449,7 @@ export const getVendorSellThroughReport = async () => {
     const [vendors, stocks, saleLines, rentalLines] = await Promise.all([
         Vendor.findAll({
             where: { deletedAt: null },
-            attributes: ['id', 'name'],
+            attributes: ['id', 'uuid', 'name'],
         }),
         Stock.findAll({
             where: { deletedAt: null },
@@ -466,7 +466,7 @@ export const getVendorSellThroughReport = async () => {
             attributes: ['rentPerDayPaise'],
             include: [
                 { association: 'unit', attributes: ['stockId'] },
-                { association: 'agreement', attributes: ['status'] },
+                { association: 'agreement', attributes: ['status', 'startDate'] },
                 { association: 'returns' },
             ],
         }),
