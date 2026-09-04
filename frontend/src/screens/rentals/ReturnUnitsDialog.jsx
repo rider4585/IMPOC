@@ -142,7 +142,7 @@ export function ReturnUnitsDialog({ open, onClose, onSave, saving, agreement, da
                             ))}
                           </Select>
                           <Input
-                            label="Damage charge (₹) — leave blank to use grade default"
+                            label="Damage charge (₹) — optional, defaults to 0"
                             value={charges[line.uuid] || ''}
                             onChange={(ev) => setCharge(line.uuid, ev.target.value)}
                             placeholder="e.g. 150.00"

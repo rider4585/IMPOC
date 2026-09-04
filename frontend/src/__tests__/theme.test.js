@@ -55,7 +55,7 @@ describe('Revamp Design System — Tailwind v4, LIGHT MODE ONLY (index.css)', ()
     });
   });
 
-  describe('Semantic unit-status tokens (preserved from bmad)', () => {
+  describe('Semantic unit-status tokens', () => {
     it('should define all unit status colors', () => {
       expect(cssContent).toContain('--status-in-stock: #2F6E4F');
       expect(cssContent).toContain('--status-rented: #2B5C8A');
@@ -66,7 +66,7 @@ describe('Revamp Design System — Tailwind v4, LIGHT MODE ONLY (index.css)', ()
     });
   });
 
-  describe('Semantic money tokens (preserved from bmad)', () => {
+  describe('Semantic money tokens', () => {
     it('should define all money color tokens (three kinds)', () => {
       expect(cssContent).toContain('--money-in: #2F6E4F');
       expect(cssContent).toContain('--money-out: #B3261E');

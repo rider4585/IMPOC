@@ -19,10 +19,10 @@ function buildError(error, fallback) {
 }
 
 const RESOURCE_BASE = {
-  productTypes: '/product-types',
-  colours: '/colours',
-  sizes: '/sizes',
-  damageGrades: '/damage-grades',
+  productTypes: '/picklists/product-types',
+  colours: '/picklists/colours',
+  sizes: '/picklists/sizes',
+  damageGrades: '/picklists/damage-grades',
 };
 
 /**

@@ -52,6 +52,8 @@ import RentalReturnModel from './RentalReturn.js';
 import RentalReversalModel from './RentalReversal.js';
 import ExpenseModel from './Expense.js';
 import ExpenseReversalModel from './ExpenseReversal.js';
+import IntakeRecordModel from './IntakeRecord.js';
+import IntakeTemplateModel from './IntakeTemplate.js';
 
 const User = UserModel(sequelize);
 const Role = RoleModel(sequelize);
@@ -79,6 +81,8 @@ const RentalReturn = RentalReturnModel(sequelize);
 const RentalReversal = RentalReversalModel(sequelize);
 const Expense = ExpenseModel(sequelize);
 const ExpenseReversal = ExpenseReversalModel(sequelize);
+const IntakeRecord = IntakeRecordModel(sequelize);
+const IntakeTemplate = IntakeTemplateModel(sequelize);
 
 /*
  * User ↔ Role
@@ -383,6 +387,40 @@ ExpenseReversal.belongsTo(Expense, {
     as: 'expense',
 });
 
+/*
+ * IntakeRecord ↔ Vendor (optional)
+ */
+Vendor.hasMany(IntakeRecord, {
+    foreignKey: 'vendor_id',
+    as: 'intakeRecords',
+});
+
+IntakeRecord.belongsTo(Vendor, {
+    foreignKey: 'vendor_id',
+    as: 'vendor',
+});
+
+/*
+ * IntakeRecord ↔ IntakeTemplate
+ */
+IntakeRecord.hasMany(IntakeTemplate, {
+    foreignKey: 'intake_record_id',
+    as: 'templates',
+});
+
+IntakeTemplate.belongsTo(IntakeRecord, {
+    foreignKey: 'intake_record_id',
+    as: 'intakeRecord',
+});
+
+/*
+ * IntakeTemplate ↔ ProductType (subtype)
+ */
+IntakeTemplate.belongsTo(ProductType, {
+    foreignKey: 'product_type_id',
+    as: 'productType',
+});
+
 export {
     sequelize,
     Sequelize,
@@ -411,5 +449,7 @@ export {
     RentalReturn,
     RentalReversal,
     Expense,
-    ExpenseReversal
+    ExpenseReversal,
+    IntakeRecord,
+    IntakeTemplate,
 };

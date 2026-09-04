@@ -87,6 +87,27 @@ export const EXPENSE_ROUTES = {
   CANCEL: (uuid) => `/expenses/${encodeURIComponent(uuid)}/cancel`,
 };
 
+// Intake records (dated buying events) and their templates
+export const INTAKE_RECORD_ROUTES = {
+  /** GET /intake-records - List all intake records */
+  LIST: '/intake-records',
+  /** POST /intake-records - Create an intake record */
+  CREATE: '/intake-records',
+  /** GET /intake-records/{intakeUuid} - Get a single intake record (with templates) */
+  GET: (intakeUuid) => `/intake-records/${encodeURIComponent(intakeUuid)}`,
+  /** PATCH /intake-records/{intakeUuid} - Update an intake record */
+  UPDATE: (intakeUuid) => `/intake-records/${encodeURIComponent(intakeUuid)}`,
+  /** POST /intake-records/{intakeUuid}/templates - Create a template under an intake */
+  CREATE_TEMPLATE: (intakeUuid) =>
+    `/intake-records/${encodeURIComponent(intakeUuid)}/templates`,
+  /** PATCH /intake-records/{intakeUuid}/templates/{uuid} - Update a template */
+  UPDATE_TEMPLATE: (intakeUuid, uuid) =>
+    `/intake-records/${encodeURIComponent(intakeUuid)}/templates/${encodeURIComponent(uuid)}`,
+  /** DELETE /intake-records/{intakeUuid}/templates/{uuid} - Soft-delete a template */
+  DELETE_TEMPLATE: (intakeUuid, uuid) =>
+    `/intake-records/${encodeURIComponent(intakeUuid)}/templates/${encodeURIComponent(uuid)}`,
+};
+
 // Unit endpoints
 export const UNIT_ROUTES = {
   /** GET /units/by-barcode/{barcode} - Get a unit by its barcode */

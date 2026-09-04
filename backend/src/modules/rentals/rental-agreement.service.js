@@ -275,7 +275,7 @@ async function resolveDamageGrade(gradeUuid, transaction) {
     if (!gradeUuid) return null;
     const grade = await DamageGrade.findOne({
         where: { uuid: gradeUuid, deletedAt: null, isActive: true },
-        attributes: ['id', 'name', 'defaultChargePaise', 'outcome'],
+        attributes: ['id', 'name', 'outcome'],
         transaction,
     });
     if (!grade) {
@@ -361,11 +361,8 @@ export const processRentalReturn = async ({ uuid, actualReturnDate, items, actor
             const lateDays = Math.max(0, daysBetween(agreement.dueDate, returnDate));
             const overdueChargePaise = lateDays * Number(line.overduePerDayPaise);
 
-            // Damage charge: explicit override, else grade default, else 0
-            let damageChargePaise = item.damageChargePaise !== undefined ? Number(item.damageChargePaise) : 0;
-            if (item.damageChargePaise === undefined && grade) {
-                damageChargePaise = Number(grade.defaultChargePaise);
-            }
+            // Damage charge is decided per item at return time; defaults to 0
+            const damageChargePaise = item.damageChargePaise !== undefined ? Number(item.damageChargePaise) : 0;
 
             // Deposit actually refunded = deposit - overdue - damage, min 0
             const depositRefundedPaise = Math.max(0, Number(line.depositPaise) - overdueChargePaise - damageChargePaise);

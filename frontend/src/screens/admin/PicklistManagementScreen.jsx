@@ -23,18 +23,10 @@ const SIZE_FIELDS = [{ key: 'name', label: 'Name', required: true }];
 
 const DAMAGE_COLUMNS = [
   { key: 'name', label: 'Name' },
-  { key: 'defaultChargePaise', label: 'Default charge (paise)' },
   { key: 'outcome', label: 'Outcome' },
 ];
 const DAMAGE_FIELDS = [
   { key: 'name', label: 'Name', required: true },
-  {
-    key: 'defaultChargePaise',
-    label: 'Default charge (paise)',
-    type: 'number',
-    required: true,
-    hint: 'Whole paise only.',
-  },
   {
     key: 'outcome',
     label: 'Outcome',

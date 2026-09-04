@@ -38,7 +38,7 @@ npm-debug.log*
 .cache/
 .temp/
 
-# Orchestration / hive state (not part of the IMPOC app)
+# Hive orchestration (not part of the IMPOC app)
 hive/
 palace/
 roster-backups/

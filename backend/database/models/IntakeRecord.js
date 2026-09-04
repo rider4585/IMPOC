@@ -1,8 +1,8 @@
 import { DataTypes } from 'sequelize';
 
 export default (sequelize) => {
-    const DamageGrade = sequelize.define(
-        'DamageGrade',
+    const IntakeRecord = sequelize.define(
+        'IntakeRecord',
         {
             id: {
                 type: DataTypes.INTEGER,
@@ -18,20 +18,31 @@ export default (sequelize) => {
             },
 
             name: {
-                type: DataTypes.STRING(100),
+                type: DataTypes.STRING(200),
                 allowNull: false,
             },
 
-            outcome: {
-                type: DataTypes.STRING(30),
+            purchasedOn: {
+                type: DataTypes.DATEONLY,
+                field: 'purchased_on',
                 allowNull: false,
             },
 
-            isActive: {
-                type: DataTypes.BOOLEAN,
-                field: 'is_active',
+            vendorId: {
+                type: DataTypes.INTEGER,
+                field: 'vendor_id',
+                allowNull: true,
+            },
+
+            notes: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+            },
+
+            status: {
+                type: DataTypes.STRING(20),
                 allowNull: false,
-                defaultValue: true,
+                defaultValue: 'active',
             },
 
             deletedAt: {
@@ -50,12 +61,12 @@ export default (sequelize) => {
             },
         },
         {
-            tableName: 'damage_grades',
+            tableName: 'intake_records',
             timestamps: true,
             underscored: true,
             paranoid: true,
         }
     );
 
-    return DamageGrade;
+    return IntakeRecord;
 };

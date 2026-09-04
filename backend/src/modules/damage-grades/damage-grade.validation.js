@@ -9,11 +9,6 @@ export const createDamageGradeSchema = z.object({
         .max(100)
         .refine((name) => name.trim().length > 0, "Name cannot be empty or whitespace-only"),
 
-    defaultChargePaise: z
-        .number()
-        .int()
-        .nonnegative("Default charge cannot be negative"),
-
     outcome: z
         .string()
         .refine(
@@ -33,12 +28,6 @@ export const updateDamageGradeSchema = z.object({
         .min(1)
         .max(100)
         .refine((name) => name.trim().length > 0, "Name cannot be empty or whitespace-only")
-        .optional(),
-
-    defaultChargePaise: z
-        .number()
-        .int()
-        .nonnegative("Default charge cannot be negative")
         .optional(),
 
     outcome: z

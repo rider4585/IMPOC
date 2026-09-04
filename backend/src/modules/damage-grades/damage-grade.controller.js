@@ -9,13 +9,12 @@ import {
 /**
  * Map damage grade to DTO response
  * @param {Object} damageGrade - DamageGrade from service
- * @returns {Object} DTO with uuid, name, defaultChargePaise, outcome, isActive, createdAt, updatedAt
+ * @returns {Object} DTO with uuid, name, outcome, isActive, createdAt, updatedAt
  */
 function mapDamageGradeDTO(damageGrade) {
     return {
         uuid: damageGrade.uuid,
         name: damageGrade.name,
-        defaultChargePaise: damageGrade.defaultChargePaise,
         outcome: damageGrade.outcome,
         isActive: damageGrade.isActive,
         createdAt: damageGrade.createdAt,

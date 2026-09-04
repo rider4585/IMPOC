@@ -113,13 +113,11 @@ describe('Rental agreements module (T-10)', () => {
 
         gradeMaintenance = await db.DamageGrade.create({
             name: `Grade_Maint_${Date.now()}`,
-            defaultChargePaise: 3000,
             outcome: 'SEND_TO_MAINTENANCE',
             isActive: true,
         });
         gradeRetire = await db.DamageGrade.create({
             name: `Grade_Retire_${Date.now()}`,
-            defaultChargePaise: 4000,
             outcome: 'RETIRE',
             isActive: true,
         });
@@ -219,7 +217,7 @@ describe('Rental agreements module (T-10)', () => {
                 .set('Authorization', `Bearer ${managerToken}`)
                 .send({
                     actualReturnDate: '2026-09-10', // 4 days past due date 2026-09-06
-                    items: [{ barcode: 'RA0000000002', gradeUuid: gradeMaintenance.uuid }],
+                    items: [{ barcode: 'RA0000000002', gradeUuid: gradeMaintenance.uuid, damageChargePaise: 3000 }],
                 })
                 .expect(200);
 
@@ -231,7 +229,7 @@ describe('Rental agreements module (T-10)', () => {
             // overdue: 4 days * 2000 = 8000
             expect(returnRow.lateDays).toBe(4);
             expect(returnRow.overdueChargePaise).toBe('8000');
-            // damage: grade default 3000
+            // damage: entered per item at return time
             expect(returnRow.damageChargePaise).toBe('3000');
             // deposit refunded = 5000 - 8000 - 3000 => 0
             expect(returnRow.depositRefundedPaise).toBe('0');

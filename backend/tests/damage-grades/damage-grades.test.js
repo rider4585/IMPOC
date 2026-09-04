@@ -87,7 +87,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
       // Create a test damage grade first
       await db.DamageGrade.create({
         name: 'TEST_Mint',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -102,9 +101,9 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         expect(grade).not.toHaveProperty('id');
         expect(grade).toHaveProperty('uuid');
         expect(grade).toHaveProperty('name');
-        expect(grade).toHaveProperty('defaultChargePaise');
         expect(grade).toHaveProperty('outcome');
         expect(grade).toHaveProperty('isActive');
+        expect(grade).not.toHaveProperty('defaultChargePaise');
       });
     });
 
@@ -112,14 +111,12 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
       // Create active grade
       await db.DamageGrade.create({
         name: 'TEST_Active',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
       // Create and deactivate a grade
       const inactive = await db.DamageGrade.create({
         name: 'TEST_Inactive',
-        defaultChargePaise: 5000,
         outcome: 'SEND_TO_MAINTENANCE'
       });
       await inactive.update({ isActive: false });
@@ -145,7 +142,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
           .set('Authorization', `Bearer ${inventoryToken}`)
           .send({
             name: `TEST_${outcome}`,
-            defaultChargePaise: 1000,
             outcome
           });
 
@@ -154,47 +150,18 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         expect(res.body.data).toHaveProperty('uuid');
         expect(res.body.data.name).toBe(`TEST_${outcome}`);
         expect(res.body.data.outcome).toBe(outcome);
-        expect(res.body.data.defaultChargePaise).toBe(1000);
         expect(res.body.data.isActive).toBe(true);
         expect(res.body.data).toHaveProperty('createdAt');
         expect(res.body.data).toHaveProperty('updatedAt');
         expect(res.body.data).not.toHaveProperty('id');
+        expect(res.body.data).not.toHaveProperty('defaultChargePaise');
       }
-    });
-
-    it('should create damage grade with zero charge', async () => {
-      const res = await request(app)
-        .post('/api/picklists/damage-grades')
-        .set('Authorization', `Bearer ${inventoryToken}`)
-        .send({
-          name: 'TEST_Zero',
-          defaultChargePaise: 0,
-          outcome: 'RETURN_TO_STOCK'
-        });
-
-      expect(res.statusCode).toBe(201);
-      expect(res.body.data.defaultChargePaise).toBe(0);
-    });
-
-    it('should create damage grade with large charge', async () => {
-      const res = await request(app)
-        .post('/api/picklists/damage-grades')
-        .set('Authorization', `Bearer ${inventoryToken}`)
-        .send({
-          name: 'TEST_Expensive',
-          defaultChargePaise: 999999999,
-          outcome: 'SEND_TO_MAINTENANCE'
-        });
-
-      expect(res.statusCode).toBe(201);
-      expect(res.body.data.defaultChargePaise).toBe(999999999);
     });
 
     it('should return 409 for duplicate active damage grade name', async () => {
       // Create first grade
       await db.DamageGrade.create({
         name: 'TEST_Duplicate',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -204,7 +171,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         .set('Authorization', `Bearer ${inventoryToken}`)
         .send({
           name: 'TEST_Duplicate',
-          defaultChargePaise: 1000,
           outcome: 'RETIRE'
         });
 
@@ -217,7 +183,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
       // Create and deactivate a grade
       const grade = await db.DamageGrade.create({
         name: 'TEST_Reusable',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
       await grade.update({ isActive: false });
@@ -228,7 +193,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         .set('Authorization', `Bearer ${inventoryToken}`)
         .send({
           name: 'TEST_Reusable',
-          defaultChargePaise: 5000,
           outcome: 'RETIRE'
         });
 
@@ -243,7 +207,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         .post('/api/picklists/damage-grades')
         .send({
           name: 'TEST_NoAuth',
-          defaultChargePaise: 0,
           outcome: 'RETURN_TO_STOCK'
         });
 
@@ -275,7 +238,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         .set('Authorization', `Bearer ${cashierToken}`)
         .send({
           name: 'TEST_NoPermission',
-          defaultChargePaise: 0,
           outcome: 'RETURN_TO_STOCK'
         });
 
@@ -288,25 +250,11 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         .set('Authorization', `Bearer ${inventoryToken}`)
         .send({
           name: '  TEST_Trimmed  ',
-          defaultChargePaise: 0,
           outcome: 'RETURN_TO_STOCK'
         });
 
       expect(res.statusCode).toBe(201);
       expect(res.body.data.name).toBe('TEST_Trimmed');
-    });
-
-    it('should return 400 for negative charge', async () => {
-      const res = await request(app)
-        .post('/api/picklists/damage-grades')
-        .set('Authorization', `Bearer ${inventoryToken}`)
-        .send({
-          name: 'TEST_Negative',
-          defaultChargePaise: -100,
-          outcome: 'RETURN_TO_STOCK'
-        });
-
-      expect(res.statusCode).toBe(400);
     });
 
     it('should return 400 for invalid outcome', async () => {
@@ -315,7 +263,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         .set('Authorization', `Bearer ${inventoryToken}`)
         .send({
           name: 'TEST_InvalidOutcome',
-          defaultChargePaise: 0,
           outcome: 'INVALID_OUTCOME'
         });
 
@@ -327,19 +274,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         .post('/api/picklists/damage-grades')
         .set('Authorization', `Bearer ${inventoryToken}`)
         .send({
-          defaultChargePaise: 0,
-          outcome: 'RETURN_TO_STOCK'
-        });
-
-      expect(res.statusCode).toBe(400);
-    });
-
-    it('should return 400 for missing defaultChargePaise', async () => {
-      const res = await request(app)
-        .post('/api/picklists/damage-grades')
-        .set('Authorization', `Bearer ${inventoryToken}`)
-        .send({
-          name: 'TEST_Missing',
           outcome: 'RETURN_TO_STOCK'
         });
 
@@ -351,8 +285,7 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         .post('/api/picklists/damage-grades')
         .set('Authorization', `Bearer ${inventoryToken}`)
         .send({
-          name: 'TEST_Missing',
-          defaultChargePaise: 0
+          name: 'TEST_Missing'
         });
 
       expect(res.statusCode).toBe(400);
@@ -364,7 +297,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
         .set('Authorization', `Bearer ${inventoryToken}`)
         .send({
           name: 'A'.repeat(101),
-          defaultChargePaise: 0,
           outcome: 'RETURN_TO_STOCK'
         });
 
@@ -376,7 +308,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
     it('should get damage grade by uuid with authentication', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_GetOne',
-        defaultChargePaise: 2500,
         outcome: 'SEND_TO_MAINTENANCE'
       });
 
@@ -388,7 +319,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data.uuid).toBe(grade.uuid);
       expect(res.body.data.name).toBe('TEST_GetOne');
-      expect(res.body.data.defaultChargePaise).toBe(2500);
       expect(res.body.data.outcome).toBe('SEND_TO_MAINTENANCE');
       expect(res.body.data).not.toHaveProperty('id');
     });
@@ -405,7 +335,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
     it('should return 401 without authentication', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_NoAuth',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -428,7 +357,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
     it('should update damage grade name', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_UpdateName',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -440,33 +368,13 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.name).toBe('TEST_UpdatedName');
-      expect(res.body.data.defaultChargePaise).toBe(0);
       expect(res.body.data.outcome).toBe('RETURN_TO_STOCK');
       expect(res.body.data.uuid).toBe(grade.uuid);
-    });
-
-    it('should update damage grade charge', async () => {
-      const grade = await db.DamageGrade.create({
-        name: 'TEST_UpdateCharge',
-        defaultChargePaise: 1000,
-        outcome: 'RETIRE'
-      });
-
-      const res = await request(app)
-        .patch(`/api/picklists/damage-grades/${grade.uuid}`)
-        .set('Authorization', `Bearer ${inventoryToken}`)
-        .send({ defaultChargePaise: 5000 });
-
-      expect(res.statusCode).toBe(200);
-      expect(res.body.data.defaultChargePaise).toBe(5000);
-      expect(res.body.data.name).toBe('TEST_UpdateCharge');
-      expect(res.body.data.outcome).toBe('RETIRE');
     });
 
     it('should update damage grade outcome', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_UpdateOutcome',
-        defaultChargePaise: 3000,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -478,13 +386,11 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.data.outcome).toBe('SEND_TO_MAINTENANCE');
       expect(res.body.data.name).toBe('TEST_UpdateOutcome');
-      expect(res.body.data.defaultChargePaise).toBe(3000);
     });
 
     it('should deactivate grade by setting isActive to false', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_Deactivate',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -500,7 +406,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
     it('should reactivate grade by setting isActive to true', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_Reactivate',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK',
         isActive: false
       });
@@ -526,12 +431,10 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
     it('should return 409 when updating to duplicate name', async () => {
       const grade1 = await db.DamageGrade.create({
         name: 'TEST_Grade1',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
       const grade2 = await db.DamageGrade.create({
         name: 'TEST_Grade2',
-        defaultChargePaise: 1000,
         outcome: 'RETIRE'
       });
 
@@ -546,7 +449,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
     it('should return 401 without authentication', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_NoAuth',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -560,7 +462,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
     it('should return 403 without inventory.update permission', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_NoPermission',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -594,7 +495,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
     it('should return 400 when update has no fields', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_EmptyUpdate',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -606,25 +506,9 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
       expect(res.statusCode).toBe(400);
     });
 
-    it('should return 400 for negative charge on update', async () => {
-      const grade = await db.DamageGrade.create({
-        name: 'TEST_NegativeUpdate',
-        defaultChargePaise: 1000,
-        outcome: 'RETURN_TO_STOCK'
-      });
-
-      const res = await request(app)
-        .patch(`/api/picklists/damage-grades/${grade.uuid}`)
-        .set('Authorization', `Bearer ${inventoryToken}`)
-        .send({ defaultChargePaise: -500 });
-
-      expect(res.statusCode).toBe(400);
-    });
-
     it('should return 400 for invalid outcome on update', async () => {
       const grade = await db.DamageGrade.create({
         name: 'TEST_InvalidOutcomeUpdate',
-        defaultChargePaise: 0,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -642,7 +526,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
       // Create a damage grade
       const grade = await db.DamageGrade.create({
         name: 'TEST_SoftDeleted',
-        defaultChargePaise: 1000,
         outcome: 'RETURN_TO_STOCK'
       });
 
@@ -668,7 +551,6 @@ describe('Damage Grades Module - /api/picklists/damage-grades', () => {
       // Create and soft-delete a damage grade
       const grade = await db.DamageGrade.create({
         name: 'TEST_SoftDeletedByUuid',
-        defaultChargePaise: 500,
         outcome: 'SEND_TO_MAINTENANCE'
       });
 

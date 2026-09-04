@@ -6,6 +6,8 @@ import PermissionsScreen from '../screens/admin/PermissionsScreen';
 import PicklistManagementScreen from '../screens/admin/PicklistManagementScreen';
 import VendorsScreen from '../screens/admin/VendorsScreen';
 import TripsScreen from '../screens/inventory/TripsScreen';
+import IntakeRecordsScreen from '../screens/inventory/IntakeRecordsScreen';
+import IntakeRecordDetailScreen from '../screens/inventory/IntakeRecordDetailScreen';
 import TripDetailScreen from '../screens/inventory/TripDetailScreen';
 import LotForm from '../screens/inventory/LotForm';
 import LotIntake from '../screens/inventory/LotIntake';
@@ -34,6 +36,7 @@ export const navigationRegistry = [
   { permission: PERMISSIONS.PICKLISTS.VIEW, label: 'Picklists', path: '/picklists', element: PicklistManagementScreen },
   { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Vendors', path: '/vendors', element: VendorsScreen },
   { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Trips', path: '/trips', element: TripsScreen },
+  { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Intake Records', path: '/intake-records', element: IntakeRecordsScreen },
   { permission: PERMISSIONS.SALES.CREATE, label: 'POS', path: '/pos', element: POSScreen },
   { permission: PERMISSIONS.SALES.VIEW, label: 'Sales', path: '/sales', element: SalesListScreen },
   { permission: PERMISSIONS.RENTALS.VIEW, label: 'Rentals', path: '/rentals', element: RentalsScreen },
@@ -56,6 +59,7 @@ export const navigationSections = [
     icon: 'inventory',
     items: [
       { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Trips', path: '/trips' },
+      { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Intake Records', path: '/intake-records' },
       { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Vendors', path: '/vendors' },
       { permission: PERMISSIONS.INVENTORY.BARCODE_GENERATE, label: 'Print labels', path: '/barcode-sheets' },
     ],

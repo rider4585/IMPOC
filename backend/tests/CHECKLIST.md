@@ -287,10 +287,6 @@ NODE_OPTIONS=--experimental-vm-modules jest tests/auth/auth.test.js -t "specific
    npm test -- --coverage
    ```
 
-4. ✅ Review test summary:
-   ```bash
-   cat _bmad-output/implementation-artifacts/tests/test-summary.md
-   ```
 
 ---
 

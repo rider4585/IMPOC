@@ -7,6 +7,7 @@ import { RouteGuard } from './app/RouteGuard';
 import { AppShell } from './app/AppShell';
 import { navigationRegistry } from './app/navigation';
 import TripDetailScreen from './screens/inventory/TripDetailScreen';
+import IntakeRecordDetailScreen from './screens/inventory/IntakeRecordDetailScreen';
 import LotForm from './screens/inventory/LotForm';
 import LotIntake from './screens/inventory/LotIntake';
 import VendorDetail from './screens/inventory/VendorDetail';
@@ -81,6 +82,9 @@ function App() {
 
                 {/* Nested vendor detail route */}
                 <Route path="/vendors/:uuid" element={<VendorDetail />} />
+
+                {/* Nested intake record detail route */}
+                <Route path="/intake-records/:intakeUuid" element={<IntakeRecordDetailScreen />} />
 
                 {/* Fallback: if user has no accessible routes, show "nothing here yet" */}
                 <Route

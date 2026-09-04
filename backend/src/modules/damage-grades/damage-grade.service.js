@@ -2,14 +2,14 @@ import { DamageGrade, sequelize } from '../../../database/models/index.js';
 
 export const getDamageGrades = async () => {
     const damageGrades = await DamageGrade.findAll({
-        attributes: ['uuid', 'name', 'defaultChargePaise', 'outcome', 'isActive', 'createdAt', 'updatedAt'],
+        attributes: ['uuid', 'name', 'outcome', 'isActive', 'createdAt', 'updatedAt'],
         order: [['createdAt', 'DESC']],
     });
 
     return damageGrades;
 };
 
-export const createDamageGrade = async ({ name, defaultChargePaise, outcome }) => {
+export const createDamageGrade = async ({ name, outcome }) => {
     const transaction = await sequelize.transaction();
 
     try {
@@ -28,7 +28,6 @@ export const createDamageGrade = async ({ name, defaultChargePaise, outcome }) =
         // Create the damage grade
         const damageGrade = await DamageGrade.create({
             name,
-            defaultChargePaise,
             outcome,
         }, { transaction });
 
@@ -43,7 +42,7 @@ export const createDamageGrade = async ({ name, defaultChargePaise, outcome }) =
 export const getDamageGradeByUuid = async (uuid) => {
     const damageGrade = await DamageGrade.findOne({
         where: { uuid },
-        attributes: ['uuid', 'name', 'defaultChargePaise', 'outcome', 'isActive', 'createdAt', 'updatedAt'],
+        attributes: ['uuid', 'name', 'outcome', 'isActive', 'createdAt', 'updatedAt'],
     });
 
     if (!damageGrade) {
@@ -61,7 +60,7 @@ export const updateDamageGrade = async (uuid, data) => {
     try {
         const damageGrade = await DamageGrade.findOne({
             where: { uuid },
-            attributes: ['id', 'uuid', 'name', 'defaultChargePaise', 'outcome', 'isActive', 'createdAt', 'updatedAt'],
+            attributes: ['id', 'uuid', 'name', 'outcome', 'isActive', 'createdAt', 'updatedAt'],
             transaction,
         });
 
@@ -88,11 +87,6 @@ export const updateDamageGrade = async (uuid, data) => {
                 error.statusCode = 409;
                 throw error;
             }
-        }
-
-        // Handle defaultChargePaise update
-        if (data.defaultChargePaise !== undefined) {
-            updateData.defaultChargePaise = data.defaultChargePaise;
         }
 
         // Handle outcome update

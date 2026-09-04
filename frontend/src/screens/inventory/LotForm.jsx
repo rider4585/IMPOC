@@ -4,6 +4,7 @@ import { Card, CardContent, Button, Input, Select, useToast } from '../../compon
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { createStockIntakeLine } from '../../services/intakeApi.js';
+import { getIntakeRecords, getIntakeRecord } from '../../services/intakeRecordsApi.js';
 import { getProductTypes, getSizes } from '../../services/picklistsApi.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { formatPaiseForInput, parseRupeesToPaise } from '../../platform/moneyInput.js';
@@ -24,6 +25,11 @@ export function LotForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const [intakeRecords, setIntakeRecords] = useState([]);
+  const [selectedIntakeUuid, setSelectedIntakeUuid] = useState('');
+  const [intakeTemplates, setIntakeTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
   const [form, setForm] = useState(() => ({
     productTypeUuid: prefill?.productTypeUuid || '',
     name: prefill?.name || '',
@@ -42,7 +48,38 @@ export function LotForm() {
   useEffect(() => {
     getProductTypes().then(setProductTypes).catch(() => {});
     getSizes().then(setSizes).catch(() => {});
+    getIntakeRecords().then(setIntakeRecords).catch(() => {});
   }, []);
+
+  const handleIntakeChange = async (e) => {
+    const intakeUuid = e.target.value;
+    setSelectedIntakeUuid(intakeUuid);
+    setIntakeTemplates([]);
+    if (!intakeUuid) return;
+    setLoadingTemplates(true);
+    try {
+      const record = await getIntakeRecord(intakeUuid);
+      setIntakeTemplates(Array.isArray(record?.templates) ? record.templates : []);
+    } catch {
+      setIntakeTemplates([]);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const applyTemplate = (e) => {
+    const uuid = e.target.value;
+    const tpl = intakeTemplates.find((t) => t.uuid === uuid);
+    if (!tpl) return;
+    setForm((f) => ({
+      ...f,
+      productTypeUuid: tpl.productTypeUuid || f.productTypeUuid,
+      quantity: tpl.defaultQuantity != null ? String(tpl.defaultQuantity) : f.quantity,
+      buyingPricePaise: rupeeOrEmpty(tpl.buyingPricePaise),
+      sellingPricePaise: rupeeOrEmpty(tpl.defaultSellingPricePaise),
+      floorPricePaise: rupeeOrEmpty(tpl.defaultFloorPricePaise),
+    }));
+  };
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -132,6 +169,52 @@ export function LotForm() {
       </div>
 
       <form id="lot-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {intakeRecords.length > 0 && (
+          <div className="rounded-lg border border-[var(--border)] bg-white p-4">
+            <p className="mb-2 text-sm font-medium text-[var(--ink)]">
+              Pre-fill from an intake template
+            </p>
+            <div className="flex flex-col gap-3">
+              <Select
+                label="Intake record"
+                value={selectedIntakeUuid}
+                onChange={handleIntakeChange}
+                hint="Pick the buying day whose template you used for this stock."
+              >
+                <option value="">-- Select intake record --</option>
+                {intakeRecords
+                  .filter((r) => r.status !== 'closed')
+                  .map((r) => (
+                    <option key={r.uuid} value={r.uuid}>
+                      {r.name} · {new Date(r.purchasedOn + 'T00:00:00').toLocaleDateString()}
+                    </option>
+                  ))}
+              </Select>
+              <Select
+                label="Template"
+                value=""
+                onChange={applyTemplate}
+                hint="Applying a template pre-fills type and prices below (still editable)."
+              >
+                <option value="">-- Select template --</option>
+                {intakeTemplates.map((t) => (
+                  <option key={t.uuid} value={t.uuid}>
+                    {t.name || 'Untitled template'}
+                  </option>
+                ))}
+              </Select>
+              {loadingTemplates && (
+                <p className="text-xs text-[var(--ink-muted)]">Loading templates…</p>
+              )}
+              {selectedIntakeUuid && !loadingTemplates && intakeTemplates.length === 0 && (
+                <p className="text-xs text-[var(--ink-muted)]">
+                  This intake record has no templates yet.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         <Select label="Product type" value={form.productTypeUuid} onChange={set('productTypeUuid')} required>
           <option value="">Select a product type…</option>
           {productTypes.filter((t) => t.isActive !== false).map((t) => (
