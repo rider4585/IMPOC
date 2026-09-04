@@ -27,6 +27,15 @@ import {
 import { formatPaise } from '../../platform/money.js';
 import { VendorFormDialog } from './VendorFormDialog.jsx';
 
+function tripStocks(trip) {
+  const tripVendors = Array.isArray(trip.trip_vendors) ? trip.trip_vendors : [];
+  if (tripVendors.length > 0) {
+    return tripVendors.flatMap((tv) => (Array.isArray(tv.stocks) ? tv.stocks : []));
+  }
+  // Legacy / mid-migration response shape: flat lines on the trip.
+  return trip.lines || [];
+}
+
 export function VendorsScreen() {
   const { permissions } = useAuth();
   const toast = useToast();
@@ -273,19 +282,19 @@ export function VendorsScreen() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {trip.lines.map((line) => (
-                        <TableRow key={line.uuid}>
-                          <TableCell>{line.productTypeUuid || '—'}</TableCell>
-                          <TableCell>{line.quantity}</TableCell>
-                          <TableCell>{formatPaise(Number(line.buyingPricePaise))}</TableCell>
-                          <TableCell>{formatPaise(Number(line.sellingPricePaise))}</TableCell>
-                          <TableCell>{line.channel || '—'}</TableCell>
+                      {tripStocks(trip).map((stock) => (
+                        <TableRow key={stock.uuid}>
+                          <TableCell>{stock.productTypeUuid || '—'}</TableCell>
+                          <TableCell>{stock.quantity}</TableCell>
+                          <TableCell>{formatPaise(Number(stock.buyingPricePaise))}</TableCell>
+                          <TableCell>{formatPaise(Number(stock.sellingPricePaise))}</TableCell>
+                          <TableCell>{stock.channel || '—'}</TableCell>
                         </TableRow>
                       ))}
-                      {trip.lines.length === 0 && (
+                      {tripStocks(trip).length === 0 && (
                         <TableRow>
                           <TableCell colSpan={5} className="text-sm text-[var(--ink-muted)]">
-                            No lots in this trip.
+                            No stocks in this trip.
                           </TableCell>
                         </TableRow>
                       )}

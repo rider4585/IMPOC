@@ -36,7 +36,7 @@ describe('navigationSections — grouped, labelled, iconed', () => {
       (acc, s) => ({ ...acc, [s.key]: s.items.map((i) => i.path) }),
       {}
     );
-    expect(sectionItems.inventory).toEqual(['/trips', '/intake-records', '/vendors', '/barcode-sheets']);
+    expect(sectionItems.inventory).toEqual(['/trips', '/vendors', '/barcode-sheets']);
     expect(sectionItems.pos).toEqual(['/pos', '/sales']);
     expect(sectionItems.rentals).toEqual(['/rentals']);
     expect(sectionItems.expenses).toEqual(['/expenses']);

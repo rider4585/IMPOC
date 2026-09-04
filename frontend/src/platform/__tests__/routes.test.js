@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   BARCODE_ROUTES,
-  STOCK_INTAKE_ROUTES,
-  STOCK_INTAKE_LINE_ROUTES,
+  TRIP_ROUTES,
+  STOCK_ROUTES,
+  TEMPLATE_ROUTES,
   SALES_ROUTES,
   RENTAL_ROUTES,
   EXPENSE_ROUTES,
@@ -25,60 +26,78 @@ describe('BARCODE_ROUTES', () => {
   });
 });
 
-describe('STOCK_INTAKE_ROUTES', () => {
+describe('TRIP_ROUTES', () => {
   it('exposes list/create constants', () => {
-    expect(STOCK_INTAKE_ROUTES.LIST).toBe('/stock-intakes');
-    expect(STOCK_INTAKE_ROUTES.CREATE).toBe('/stock-intakes');
+    expect(TRIP_ROUTES.LIST).toBe('/trips');
+    expect(TRIP_ROUTES.CREATE).toBe('/trips');
   });
 
   it('builds a GET path for a trip uuid', () => {
     const uuid = '550e8400-e29b-41d4-a716-446655440000';
-    expect(STOCK_INTAKE_ROUTES.GET(uuid)).toBe(`/stock-intakes/${uuid}`);
+    expect(TRIP_ROUTES.GET(uuid)).toBe(`/trips/${uuid}`);
   });
 
-  it('builds the clone-last-lot path', () => {
+  it('builds the add-vendor path', () => {
     const uuid = '550e8400-e29b-41d4-a716-446655440000';
-    expect(STOCK_INTAKE_ROUTES.CLONE_LAST_LOT(uuid)).toBe(
-      `/stock-intakes/${uuid}/clone-last-lot`
-    );
-    expect(STOCK_INTAKE_ROUTES.CLONE_LAST_LOT(uuid)).not.toContain('/api/');
+    expect(TRIP_ROUTES.ADD_VENDOR(uuid)).toBe(`/trips/${uuid}/vendors`);
+    expect(TRIP_ROUTES.ADD_VENDOR(uuid)).not.toContain('/api/');
+  });
+
+  it('builds the clone-last-stock path', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(TRIP_ROUTES.CLONE_LAST_STOCK(uuid)).toBe(`/trips/${uuid}/clone-last-stock`);
+    expect(TRIP_ROUTES.CLONE_LAST_STOCK(uuid)).not.toContain('/api/');
   });
 });
 
-describe('STOCK_INTAKE_LINE_ROUTES', () => {
+describe('STOCK_ROUTES', () => {
   describe('SCAN', () => {
-    const trip = '11111111-1111-4111-8111-111111111111';
     const uuid = '550e8400-e29b-41d4-a716-446655440000';
 
-    it('returns the correct path under the trip lines mount', () => {
-      expect(STOCK_INTAKE_LINE_ROUTES.SCAN(trip, uuid)).toBe(
-        `/stock-intakes/${trip}/lines/${uuid}/scan`
-      );
+    it('returns the correct path under the stocks mount', () => {
+      expect(STOCK_ROUTES.SCAN(uuid)).toBe(`/stocks/${uuid}/scan`);
     });
 
     it('is a function', () => {
-      expect(typeof STOCK_INTAKE_LINE_ROUTES.SCAN).toBe('function');
+      expect(typeof STOCK_ROUTES.SCAN).toBe('function');
     });
 
     it('does not include /api prefix', () => {
-      expect(STOCK_INTAKE_LINE_ROUTES.SCAN(trip, uuid)).not.toContain('/api/');
+      expect(STOCK_ROUTES.SCAN(uuid)).not.toContain('/api/');
     });
 
-    it('encodes special characters in both params', () => {
-      const result = STOCK_INTAKE_LINE_ROUTES.SCAN('trip@x', 'line@y');
-      expect(result).toContain('trip%40x');
-      expect(result).toContain('line%40y');
+    it('encodes special characters in the param', () => {
+      const result = STOCK_ROUTES.SCAN('stock@y');
+      expect(result).toContain('stock%40y');
     });
   });
 
-  it('builds list/create/update paths', () => {
+  it('builds list/create/update paths under the trip', () => {
     const trip = '11111111-1111-4111-8111-111111111111';
     const uuid = '550e8400-e29b-41d4-a716-446655440000';
-    expect(STOCK_INTAKE_LINE_ROUTES.LIST(trip)).toBe(`/stock-intakes/${trip}/lines`);
-    expect(STOCK_INTAKE_LINE_ROUTES.CREATE(trip)).toBe(`/stock-intakes/${trip}/lines`);
-    expect(STOCK_INTAKE_LINE_ROUTES.UPDATE(trip, uuid)).toBe(
-      `/stock-intakes/${trip}/lines/${uuid}`
-    );
+    expect(STOCK_ROUTES.LIST(trip)).toBe(`/trips/${trip}/stocks`);
+    expect(STOCK_ROUTES.CREATE(trip)).toBe(`/trips/${trip}/stocks`);
+    expect(STOCK_ROUTES.UPDATE(trip, uuid)).toBe(`/trips/${trip}/stocks/${uuid}`);
+  });
+
+  it('builds a GET path for a single stock', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(STOCK_ROUTES.GET(uuid)).toBe(`/stocks/${uuid}`);
+  });
+});
+
+describe('TEMPLATE_ROUTES', () => {
+  it('list/create are constants', () => {
+    expect(TEMPLATE_ROUTES.LIST).toBe('/templates');
+    expect(TEMPLATE_ROUTES.CREATE).toBe('/templates');
+  });
+
+  it('builds GET/UPDATE/DELETE paths for a template uuid', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    expect(TEMPLATE_ROUTES.GET(uuid)).toBe(`/templates/${uuid}`);
+    expect(TEMPLATE_ROUTES.UPDATE(uuid)).toBe(`/templates/${uuid}`);
+    expect(TEMPLATE_ROUTES.DELETE(uuid)).toBe(`/templates/${uuid}`);
+    expect(TEMPLATE_ROUTES.DELETE(uuid)).not.toContain('/api/');
   });
 });
 

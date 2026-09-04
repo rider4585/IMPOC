@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Dialog, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
-import { getStockIntakes, createStockIntake } from '../../services/intakeApi.js';
+import { getTrips, createTrip } from '../../services/tripsApi.js';
 import { getVendors } from '../../services/vendorsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { parseRupeesToPaise } from '../../platform/moneyInput.js';
@@ -43,11 +43,23 @@ export function TripsScreen() {
     [vendors]
   );
 
+  const tripLabel = useCallback(
+    (t) => {
+      const firstTv = Array.isArray(t.trip_vendors) ? t.trip_vendors[0] : null;
+      const name = firstTv?.vendor?.name || vendorName(t.vendorUuid);
+      const extra = Array.isArray(t.trip_vendors) && t.trip_vendors.length > 1
+        ? ` +${t.trip_vendors.length - 1}`
+        : '';
+      return `${name}${extra}`;
+    },
+    [vendorName]
+  );
+
   const loadTrips = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const response = await getStockIntakes();
+      const response = await getTrips();
       if (Array.isArray(response)) {
         setTrips(response);
         setTotal(response.length);
@@ -81,7 +93,7 @@ export function TripsScreen() {
     if (Number.isNaN(totalPaidPaise)) { setFormError('Total paid must be a valid rupee amount.'); return; }
     setSaving(true);
     try {
-      const created = await createStockIntake({
+      const created = await createTrip({
         vendorUuid: form.vendorUuid,
         purchasedOn: form.purchasedOn,
         billReference: form.billReference.trim() || null,
@@ -116,7 +128,7 @@ export function TripsScreen() {
         <div>
           <h1 className="typography-heading mb-1">Trips</h1>
           <p className="typography-body-sm text-[var(--ink-muted)]">
-            Buying trips, newest first. Each ties lots to a vendor visit.
+            Buying trips, newest first. Each groups the vendors and stocks bought on one visit.
           </p>
         </div>
         {canCreate && (
@@ -157,7 +169,7 @@ export function TripsScreen() {
                       onClick={() => navigate(`/trips/${t.uuid}`)}
                       data-testid="trip-row"
                     >
-                      {vendorName(t.vendorUuid)} &middot; {new Date(t.purchasedOn).toLocaleDateString()}
+                      {tripLabel(t)} &middot; {new Date(t.purchasedOn).toLocaleDateString()}
                     </button>
                     <span className="text-[var(--ink-muted)]">
                       Paid {formatPaise(Number(t.totalPaidPaise))}

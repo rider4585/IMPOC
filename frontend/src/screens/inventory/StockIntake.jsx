@@ -3,24 +3,24 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button, Select, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
-import { getStockIntakeLines, scanBarcodeIntoLot } from '../../services/intakeApi.js';
+import { getStock, scanBarcodeIntoStock } from '../../services/tripsApi.js';
 import { getColours, getSizes } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { wakingRequest } from '../../platform/wakingRequest.js';
 import { createRequestKey } from '../../platform/requestKey.js';
 import BarcodeScanner from '../../components/BarcodeScanner.jsx';
 
-const STATES = { IDLE: 'idle', ARMED: 'armed', DECODED: 'decoded', SAVING: 'saving', LOT_FULL: 'lot_full' };
+const STATES = { IDLE: 'idle', ARMED: 'armed', DECODED: 'decoded', SAVING: 'saving', STOCK_FULL: 'stock_full' };
 
-export function LotIntake() {
-  const { tripUuid, lotUuid } = useParams();
+export function StockIntake() {
+  const { tripUuid, stockUuid } = useParams();
   const navigate = useNavigate();
   const { permissions } = useAuth();
   const toast = useToast();
   const can = useCallback((p) => permissions && permissions.includes(p), [permissions]);
   const canScan = can(PERMISSIONS.INVENTORY.CREATE);
 
-  const [lot, setLot] = useState(null);
+  const [stock, setStock] = useState(null);
   const [colours, setColours] = useState([]);
   const [sizes, setSizes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ export function LotIntake() {
   const [lastSavedColour, setLastSavedColour] = useState('');
   const [lastSavedSize, setLastSavedSize] = useState('');
 
-  // Size-run state (passed via navigation state from LotForm)
+  // Size-run state (passed via navigation state from StockForm)
   const navState = useLocation()?.state || {};
   const sizeRunEnabled = Boolean(navState?.sizeRun?.length > 0);
   const sizeRunSequence = navState?.sizeRun || [];
@@ -46,30 +46,31 @@ export function LotIntake() {
   const [decodeFailHint, setDecodeFailHint] = useState(false);
   const decodeTimerRef = useRef(null);
 
-  const scannedCount = lot?.unitsScannedCount ?? 0;
-  const quantity = lot ? Number(lot.quantity) : 0;
+  const scannedCount = stock?.unitsScannedCount ?? 0;
+  const quantity = stock ? Number(stock.quantity) : 0;
   const isFull = scannedCount >= quantity;
 
-  // Load lot data
+  const refreshStock = useCallback(async () => {
+    if (!stockUuid) return null;
+    const data = await getStock(stockUuid);
+    if (data) setStock(data);
+    return data;
+  }, [stockUuid]);
+
+  // Load stock data
   useEffect(() => {
-    if (!tripUuid || !lotUuid) return;
+    if (!stockUuid) return;
     setLoading(true);
-    Promise.all([
-      getStockIntakeLines(tripUuid),
-      getColours(),
-      getSizes(),
-    ])
-      .then(([lotsData, colData, szData]) => {
-        const lots = Array.isArray(lotsData) ? lotsData : lotsData?.items || [];
-        const found = lots.find((l) => l.uuid === lotUuid);
-        if (found) setLot(found);
-        else setError('Lot not found');
+    Promise.all([getStock(stockUuid), getColours(), getSizes()])
+      .then(([stockData, colData, szData]) => {
+        if (stockData) setStock(stockData);
+        else setError('Stock not found');
         setColours(Array.isArray(colData) ? colData : colData?.items || []);
         setSizes(Array.isArray(szData) ? szData : szData?.items || []);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [tripUuid, lotUuid]);
+  }, [stockUuid]);
 
   // Decode timer — after 10s armed with no decode, show hint + manual entry
   useEffect(() => {
@@ -141,7 +142,7 @@ export function LotIntake() {
 
     const requestKey = createRequestKey();
     const doSave = () =>
-      scanBarcodeIntoLot(tripUuid, lotUuid, {
+      scanBarcodeIntoStock(stockUuid, {
         barcode: scannedBarcode,
         colourUuid,
         sizeUuid,
@@ -151,16 +152,9 @@ export function LotIntake() {
       const result = await wakingRequest(doSave, { requestKey });
       if (result?.status === 'waking') {
         setWaking(true);
-        // Keep waiting — wakingRequest retries internally, but if it returned waking
-        // the outer promise resolved. We need to re-call with the same key.
-        // Actually wakingRequest resolves with the result once it succeeds or fails.
-        // The waking status is a signal, not the final result. Let's just re-fetch lot state.
       }
-      // Refresh lot data to get updated count
-      const lotsData = await getStockIntakeLines(tripUuid);
-      const lots = Array.isArray(lotsData) ? lotsData : lotsData?.items || [];
-      const updated = lots.find((l) => l.uuid === lotUuid);
-      if (updated) setLot(updated);
+      // Refresh stock data to get updated count
+      const updated = await refreshStock();
 
       // Save colour/size for pre-fill
       setLastSavedColour(colourUuid);
@@ -175,10 +169,10 @@ export function LotIntake() {
       try { navigator.vibrate?.(100); } catch {}
       setWaking(false);
 
-      // Check if lot is now full
+      // Check if stock is now full
       const newCount = (updated?.unitsScannedCount ?? scannedCount) + 1;
       if (newCount >= quantity) {
-        setState(STATES.LOT_FULL);
+        setState(STATES.STOCK_FULL);
       } else {
         setState(STATES.IDLE);
       }
@@ -205,7 +199,7 @@ export function LotIntake() {
     armCamera();
   };
 
-  const closeLot = () => {
+  const closeStock = () => {
     navigate(`/trips/${tripUuid}`);
   };
 
@@ -225,11 +219,11 @@ export function LotIntake() {
     );
   }
 
-  if (error || !lot) {
+  if (error || !stock) {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/trips/${tripUuid}`)}>&larr; Back to trip</Button>
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Lot not found'}</div>
+        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Stock not found'}</div>
       </div>
     );
   }
@@ -257,12 +251,12 @@ export function LotIntake() {
           >
             {scannedCount} of {quantity}
           </div>
-          <div className="mt-1 text-sm text-white/60">{lot.name || 'Lot'}</div>
+          <div className="mt-1 text-sm text-white/60">{stock.name || 'Stock'}</div>
         </div>
       </div>
 
       {/* Size-run chip */}
-      {sizeRunEnabled && nextSizeLabel && state !== STATES.LOT_FULL && (
+      {sizeRunEnabled && nextSizeLabel && state !== STATES.STOCK_FULL && (
         <div className="flex justify-center pb-2">
           <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-semibold text-[var(--accent-foreground)]">
             Next: {nextSizeLabel}
@@ -343,10 +337,10 @@ export function LotIntake() {
                   </span>
                 </div>
 
-                {/* Lot prices */}
+                {/* Stock prices */}
                 <div className="mb-4 text-center text-xs text-[var(--ink-muted)]">
-                  Buy {formatPaise(Number(lot.buyingPricePaise))} · Sell {formatPaise(Number(lot.sellingPricePaise))}
-                  {lot.channel === 'RENTAL' && lot.rentPerDayPaise && <> · Rent {formatPaise(Number(lot.rentPerDayPaise))}/day</>}
+                  Buy {formatPaise(Number(stock.buyingPricePaise))} · Sell {formatPaise(Number(stock.sellingPricePaise))}
+                  {stock.channel === 'RENTAL' && stock.rentPerDayPaise && <> · Rent {formatPaise(Number(stock.rentPerDayPaise))}/day</>}
                 </div>
 
                 {/* Colour + Size fields */}
@@ -386,12 +380,12 @@ export function LotIntake() {
           </div>
         )}
 
-        {state === STATES.LOT_FULL && (
+        {state === STATES.STOCK_FULL && (
           <div className="w-full max-w-md text-center">
             <div className="rounded-lg border border-[var(--border)] bg-white p-6 shadow-lg">
-              <p className="text-lg font-semibold text-[var(--success)]">{quantity} of {quantity} — lot complete</p>
-              <Button onClick={closeLot} className="mt-4 w-full" data-testid="close-lot">
-                Close lot
+              <p className="text-lg font-semibold text-[var(--success)]">{quantity} of {quantity} — stock complete</p>
+              <Button onClick={closeStock} className="mt-4 w-full" data-testid="close-stock">
+                Close stock
               </Button>
             </div>
           </div>
@@ -400,9 +394,9 @@ export function LotIntake() {
         {isFull && state === STATES.IDLE && (
           <div className="w-full max-w-md text-center">
             <div className="rounded-lg border border-[var(--border)] bg-white p-6 shadow-lg">
-              <p className="text-lg font-semibold text-[var(--success)]">{quantity} of {quantity} — lot complete</p>
-              <Button onClick={closeLot} className="mt-4 w-full" data-testid="close-lot">
-                Close lot
+              <p className="text-lg font-semibold text-[var(--success)]">{quantity} of {quantity} — stock complete</p>
+              <Button onClick={closeStock} className="mt-4 w-full" data-testid="close-stock">
+                Close stock
               </Button>
             </div>
           </div>
@@ -435,4 +429,4 @@ export function LotIntake() {
   );
 }
 
-export default LotIntake;
+export default StockIntake;

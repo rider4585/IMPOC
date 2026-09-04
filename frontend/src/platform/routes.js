@@ -1,5 +1,5 @@
 /**
- * Centralized API route constants for barcode and stock intake endpoints
+ * Centralized API route constants for barcode, stock, trip, and template endpoints
  *
  * ALL paths here are WITHOUT the /api prefix because apiClient.baseURL already includes /api.
  * When adding new endpoints, follow this pattern to prevent doubled-prefix bugs.
@@ -11,38 +11,48 @@ export const BARCODE_ROUTES = {
   GENERATE: '/barcodes/generate',
 };
 
-// Stock intake (trip) endpoints
-export const STOCK_INTAKE_ROUTES = {
-  /** GET /stock-intakes - List all trips */
-  LIST: '/stock-intakes',
-  /** POST /stock-intakes - Create a trip */
-  CREATE: '/stock-intakes',
-  /** GET /stock-intakes/{uuid} - Get a single trip */
-  GET: (uuid) => `/stock-intakes/${encodeURIComponent(uuid)}`,
-  /** GET /stock-intakes/{tripUuid}/clone-last-lot - Clone the last lot of a trip */
-  CLONE_LAST_LOT: (tripUuid) =>
-    `/stock-intakes/${encodeURIComponent(tripUuid)}/clone-last-lot`,
+// Trip endpoints
+export const TRIP_ROUTES = {
+  /** GET /trips - List trips (with vendor summaries) */
+  LIST: '/trips',
+  /** POST /trips - Create a trip */
+  CREATE: '/trips',
+  /** GET /trips/{uuid} - Get a single trip (with trip_vendors[] and stocks[]) */
+  GET: (uuid) => `/trips/${encodeURIComponent(uuid)}`,
+  /** POST /trips/{uuid}/vendors - Add a vendor to a trip (bill_reference + total_paid) */
+  ADD_VENDOR: (uuid) => `/trips/${encodeURIComponent(uuid)}/vendors`,
+  /** GET /trips/{tripUuid}/clone-last-stock - Clone the pre-fill data of the last stock */
+  CLONE_LAST_STOCK: (tripUuid) =>
+    `/trips/${encodeURIComponent(tripUuid)}/clone-last-stock`,
 };
 
-// Stock intake line (lot) endpoints, mounted under /stock-intakes/:tripUuid/lines
-export const STOCK_INTAKE_LINE_ROUTES = {
-  /** GET /stock-intakes/{tripUuid}/lines - List lots for a trip */
-  LIST: (tripUuid) => `/stock-intakes/${encodeURIComponent(tripUuid)}/lines`,
-  /** POST /stock-intakes/{tripUuid}/lines - Create a lot */
-  CREATE: (tripUuid) => `/stock-intakes/${encodeURIComponent(tripUuid)}/lines`,
-  /** GET /stock-intakes/{tripUuid}/lines/{uuid} - Get a single lot */
-  GET: (tripUuid, uuid) =>
-    `/stock-intakes/${encodeURIComponent(tripUuid)}/lines/${encodeURIComponent(uuid)}`,
-  /** PATCH /stock-intakes/{tripUuid}/lines/{uuid} - Update a lot */
+// Stock endpoints (the per-vendor buying unit of a trip), mounted under /trips/:tripUuid/stocks
+export const STOCK_ROUTES = {
+  /** GET /trips/{tripUuid}/stocks - List stocks for a trip */
+  LIST: (tripUuid) => `/trips/${encodeURIComponent(tripUuid)}/stocks`,
+  /** POST /trips/{tripUuid}/stocks - Create a stock (for one of the trip's vendors) */
+  CREATE: (tripUuid) => `/trips/${encodeURIComponent(tripUuid)}/stocks`,
+  /** GET /stocks/{uuid} - Get a single stock */
+  GET: (uuid) => `/stocks/${encodeURIComponent(uuid)}`,
+  /** PATCH /trips/{tripUuid}/stocks/{uuid} - Update a stock */
   UPDATE: (tripUuid, uuid) =>
-    `/stock-intakes/${encodeURIComponent(tripUuid)}/lines/${encodeURIComponent(uuid)}`,
-  /**
-   * POST /stock-intakes/{tripUuid}/lines/{uuid}/scan - Scan a barcode into a lot
-   * (creates a unit). The stock-intake-line router is mounted with mergeParams, so
-   * both :tripUuid and :uuid are required in the path.
-   */
-  SCAN: (tripUuid, uuid) =>
-    `/stock-intakes/${encodeURIComponent(tripUuid)}/lines/${encodeURIComponent(uuid)}/scan`,
+    `/trips/${encodeURIComponent(tripUuid)}/stocks/${encodeURIComponent(uuid)}`,
+  /** POST /stocks/{uuid}/scan - Scan a barcode into a stock (creates a unit) */
+  SCAN: (uuid) => `/stocks/${encodeURIComponent(uuid)}/scan`,
+};
+
+// Per-vendor buying template endpoints
+export const TEMPLATE_ROUTES = {
+  /** GET /templates - List buying templates (filter with ?vendorUuid=) */
+  LIST: '/templates',
+  /** POST /templates - Create a buying template */
+  CREATE: '/templates',
+  /** GET /templates/{uuid} - Get a single template */
+  GET: (uuid) => `/templates/${encodeURIComponent(uuid)}`,
+  /** PATCH /templates/{uuid} - Update a template */
+  UPDATE: (uuid) => `/templates/${encodeURIComponent(uuid)}`,
+  /** DELETE /templates/{uuid} - Soft-delete a template */
+  DELETE: (uuid) => `/templates/${encodeURIComponent(uuid)}`,
 };
 
 // Sales / POS endpoints
@@ -85,27 +95,6 @@ export const EXPENSE_ROUTES = {
   UPDATE: (uuid) => `/expenses/${encodeURIComponent(uuid)}`,
   /** POST /expenses/{uuid}/cancel - Cancel a completed expense (reversal) */
   CANCEL: (uuid) => `/expenses/${encodeURIComponent(uuid)}/cancel`,
-};
-
-// Intake records (dated buying events) and their templates
-export const INTAKE_RECORD_ROUTES = {
-  /** GET /intake-records - List all intake records */
-  LIST: '/intake-records',
-  /** POST /intake-records - Create an intake record */
-  CREATE: '/intake-records',
-  /** GET /intake-records/{intakeUuid} - Get a single intake record (with templates) */
-  GET: (intakeUuid) => `/intake-records/${encodeURIComponent(intakeUuid)}`,
-  /** PATCH /intake-records/{intakeUuid} - Update an intake record */
-  UPDATE: (intakeUuid) => `/intake-records/${encodeURIComponent(intakeUuid)}`,
-  /** POST /intake-records/{intakeUuid}/templates - Create a template under an intake */
-  CREATE_TEMPLATE: (intakeUuid) =>
-    `/intake-records/${encodeURIComponent(intakeUuid)}/templates`,
-  /** PATCH /intake-records/{intakeUuid}/templates/{uuid} - Update a template */
-  UPDATE_TEMPLATE: (intakeUuid, uuid) =>
-    `/intake-records/${encodeURIComponent(intakeUuid)}/templates/${encodeURIComponent(uuid)}`,
-  /** DELETE /intake-records/{intakeUuid}/templates/{uuid} - Soft-delete a template */
-  DELETE_TEMPLATE: (intakeUuid, uuid) =>
-    `/intake-records/${encodeURIComponent(intakeUuid)}/templates/${encodeURIComponent(uuid)}`,
 };
 
 // Unit endpoints

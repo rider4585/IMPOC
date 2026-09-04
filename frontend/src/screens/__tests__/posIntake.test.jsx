@@ -6,13 +6,13 @@ import { ToastProvider } from '../../components/ui/index.js';
 import * as authModule from '../../auth/useAuth.js';
 import * as unitsService from '../../services/unitsApi.js';
 import * as salesService from '../../services/salesApi.js';
-import * as intakeService from '../../services/intakeApi.js';
+import * as tripsService from '../../services/tripsApi.js';
 import * as vendorsService from '../../services/vendorsApi.js';
 
 vi.mock('../../auth/useAuth.js');
 vi.mock('../../services/unitsApi.js');
 vi.mock('../../services/salesApi.js');
-vi.mock('../../services/intakeApi.js');
+vi.mock('../../services/tripsApi.js');
 vi.mock('../../services/vendorsApi.js');
 vi.mock('../../services/picklistsApi.js', () => ({
   getProductTypes: vi.fn().mockResolvedValue([]),
@@ -118,7 +118,7 @@ describe('TripsScreen (R-07 rewrite of T-07)', () => {
     vi.clearAllMocks();
     authModule.useAuth.mockReturnValue({ permissions: [FULL.INVENTORY.VIEW, FULL.INVENTORY.CREATE] });
     vendorsService.getVendors.mockResolvedValue([{ uuid: 'v1', name: 'Sharma Fabrics' }]);
-    intakeService.getStockIntakes.mockResolvedValue([
+    tripsService.getTrips.mockResolvedValue([
       {
         uuid: 't1',
         vendorUuid: 'v1',

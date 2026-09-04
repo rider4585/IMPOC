@@ -3,13 +3,13 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, Button, Input, Select, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
-import { createStockIntakeLine } from '../../services/intakeApi.js';
-import { getIntakeRecords, getIntakeRecord } from '../../services/intakeRecordsApi.js';
+import { getTrip, createStock } from '../../services/tripsApi.js';
+import { getTemplates } from '../../services/templatesApi.js';
 import { getProductTypes, getSizes } from '../../services/picklistsApi.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { formatPaiseForInput, parseRupeesToPaise } from '../../platform/moneyInput.js';
 
-export function LotForm() {
+export function StockForm() {
   const { tripUuid } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -20,17 +20,17 @@ export function LotForm() {
 
   const prefill = location.state?.prefill || null;
 
+  const [tripVendors, setTripVendors] = useState([]);
   const [productTypes, setProductTypes] = useState([]);
   const [sizes, setSizes] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const [intakeRecords, setIntakeRecords] = useState([]);
-  const [selectedIntakeUuid, setSelectedIntakeUuid] = useState('');
-  const [intakeTemplates, setIntakeTemplates] = useState([]);
+  const [vendorTemplates, setVendorTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
   const [form, setForm] = useState(() => ({
+    vendorUuid: prefill?.vendorUuid || '',
     productTypeUuid: prefill?.productTypeUuid || '',
     name: prefill?.name || '',
     quantity: prefill?.quantity != null ? String(prefill.quantity) : '1',
@@ -48,20 +48,30 @@ export function LotForm() {
   useEffect(() => {
     getProductTypes().then(setProductTypes).catch(() => {});
     getSizes().then(setSizes).catch(() => {});
-    getIntakeRecords().then(setIntakeRecords).catch(() => {});
-  }, []);
+    if (!tripUuid) return;
+    getTrip(tripUuid)
+      .then((trip) => {
+        const vendors = Array.isArray(trip?.trip_vendors) ? trip.trip_vendors : [];
+        setTripVendors(vendors);
+        if (vendors.length === 1 && !form.vendorUuid) {
+          setForm((f) => ({ ...f, vendorUuid: vendors[0].vendor?.uuid || '' }));
+        }
+      })
+      .catch(() => setTripVendors([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripUuid]);
 
-  const handleIntakeChange = async (e) => {
-    const intakeUuid = e.target.value;
-    setSelectedIntakeUuid(intakeUuid);
-    setIntakeTemplates([]);
-    if (!intakeUuid) return;
+  const handleVendorChange = async (e) => {
+    const vendorUuid = e.target.value;
+    setForm((f) => ({ ...f, vendorUuid }));
+    setVendorTemplates([]);
+    if (!vendorUuid) return;
     setLoadingTemplates(true);
     try {
-      const record = await getIntakeRecord(intakeUuid);
-      setIntakeTemplates(Array.isArray(record?.templates) ? record.templates : []);
+      const templates = await getTemplates(vendorUuid);
+      setVendorTemplates(Array.isArray(templates) ? templates : []);
     } catch {
-      setIntakeTemplates([]);
+      setVendorTemplates([]);
     } finally {
       setLoadingTemplates(false);
     }
@@ -69,11 +79,12 @@ export function LotForm() {
 
   const applyTemplate = (e) => {
     const uuid = e.target.value;
-    const tpl = intakeTemplates.find((t) => t.uuid === uuid);
+    const tpl = vendorTemplates.find((t) => t.uuid === uuid);
     if (!tpl) return;
     setForm((f) => ({
       ...f,
       productTypeUuid: tpl.productTypeUuid || f.productTypeUuid,
+      name: tpl.name || f.name,
       quantity: tpl.defaultQuantity != null ? String(tpl.defaultQuantity) : f.quantity,
       buyingPricePaise: rupeeOrEmpty(tpl.buyingPricePaise),
       sellingPricePaise: rupeeOrEmpty(tpl.defaultSellingPricePaise),
@@ -96,6 +107,7 @@ export function LotForm() {
     e.preventDefault();
     setError('');
 
+    if (!form.vendorUuid) { setError('Please select a vendor on this trip.'); return; }
     if (!form.productTypeUuid) { setError('Please select a product type.'); return; }
     const quantity = Number(form.quantity);
     if (!Number.isInteger(quantity) || quantity < 1) { setError('Quantity must be a whole number of at least 1.'); return; }
@@ -113,6 +125,7 @@ export function LotForm() {
       if ([rent, deposit, overdue].some(Number.isNaN)) { setError('Rent per day, deposit and overdue per day are required for RENTAL.'); return; }
       if (overdue <= rent) { setError('Overdue per day must be greater than rent per day.'); return; }
       doCreate({
+        vendorUuid: form.vendorUuid,
         productTypeUuid: form.productTypeUuid,
         name: form.name.trim() || undefined,
         quantity,
@@ -126,6 +139,7 @@ export function LotForm() {
       });
     } else {
       doCreate({
+        vendorUuid: form.vendorUuid,
         productTypeUuid: form.productTypeUuid,
         name: form.name.trim() || undefined,
         quantity,
@@ -140,8 +154,8 @@ export function LotForm() {
   const doCreate = async (payload) => {
     setSaving(true);
     try {
-      const created = await createStockIntakeLine(tripUuid, payload);
-      toast.success({ title: 'Lot added' });
+      await createStock(tripUuid, payload);
+      toast.success({ title: 'Stock added' });
       navigate(`/trips/${tripUuid}`, { state: { sizeRun: form.sizeRunEnabled ? form.sizeRun : null } });
     } catch (err) {
       setError(err.message);
@@ -153,7 +167,7 @@ export function LotForm() {
   if (!canCreate) {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
-        <p className="text-sm text-[var(--ink-muted)]">You do not have permission to create lots.</p>
+        <p className="text-sm text-[var(--ink-muted)]">You do not have permission to create stocks.</p>
       </div>
     );
   }
@@ -162,34 +176,34 @@ export function LotForm() {
     <div className="mx-auto flex max-w-[640px] flex-col gap-5 p-6">
       <div>
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>&larr; Back</Button>
-        <h1 className="typography-heading mb-1 mt-1">{prefill ? 'Add lot (cloned)' : 'Add lot'}</h1>
+        <h1 className="typography-heading mb-1 mt-1">{prefill ? 'Add stock (cloned)' : 'Add stock'}</h1>
         <p className="typography-body-sm text-[var(--ink-muted)]">
-          Define the attributes every unit in this lot will inherit.
+          Define the attributes every unit in this stock will inherit.
         </p>
       </div>
 
-      <form id="lot-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {intakeRecords.length > 0 && (
+      <form id="stock-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Select
+          label="Vendor (on this trip)"
+          value={form.vendorUuid}
+          onChange={handleVendorChange}
+          required
+          hint="The stock's vendor must be one of the trip's vendors."
+        >
+          <option value="">Select a vendor…</option>
+          {tripVendors.map((tv) => (
+            <option key={tv.vendor?.uuid || tv.uuid} value={tv.vendor?.uuid || tv.uuid}>
+              {tv.vendor?.name || 'Vendor'}
+            </option>
+          ))}
+        </Select>
+
+        {form.vendorUuid && vendorTemplates.length > 0 && (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <p className="mb-2 text-sm font-medium text-[var(--ink)]">
-              Pre-fill from an intake template
+              Pre-fill from a buying template
             </p>
             <div className="flex flex-col gap-3">
-              <Select
-                label="Intake record"
-                value={selectedIntakeUuid}
-                onChange={handleIntakeChange}
-                hint="Pick the buying day whose template you used for this stock."
-              >
-                <option value="">-- Select intake record --</option>
-                {intakeRecords
-                  .filter((r) => r.status !== 'closed')
-                  .map((r) => (
-                    <option key={r.uuid} value={r.uuid}>
-                      {r.name} · {new Date(r.purchasedOn + 'T00:00:00').toLocaleDateString()}
-                    </option>
-                  ))}
-              </Select>
               <Select
                 label="Template"
                 value=""
@@ -197,7 +211,7 @@ export function LotForm() {
                 hint="Applying a template pre-fills type and prices below (still editable)."
               >
                 <option value="">-- Select template --</option>
-                {intakeTemplates.map((t) => (
+                {vendorTemplates.map((t) => (
                   <option key={t.uuid} value={t.uuid}>
                     {t.name || 'Untitled template'}
                   </option>
@@ -206,13 +220,14 @@ export function LotForm() {
               {loadingTemplates && (
                 <p className="text-xs text-[var(--ink-muted)]">Loading templates…</p>
               )}
-              {selectedIntakeUuid && !loadingTemplates && intakeTemplates.length === 0 && (
-                <p className="text-xs text-[var(--ink-muted)]">
-                  This intake record has no templates yet.
-                </p>
-              )}
             </div>
           </div>
+        )}
+
+        {form.vendorUuid && !loadingTemplates && vendorTemplates.length === 0 && (
+          <p className="text-xs text-[var(--ink-muted)]">
+            No buying templates saved for this vendor yet.
+          </p>
         )}
 
         <Select label="Product type" value={form.productTypeUuid} onChange={set('productTypeUuid')} required>
@@ -222,7 +237,7 @@ export function LotForm() {
           ))}
         </Select>
 
-        <Input label="Lot name (optional)" value={form.name} onChange={set('name')} placeholder="e.g. Round-neck kurti" maxLength={200} />
+        <Input label="Stock name (optional)" value={form.name} onChange={set('name')} placeholder="e.g. Round-neck kurti" maxLength={200} />
 
         <Input label="Quantity" type="number" min={1} step={1} value={form.quantity} onChange={set('quantity')} required />
 
@@ -289,7 +304,7 @@ export function LotForm() {
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={() => navigate(-1)} disabled={saving}>Cancel</Button>
-        <Button type="submit" form="lot-form" loading={saving}>Save lot</Button>
+        <Button type="submit" form="stock-form" loading={saving}>Save stock</Button>
       </div>
     </div>
   );
@@ -300,4 +315,4 @@ function rupeeOrEmpty(paise) {
   return formatPaiseForInput(Number(paise));
 }
 
-export default LotForm;
+export default StockForm;
