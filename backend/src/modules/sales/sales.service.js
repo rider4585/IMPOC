@@ -1,6 +1,27 @@
-import { Sale, SaleLine, SaleReversal, Unit, sequelize } from '../../../database/models/index.js';
+import { Sale, SaleLine, SaleReversal, Unit, Customer, sequelize } from '../../../database/models/index.js';
 import { transitionUnit } from '../units/units.service.js';
 import { CHANNEL } from '../../constants/channel.js';
+
+/**
+ * Resolve a linked customer by uuid (if supplied).
+ * @returns {Promise<{id: number, name: string, phone: string, email: string}|null>}
+ */
+async function resolveCustomer(customerUuid, transaction) {
+    if (!customerUuid) {
+        return null;
+    }
+    const customer = await Customer.findOne({
+        where: { uuid: customerUuid, deletedAt: null },
+        attributes: ['id', 'name', 'phone', 'email'],
+        transaction,
+    });
+    if (!customer) {
+        const error = new Error('Customer not found');
+        error.statusCode = 404;
+        throw error;
+    }
+    return customer;
+}
 
 /**
  * Generate the next sale number, e.g. S-0001
@@ -18,10 +39,17 @@ async function nextSaleNumber(transaction) {
 }
 
 function mapSaleDTO(sale, lines = [], reversals = []) {
+    const customer = sale.customer && sale.customer.deletedAt === null
+        ? { name: sale.customer.name, phone: sale.customer.phone, email: sale.customer.email }
+        : null;
+
     return {
         uuid: sale.uuid,
         saleNumber: sale.saleNumber,
         customerName: sale.customerName,
+        customerMobile: sale.customerMobile,
+        customerId: sale.customerId,
+        customer,
         soldAt: sale.soldAt,
         totalPaise: String(sale.totalPaise),
         status: sale.status,
@@ -83,10 +111,10 @@ async function resolveSellableUnit({ unitUuid, barcode }, transaction) {
  * Snapshots each unit's selling_price_paise at checkout and moves each unit
  * in_stock -> sold via the state machine inside one transaction.
  *
- * @param {Object} params - { customerName, soldAt, notes, items, actorUserId }
+ * @param {Object} params - { customerName, customerUuid, soldAt, notes, items, actorUserId }
  * @returns {Object} sale DTO
  */
-export const createSale = async ({ customerName, soldAt, notes, items, actorUserId }) => {
+export const createSale = async ({ customerName, customerUuid, soldAt, notes, items, actorUserId }) => {
     const transaction = await sequelize.transaction();
     try {
         const units = [];
@@ -96,6 +124,8 @@ export const createSale = async ({ customerName, soldAt, notes, items, actorUser
             units.push(unit);
         }
 
+        const linkedCustomer = await resolveCustomer(customerUuid, transaction);
+
         const date = soldAt || new Date().toISOString().split('T')[0];
         const saleNumber = await nextSaleNumber(transaction);
 
@@ -104,7 +134,9 @@ export const createSale = async ({ customerName, soldAt, notes, items, actorUser
         const sale = await Sale.create(
             {
                 saleNumber,
-                customerName: customerName || null,
+                customerName: linkedCustomer ? linkedCustomer.name : (customerName || null),
+                customerMobile: linkedCustomer ? linkedCustomer.phone : null,
+                customerId: linkedCustomer ? linkedCustomer.id : null,
                 soldAt: date,
                 totalPaise,
                 status: 'completed',
@@ -147,6 +179,7 @@ export const createSale = async ({ customerName, soldAt, notes, items, actorUser
         const fullSale = await Sale.findByPk(sale.id, {
             include: [
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+                { association: 'customer' },
                 { association: 'reversals' },
             ],
         });
@@ -259,6 +292,7 @@ export const cancelSale = async ({ uuid, reason, actorUserId }) => {
         const fullSale = await Sale.findByPk(sale.id, {
             include: [
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+                { association: 'customer' },
                 { association: 'reversals' },
             ],
         });
@@ -310,6 +344,7 @@ export const refundSale = async ({ uuid, reason, actorUserId }) => {
         const fullSale = await Sale.findByPk(sale.id, {
             include: [
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+                { association: 'customer' },
                 { association: 'reversals' },
             ],
         });
@@ -319,4 +354,67 @@ export const refundSale = async ({ uuid, reason, actorUserId }) => {
         await transaction.rollback();
         throw error;
     }
+};
+
+/**
+ * Update a sale's linkable fields: link/unlink a customer (customerUuid) and
+ * optionally refresh snapshot contact fields. Financial fields are never mutable.
+ *
+ * @param {Object} params - { uuid, payload: { customerUuid, customerName, notes, soldAt } }
+ * @returns {Object} sale DTO
+ */
+export const patchSale = async ({ uuid, payload }) => {
+    const sale = await Sale.findOne({
+        where: { uuid, deletedAt: null },
+        include: [
+            { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+            { association: 'reversals' },
+        ],
+    });
+
+    if (!sale) {
+        const error = new Error('Sale not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const updates = {};
+
+    if (payload.customerName !== undefined) {
+        updates.customerName = payload.customerName === null ? null : payload.customerName;
+    }
+
+    if (payload.soldAt !== undefined) {
+        updates.soldAt = payload.soldAt;
+    }
+
+    if (payload.notes !== undefined) {
+        updates.notes = payload.notes === null ? null : payload.notes;
+    }
+
+    if (payload.customerUuid !== undefined) {
+        if (payload.customerUuid === null) {
+            // Explicitly unlink; keep snapshot contact fields for backward compat
+            updates.customerId = null;
+        } else {
+            const linkedCustomer = await resolveCustomer(payload.customerUuid);
+            updates.customerId = linkedCustomer.id;
+            updates.customerName = linkedCustomer.name;
+            updates.customerMobile = linkedCustomer.phone;
+        }
+    }
+
+    if (Object.keys(updates).length > 0) {
+        await sale.update(updates);
+    }
+
+    const fullSale = await Sale.findByPk(sale.id, {
+        include: [
+            { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
+            { association: 'customer' },
+            { association: 'reversals' },
+        ],
+    });
+
+    return mapSaleDTO(fullSale, fullSale.lines, fullSale.reversals);
 };

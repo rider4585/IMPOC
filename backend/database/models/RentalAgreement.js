@@ -30,6 +30,18 @@ export default (sequelize) => {
                 allowNull: true,
             },
 
+            customerMobile: {
+                type: DataTypes.STRING(30),
+                field: 'customer_mobile',
+                allowNull: true,
+            },
+
+            customerId: {
+                type: DataTypes.INTEGER,
+                field: 'customer_id',
+                allowNull: true,
+            },
+
             startDate: {
                 type: DataTypes.DATEONLY,
                 field: 'start_date',

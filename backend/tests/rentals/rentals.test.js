@@ -19,7 +19,7 @@ testApp.use(express.json());
 testApp.use('/api/rentals', rentalRoutes);
 testApp.use(errorMiddleware);
 
-const RENTAL_PERMISSIONS = ['rentals.view', 'rentals.create', 'rentals.return', 'rentals.cancel'];
+const RENTAL_PERMISSIONS = ['rentals.view', 'rentals.create', 'rentals.update', 'rentals.return', 'rentals.cancel'];
 
 describe('Rental agreements module (T-10)', () => {
     let managerToken;

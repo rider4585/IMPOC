@@ -1,10 +1,11 @@
-import { createSaleBodySchema, saleUuidParamSchema, reversalBodySchema } from './sales.validation.js';
+import { createSaleBodySchema, saleUuidParamSchema, reversalBodySchema, updateSaleBodySchema } from './sales.validation.js';
 import {
     createSale as createSaleService,
     listSales as listSalesService,
     getSaleByUuid as getSaleByUuidService,
     cancelSale as cancelSaleService,
     refundSale as refundSaleService,
+    patchSale as patchSaleService,
 } from './sales.service.js';
 
 /**
@@ -16,6 +17,7 @@ export const createSale = async (req, res, next) => {
 
         const sale = await createSaleService({
             customerName: body.customerName,
+            customerUuid: body.customerUuid,
             soldAt: body.soldAt,
             notes: body.notes,
             items: body.items,
@@ -106,6 +108,33 @@ export const refundSale = async (req, res, next) => {
             uuid,
             reason: body.reason,
             actorUserId: req.user?.id,
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: sale,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * PATCH /api/sales/:uuid - Update linkable fields (customer link, snapshots)
+ */
+export const patchSale = async (req, res, next) => {
+    try {
+        const { uuid } = saleUuidParamSchema.parse(req.params);
+        const body = updateSaleBodySchema.parse(req.body);
+
+        const sale = await patchSaleService({
+            uuid,
+            payload: {
+                customerUuid: body.customerUuid,
+                customerName: body.customerName,
+                soldAt: body.soldAt,
+                notes: body.notes,
+            },
         });
 
         return res.status(200).json({

@@ -12,10 +12,21 @@ const itemSchema = z.object({
  */
 export const createRentalBodySchema = z.object({
     customerName: z.string().trim().max(255).optional().default(undefined),
+    customerUuid: uuidSchema.nullable().optional().default(undefined),
     startDate: z.string().date('Invalid date').optional().default(undefined),
     rentalDays: z.number().int().positive('Rental days must be a positive integer').optional().default(undefined),
     notes: z.string().trim().max(2000).optional().default(undefined),
     items: z.array(itemSchema).min(1, 'At least one item is required'),
+});
+
+/**
+ * Validation schema for PATCH /api/rentals/:uuid
+ * Links/unlinks a customer and refreshes snapshot contact fields.
+ */
+export const updateRentalBodySchema = z.object({
+    customerUuid: uuidSchema.nullable().optional(),
+    customerName: z.string().trim().max(255).nullable().optional(),
+    notes: z.string().trim().max(2000).nullable().optional(),
 });
 
 /**

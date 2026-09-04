@@ -158,8 +158,15 @@ export async function seedTestData() {
     // Sales permissions
     { name: 'sales.view', description: 'View sales' },
     { name: 'sales.create', description: 'Create sales' },
+    { name: 'sales.update', description: 'Update sales' },
     { name: 'sales.cancel', description: 'Cancel sales' },
     { name: 'sales.refund', description: 'Process refunds' },
+    // Rental permissions
+    { name: 'rentals.view', description: 'View rentals' },
+    { name: 'rentals.create', description: 'Create rentals' },
+    { name: 'rentals.update', description: 'Update rentals' },
+    { name: 'rentals.return', description: 'Process rental returns' },
+    { name: 'rentals.cancel', description: 'Cancel rentals' },
     // Expenses permissions
     { name: 'expenses.view', description: 'View expenses' },
     { name: 'expenses.create', description: 'Create expenses' },
@@ -173,6 +180,14 @@ export async function seedTestData() {
     { name: 'picklists.view', description: 'View picklists' },
     { name: 'picklists.create', description: 'Create picklists' },
     { name: 'picklists.update', description: 'Update picklists' },
+    // Customer permissions
+    { name: 'customers.view', description: 'View customers' },
+    { name: 'customers.create', description: 'Create customers' },
+    { name: 'customers.update', description: 'Update customers' },
+    { name: 'customers.delete', description: 'Soft delete customers' },
+    // Delivery permissions
+    { name: 'delivery.view', description: 'View delivery logs' },
+    { name: 'delivery.create', description: 'Create delivery logs' },
   ], { ignoreDuplicates: true });
 
   // Assign permissions to ADMIN role (all permissions)
@@ -182,7 +197,7 @@ export async function seedTestData() {
   // Assign permissions to MANAGER role
   const managerRole = roles[1];
   const managerPermissions = permissions.filter(p =>
-    ['users.view', 'users.update', 'inventory.view', 'inventory.create', 'inventory.update', 'inventory.barcode_generate', 'picklists.view', 'picklists.create', 'picklists.update', 'sales.view', 'sales.create', 'sales.cancel', 'sales.refund', 'expenses.view', 'expenses.create', 'expenses.update', 'reports.view'].includes(p.name)
+    ['users.view', 'users.update', 'inventory.view', 'inventory.create', 'inventory.update', 'inventory.barcode_generate', 'picklists.view', 'picklists.create', 'picklists.update', 'sales.view', 'sales.create', 'sales.update', 'sales.cancel', 'sales.refund', 'rentals.view', 'rentals.create', 'rentals.update', 'rentals.return', 'rentals.cancel', 'expenses.view', 'expenses.create', 'expenses.update', 'reports.view', 'customers.view', 'customers.create', 'customers.update', 'customers.delete', 'delivery.view', 'delivery.create'].includes(p.name)
   );
   await managerRole.addPermissions(managerPermissions);
 
@@ -412,4 +427,25 @@ export async function createTestStock({ trip, tripVendor, vendor, productType, o
     overduePerDayPaise: null,
     ...overrides,
   });
+}
+
+/**
+ * Build a valid customer fixture. Overrides win over defaults so tests can
+ * control phone/email collisions easily.
+ */
+export function generateTestCustomer(overrides = {}) {
+  const suffix = uniqueSuffix();
+  return {
+    name: `TEST_Customer_${suffix}`,
+    phone: `+9199${String(suffix).slice(-8).padStart(8, '0')}`,
+    email: `cust_${suffix}@example.com`,
+    dob: '1990-01-15',
+    address: '1 Test Street, Testville',
+    notes: 'Created by test setup',
+    consentWhatsapp: false,
+    consentEmail: false,
+    consentSms: false,
+    consentWhatsappGroup: false,
+    ...overrides,
+  };
 }

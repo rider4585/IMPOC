@@ -1,10 +1,14 @@
-import { periodQuerySchema, expensesQuerySchema } from './reports.validation.js';
+import { periodQuerySchema, expensesQuerySchema, stockLevelsQuerySchema } from './reports.validation.js';
 import {
     getDashboard as getDashboardService,
     getSalesReport as getSalesReportService,
     getRentalsReport as getRentalsReportService,
     getExpensesReport as getExpensesReportService,
     getInventoryReport as getInventoryReportService,
+    getTripPnlReport as getTripPnlReportService,
+    getVendorSellThroughReport as getVendorSellThroughReportService,
+    getStockLevelsReport as getStockLevelsReportService,
+    getMarginsReport as getMarginsReportService,
 } from './reports.service.js';
 
 /**
@@ -69,6 +73,55 @@ export const getExpensesReport = async (req, res, next) => {
 export const getInventoryReport = async (req, res, next) => {
     try {
         const data = await getInventoryReportService();
+        return res.status(200).json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/reports/trip-pnl - Per-trip P&L.
+ */
+export const getTripPnlReport = async (req, res, next) => {
+    try {
+        const data = await getTripPnlReportService();
+        return res.status(200).json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/reports/vendor-sell-through - Per-vendor sell-through + revenue.
+ */
+export const getVendorSellThroughReport = async (req, res, next) => {
+    try {
+        const data = await getVendorSellThroughReportService();
+        return res.status(200).json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/reports/stock-levels - Stock unit counts + low-stock alerts.
+ */
+export const getStockLevelsReport = async (req, res, next) => {
+    try {
+        const query = stockLevelsQuerySchema.parse(req.query);
+        const data = await getStockLevelsReportService({ lowStockThreshold: query.lowStockThreshold });
+        return res.status(200).json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/reports/margins - Average margins per trip/vendor/product type.
+ */
+export const getMarginsReport = async (req, res, next) => {
+    try {
+        const data = await getMarginsReportService();
         return res.status(200).json({ success: true, data });
     } catch (error) {
         next(error);

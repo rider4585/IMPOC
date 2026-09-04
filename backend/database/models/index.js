@@ -54,6 +54,8 @@ import RentalReturnModel from './RentalReturn.js';
 import RentalReversalModel from './RentalReversal.js';
 import ExpenseModel from './Expense.js';
 import ExpenseReversalModel from './ExpenseReversal.js';
+import CustomerModel from './Customer.js';
+import DeliveryLogModel from './DeliveryLog.js';
 
 const User = UserModel(sequelize);
 const Role = RoleModel(sequelize);
@@ -83,6 +85,8 @@ const RentalReturn = RentalReturnModel(sequelize);
 const RentalReversal = RentalReversalModel(sequelize);
 const Expense = ExpenseModel(sequelize);
 const ExpenseReversal = ExpenseReversalModel(sequelize);
+const Customer = CustomerModel(sequelize);
+const DeliveryLog = DeliveryLogModel(sequelize);
 
 /*
  * User ↔ Role
@@ -458,6 +462,37 @@ StockTemplate.belongsTo(ProductType, {
     as: 'productType',
 });
 
+/*
+ * Customer ↔ Sale
+ */
+Customer.hasMany(Sale, {
+    foreignKey: 'customer_id',
+    as: 'sales',
+});
+
+Sale.belongsTo(Customer, {
+    foreignKey: 'customer_id',
+    as: 'customer',
+});
+
+/*
+ * Customer ↔ RentalAgreement
+ */
+Customer.hasMany(RentalAgreement, {
+    foreignKey: 'customer_id',
+    as: 'rentals',
+});
+
+RentalAgreement.belongsTo(Customer, {
+    foreignKey: 'customer_id',
+    as: 'customer',
+});
+
+/*
+ * DeliveryLog (no FK - designed for future WhatsApp/SMTP/SMS integration,
+ * entity_id stores the target entity's uuid, not a relational id)
+ */
+
 export {
     sequelize,
     Sequelize,
@@ -489,4 +524,6 @@ export {
     RentalReversal,
     Expense,
     ExpenseReversal,
+    Customer,
+    DeliveryLog,
 };
