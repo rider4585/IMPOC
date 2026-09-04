@@ -18,6 +18,7 @@ import { getDamageGrades } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { RentalCreateDialog } from './RentalCreateDialog.jsx';
 import { ReturnUnitsDialog } from './ReturnUnitsDialog.jsx';
+import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
 
 function statusBadgeVariant(status) {
   switch (status) {
@@ -263,6 +264,14 @@ export function RentalsScreen() {
               </h1>
               <p className="typography-body-sm text-[var(--ink-muted)]">
                 {activeRental.startDate} → due {activeRental.dueDate}
+                {activeRental.customer && (activeRental.customer.phone || activeRental.customer.email) ? (
+                  <>
+                    {' · '}
+                    {activeRental.customer.phone}
+                    {activeRental.customer.phone && activeRental.customer.email ? ' · ' : ''}
+                    {activeRental.customer.email}
+                  </>
+                ) : null}
               </p>
             </div>
             {activeRental.status === 'active' && (
@@ -329,6 +338,14 @@ export function RentalsScreen() {
               </ul>
             </CardContent>
           </Card>
+
+          {activeRental.status === 'completed' && (
+            <ReceiptSection
+              entityType="RENTAL"
+              entityUuid={activeRental.uuid}
+              printTitle={`Print receipt — ${activeRental.agreementNumber}`}
+            />
+          )}
 
           {activeRental.returns && activeRental.returns.length > 0 && (
             <Card>

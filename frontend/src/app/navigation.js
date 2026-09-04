@@ -14,6 +14,7 @@ import POSScreen from '../screens/pos/POSScreen';
 import SalesListScreen from '../screens/pos/SalesListScreen';
 import RentalsScreen from '../screens/rentals/RentalsScreen';
 import ExpensesScreen from '../screens/expenses/ExpensesScreen';
+import CustomersScreen from '../screens/customers/CustomersScreen';
 import Dashboard from './Dashboard';
 
 /**
@@ -38,6 +39,7 @@ export const navigationRegistry = [
   { permission: PERMISSIONS.SALES.VIEW, label: 'Sales', path: '/sales', element: SalesListScreen },
   { permission: PERMISSIONS.RENTALS.VIEW, label: 'Rentals', path: '/rentals', element: RentalsScreen },
   { permission: PERMISSIONS.EXPENSES.VIEW, label: 'Expenses', path: '/expenses', element: ExpensesScreen },
+  { permission: PERMISSIONS.CUSTOMERS.VIEW, label: 'Customers', path: '/customers', element: CustomersScreen },
   { permission: PERMISSIONS.REPORTS.VIEW, label: 'Dashboard', path: '/dashboard', element: Dashboard },
 ];
 
@@ -90,6 +92,7 @@ export const navigationSections = [
       { permission: PERMISSIONS.ROLES.VIEW, label: 'Roles', path: '/roles' },
       { permission: PERMISSIONS.ROLES.VIEW, label: 'Permissions', path: '/permissions' },
       { permission: PERMISSIONS.PICKLISTS.VIEW, label: 'Picklists', path: '/picklists' },
+      { permission: PERMISSIONS.CUSTOMERS.VIEW, label: 'Customers', path: '/customers' },
     ],
   },
   {

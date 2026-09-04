@@ -8,12 +8,17 @@ import * as unitsService from '../../services/unitsApi.js';
 import * as salesService from '../../services/salesApi.js';
 import * as tripsService from '../../services/tripsApi.js';
 import * as vendorsService from '../../services/vendorsApi.js';
+import * as customersApi from '../../services/customersApi.js';
 
 vi.mock('../../auth/useAuth.js');
 vi.mock('../../services/unitsApi.js');
 vi.mock('../../services/salesApi.js');
 vi.mock('../../services/tripsApi.js');
 vi.mock('../../services/vendorsApi.js');
+vi.mock('../../services/customersApi.js', () => ({
+  searchCustomers: vi.fn().mockResolvedValue([]),
+  createCustomer: vi.fn(),
+}));
 vi.mock('../../services/picklistsApi.js', () => ({
   getProductTypes: vi.fn().mockResolvedValue([]),
   getColours: vi.fn().mockResolvedValue([]),
@@ -106,6 +111,63 @@ describe('POSScreen (T-09)', () => {
     await waitFor(() => {
       expect(salesService.createSale).toHaveBeenCalledWith({
         customerName: undefined,
+        customerUuid: undefined,
+        items: [{ unitUuid: 'u1' }],
+      });
+      expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
+    });
+  });
+
+  it('does not crash when CustomerPicker search returns results', async () => {
+    customersApi.searchCustomers.mockResolvedValue([
+      { uuid: 'cust-1', name: 'Priya Sharma', phone: '9876543210' },
+    ]);
+    renderWithToast(<POSScreen />);
+    const input = screen.getByLabelText(/customer/i);
+    fireEvent.change(input, { target: { value: 'Priya' } });
+    await waitFor(() => {
+      expect(screen.getByText('Priya Sharma')).toBeInTheDocument();
+    });
+  });
+
+  it('checks out a sale with a picked customer and sends customerUuid', async () => {
+    customersApi.searchCustomers.mockResolvedValue([
+      { uuid: 'cust-1', name: 'Priya Sharma', phone: '9876543210', customerCount: 3 },
+    ]);
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+    });
+    salesService.createSale.mockResolvedValue({
+      uuid: 's1',
+      saleNumber: 'SALE-001',
+      customerName: 'Priya Sharma',
+      customer: { name: 'Priya Sharma', phone: '9876543210', email: null },
+      soldAt: '2026-01-01T00:00:00.000Z',
+      totalPaise: '25000',
+      status: 'completed',
+      lines: [{ uuid: 'l1', barcode: 'B-100', sellingPricePaise: '25000', unitStatus: 'sold' }],
+      reversals: [],
+    });
+    renderWithToast(<POSScreen />);
+
+    const barcodeInput = screen.getByLabelText(/barcode/);
+    fireEvent.change(barcodeInput, { target: { value: 'B-100' } });
+    fireEvent.keyDown(barcodeInput, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
+
+    const pickerInput = screen.getByLabelText(/customer/i);
+    fireEvent.change(pickerInput, { target: { value: 'Priya' } });
+    fireEvent.click(await screen.findByRole('button', { name: /priya sharma/i }));
+
+    fireEvent.click(screen.getByTestId('pos-checkout'));
+    await waitFor(() => {
+      expect(salesService.createSale).toHaveBeenCalledWith({
+        customerName: 'Priya Sharma',
+        customerUuid: 'cust-1',
         items: [{ unitUuid: 'u1' }],
       });
       expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();

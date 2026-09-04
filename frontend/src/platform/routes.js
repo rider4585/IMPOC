@@ -104,3 +104,25 @@ export const UNIT_ROUTES = {
   /** GET /units/{uuid} - Get a unit by uuid */
   GET: (uuid) => `/units/${encodeURIComponent(uuid)}`,
 };
+
+// Customer endpoints (Schema V2 customers entity with contact + consent)
+export const CUSTOMER_ROUTES = {
+  /** GET /customers - List or search customers (?search=phone-or-name-partial) */
+  LIST: '/customers',
+  /** POST /customers - Create a customer */
+  CREATE: '/customers',
+  /** GET /customers/{uuid} - Get a single customer */
+  GET: (uuid) => `/customers/${encodeURIComponent(uuid)}`,
+  /** PATCH /customers/{uuid} - Update a customer */
+  UPDATE: (uuid) => `/customers/${encodeURIComponent(uuid)}`,
+  /** PATCH /customers/{uuid}/consent - Toggle a single consent channel */
+  CONSENT: (uuid) => `/customers/${encodeURIComponent(uuid)}/consent`,
+};
+
+// Receipt endpoints (self-contained payload + plain-text print format)
+export const RECEIPT_ROUTES = {
+  /** GET /receipts/preview - Structured digital receipt payload */
+  PREVIEW: '/receipts/preview',
+  /** GET /receipts/print - Plain-text monospace receipt ready for a printer */
+  PRINT: '/receipts/print',
+};

@@ -37,7 +37,8 @@ export async function listRentals() {
 
 /**
  * POST /rentals - Create / check out a rental agreement
- * @param {{customerName?, startDate?, rentalDays?, notes?, items: Array<{unitUuid?|barcode?}>}} payload
+ * @param {{customerName?, customerUuid?, startDate?, rentalDays?, notes?, items: Array<{unitUuid?|barcode?}>}} payload
+ * customerUuid (Schema V2) links a customers entity; customerName free text stays supported.
  * @returns {Promise<Object>} agreement DTO
  */
 export async function createRental(payload) {

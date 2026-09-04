@@ -15,6 +15,8 @@ import { getUnitByBarcode } from '../../services/unitsApi.js';
 import { createSale } from '../../services/salesApi.js';
 import { createRental } from '../../services/rentalsApi.js';
 import { formatPaise } from '../../platform/money.js';
+import { CustomerPicker } from '../../components/customers/CustomerPicker.jsx';
+import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
 import { SaleReceipt } from './SaleReceipt.jsx';
 
 function todayISO() {
@@ -36,7 +38,7 @@ export function POSScreen() {
 
   const [barcode, setBarcode] = useState('');
   const [cart, setCart] = useState([]);
-  const [customerName, setCustomerName] = useState('');
+  const [customer, setCustomer] = useState(null);
   const [checkingOut, setCheckingOut] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [lookupError, setLookupError] = useState('');
@@ -124,7 +126,7 @@ export function POSScreen() {
 
   const clearCart = () => {
     setCart([]);
-    setCustomerName('');
+    setCustomer(null);
     setBarcode('');
     setReceipt(null);
     setLookupError('');
@@ -137,9 +139,13 @@ export function POSScreen() {
     if (cart.length === 0) return;
     setCheckingOut(true);
     try {
+      const customerPayload = {
+        customerName: customer?.name || undefined,
+        customerUuid: customer?.uuid,
+      };
       if (mode === 'sale') {
         const sale = await createSale({
-          customerName: customerName.trim() || undefined,
+          ...customerPayload,
           items: cart.map((item) => ({ unitUuid: item.uuid })),
         });
         setReceipt(sale);
@@ -151,7 +157,7 @@ export function POSScreen() {
           return;
         }
         const agreement = await createRental({
-          customerName: customerName.trim() || undefined,
+          ...customerPayload,
           startDate: startDate || undefined,
           rentalDays: days,
           notes: rentalNotes.trim() || undefined,
@@ -160,7 +166,7 @@ export function POSScreen() {
         setReceipt(agreement);
       }
       setCart([]);
-      setCustomerName('');
+      setCustomer(null);
       setBarcode('');
       setStartDate(todayISO());
       setRentalDays('3');
@@ -185,15 +191,25 @@ export function POSScreen() {
         {mode === 'sale' ? (
           <SaleReceipt sale={receipt} />
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Receipt â€” {receipt.agreementNumber}</CardTitle>
-            </CardHeader>
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>Receipt — {receipt.agreementNumber}</CardTitle>
+              </CardHeader>
             <CardContent className="p-4">
-              <p className="mb-2 text-sm text-[var(--ink-muted)]">
-                {receipt.customerName ? `${receipt.customerName} Â· ` : ''}
-                {receipt.startDate} â†’ due {receipt.dueDate} Â· {receipt.status}
-              </p>
+              <div className="mb-2 text-sm text-[var(--ink-muted)]">
+                <p>
+                  {receipt.customerName ? `${receipt.customerName} · ` : ''}
+                  {receipt.startDate} → due {receipt.dueDate} · {receipt.status}
+                </p>
+                {receipt.customer && (receipt.customer.phone || receipt.customer.email) && (
+                  <p className="mt-1 text-xs">
+                    {receipt.customer.phone}
+                    {receipt.customer.phone && receipt.customer.email ? ' · ' : ''}
+                    {receipt.customer.email}
+                  </p>
+                )}
+              </div>
               <ul className="flex flex-col gap-2">
                 {receipt.lines.map((line) => (
                   <li key={line.uuid} className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm">
@@ -210,6 +226,12 @@ export function POSScreen() {
               </div>
             </CardContent>
           </Card>
+            <ReceiptSection
+              entityType="RENTAL"
+              entityUuid={receipt.uuid}
+              printTitle={`Print receipt — ${receipt.agreementNumber}`}
+            />
+          </>
         )}
         <div className="flex justify-end">
           <Button onClick={() => setReceipt(null)}>New transaction</Button>
@@ -315,12 +337,7 @@ export function POSScreen() {
               <CardTitle>{mode === 'sale' ? 'Checkout' : 'Rental checkout'}</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              <Input
-                label="Customer name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Optional"
-              />
+              <CustomerPicker value={customer} onChange={setCustomer} /> 
               {mode === 'rental' && (
                 <>
                   <Input
