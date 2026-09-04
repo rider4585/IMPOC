@@ -12,14 +12,14 @@ import coloursRoutes from './src/modules/colours/colour.routes.js';
 import sizesRoutes from './src/modules/sizes/size.routes.js';
 import damageGradesRoutes from './src/modules/damage-grades/damage-grade.routes.js';
 import vendorsRoutes from './src/modules/vendors/vendor.routes.js';
-import intakeRoutes from './src/modules/intake/stock-intake.routes.js';
-import intakeLineRoutes from './src/modules/intake/stock-intake-line.routes.js';
+import tripRoutes from './src/modules/intake/trip.routes.js';
+import stockRoutes from './src/modules/intake/stock.routes.js';
+import templateRoutes from './src/modules/intake/template.routes.js';
 import unitsRoutes from './src/modules/units/units.routes.js';
 import salesRoutes from './src/modules/sales/sales.routes.js';
 import rentalRoutes from './src/modules/rentals/rental-agreement.routes.js';
 import expensesRoutes from './src/modules/expenses/expenses.routes.js';
 import reportsRoutes from './src/modules/reports/reports.routes.js';
-import intakeTemplatesRoutes from './src/modules/intake-templates/intake-template.routes.js';
 import errorMiddleware from './src/middleware/error.middleware.js';
 
 const app = express();
@@ -62,14 +62,14 @@ app.use('/api/picklists/colours', coloursRoutes);
 app.use('/api/picklists/sizes', sizesRoutes);
 app.use('/api/picklists/damage-grades', damageGradesRoutes);
 app.use('/api/vendors', vendorsRoutes);
-app.use('/api/stock-intakes', intakeRoutes);
-app.use('/api/stock-intakes/:tripUuid/lines', intakeLineRoutes);
+app.use('/api/trips', tripRoutes);
+app.use('/api/trips/:tripUuid/stocks', stockRoutes);
+app.use('/api/templates', templateRoutes);
 app.use('/api/units', unitsRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/rentals', rentalRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/reports', reportsRoutes);
-app.use('/api/intake-records', intakeTemplatesRoutes);
 
 app.use(errorMiddleware);
 

@@ -22,9 +22,9 @@ export default (sequelize) => {
                 allowNull: false,
             },
 
-            stockIntakeLineId: {
+            stockId: {
                 type: DataTypes.INTEGER,
-                field: 'stock_intake_line_id',
+                field: 'stock_id',
                 allowNull: false,
             },
 

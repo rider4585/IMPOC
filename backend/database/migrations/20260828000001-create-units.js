@@ -20,11 +20,11 @@ export async function up(queryInterface, Sequelize) {
             allowNull: false,
         },
 
-        stock_intake_line_id: {
+        stock_id: {
             type: Sequelize.INTEGER,
             allowNull: false,
             references: {
-                model: 'stock_intake_lines',
+                model: 'stocks',
                 key: 'id',
             },
             onDelete: 'RESTRICT',
@@ -120,7 +120,7 @@ export async function up(queryInterface, Sequelize) {
         `ALTER TABLE units ADD CONSTRAINT units_status_check CHECK (status IN ('in_stock', 'sold', 'damaged', 'lost', 'in_maintenance', 'retired', 'rented'))`
     );
 
-    // CHECK constraint: channel must be RETAIL or RENTAL (mirrored from stock_intake_lines, AD-3)
+    // CHECK constraint: channel must be RETAIL or RENTAL (mirrored from stocks, AD-3)
     await queryInterface.sequelize.query(
         "ALTER TABLE units ADD CONSTRAINT units_channel_check CHECK (channel IN ('RETAIL', 'RENTAL'))"
     );

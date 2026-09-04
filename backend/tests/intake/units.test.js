@@ -1,14 +1,16 @@
 import request from 'supertest';
 import * as db from '../../database/models/index.js';
-import { initializeTestDatabase, generateTestUser, closeDatabase } from '../utils/test-setup.js';
+import { initializeTestDatabase, generateTestUser, closeDatabase, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
 import argon2 from 'argon2';
 import app from '../../app.js';
 
-describe('Story 3.3: Scan units into a lot', () => {
+describe('Story 3.3: Scan units into a stock', () => {
     let testDb;
     let testToken;
     let trip;
-    let lot;
+    let tripVendor;
+    let vendor;
+    let stock;
     let colour;
     let size;
     let productType;
@@ -51,27 +53,30 @@ describe('Story 3.3: Scan units into a lot', () => {
         productType = await db.ProductType.create({ name: 'Test Product' });
 
         // Create a vendor
-        const vendor = await db.Vendor.create({ name: 'Test Vendor' });
+        vendor = await db.Vendor.create({ name: 'Test Vendor' });
 
-        // Create a stock intake (trip)
-        trip = await db.StockIntake.create({
-            vendorId: vendor.id,
-            purchasedOn: new Date().toISOString().split('T')[0],
-            totalPaidPaise: 1000000
+        // Create trip + trip_vendors bill
+        const pair = await createTripWithVendor({
+            vendor,
+            name: 'TEST Scan Trip',
+            totalPaidPaise: 1000000,
         });
+        trip = pair.trip;
+        tripVendor = pair.tripVendor;
 
-        // Create a stock intake line (lot)
-        lot = await db.StockIntakeLine.create({
-            stockIntakeId: trip.id,
-            productTypeId: productType.id,
-            quantity: 5,
-            buyingPricePaise: 100000,
-            sellingPricePaise: 200000,
-            floorPricePaise: 150000,
-            channel: 'RETAIL',
-            rentPerDayPaise: null,
-            depositPaise: null,
-            overduePerDayPaise: null,
+        // Create a stock (declared quantity 5)
+        stock = await createTestStock({
+            trip,
+            tripVendor,
+            vendor,
+            productType,
+            overrides: {
+                quantity: 5,
+                buyingPricePaise: 100000,
+                sellingPricePaise: 200000,
+                floorPricePaise: 150000,
+                channel: 'RETAIL',
+            },
         });
     });
 
@@ -84,32 +89,39 @@ describe('Story 3.3: Scan units into a lot', () => {
                 }
             }
         });
+        await db.Unit.destroy({ where: { stockId: stock.id }, force: true });
+        await db.Stock.destroy({ where: { id: stock.id }, force: true });
+        await db.TripVendor.destroy({ where: { tripId: trip.id }, force: true });
+        await db.Trip.destroy({ where: { id: trip.id }, force: true });
         await closeDatabase();
     });
 
-    describe('POST /api/stock-intake-lines/:uuid/scan', () => {
-        it('should scan into an open lot with valid barcode', async () => {
-            const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '123456789012',
-                    stockIntakeLineUuid: lot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: size.uuid,
-                })
-                .expect(201);
+    function scan(payload) {
+        return request(app)
+            .post(`/api/trips/${trip.uuid}/stocks/${stock.uuid}/scan`)
+            .set('Authorization', `Bearer ${testToken}`)
+            .send(payload);
+    }
+
+    describe('POST /api/trips/:tripUuid/stocks/:uuid/scan', () => {
+        it('should scan into an open stock with valid barcode', async () => {
+            const res = await scan({
+                barcode: '123456789012',
+                colourUuid: colour.uuid,
+                sizeUuid: size.uuid,
+            }).expect(201);
 
             expect(res.body.success).toBe(true);
             expect(res.body.data).toHaveProperty('uuid');
             expect(res.body.data.barcode).toBe('123456789012');
             expect(res.body.data.status).toBe('in_stock');
             expect(res.body.data.channel).toBe('RETAIL');
+            expect(res.body.data.stockUuid).toBe(stock.uuid);
             expect(res.body.data.buyingPricePaise).toBe('100000');
             expect(res.body.data.sellingPricePaise).toBe('200000');
             expect(res.body.data.floorPricePaise).toBe('150000');
 
-            // Patch 6: Verify UnitStatusEvent was created atomically
+            // Verify UnitStatusEvent was created atomically
             const unitId = res.body.data.uuid;
             const unit = await db.Unit.findOne({ where: { uuid: unitId } });
             expect(unit).toBeDefined();
@@ -121,70 +133,67 @@ describe('Story 3.3: Scan units into a lot', () => {
 
         it('should reject barcode already bound to a non-deleted unit', async () => {
             // First scan
-            await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '999999999999',
-                    stockIntakeLineUuid: lot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: size.uuid,
-                })
-                .expect(201);
+            await scan({
+                barcode: '999999999999',
+                colourUuid: colour.uuid,
+                sizeUuid: size.uuid,
+            }).expect(201);
 
             // Second scan with same barcode
-            const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '999999999999',
-                    stockIntakeLineUuid: lot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: size.uuid,
-                })
-                .expect(409);
+            const res = await scan({
+                barcode: '999999999999',
+                colourUuid: colour.uuid,
+                sizeUuid: size.uuid,
+            }).expect(409);
 
             expect(res.body.success).toBe(false);
             expect(res.body.message).toContain('Barcode already bound to unit');
         });
 
-        it('should reject scan when lot has reached its declared quantity', async () => {
-            // Create a new lot with quantity 1
-            const smallLot = await db.StockIntakeLine.create({
-                stockIntakeId: trip.id,
-                productTypeId: productType.id,
-                quantity: 1,
-                buyingPricePaise: 100000,
-                sellingPricePaise: 200000,
-                floorPricePaise: 150000,
-                channel: 'RETAIL',
+        it('should reject scan when stock has reached its declared quantity', async () => {
+            // Create a new stock with quantity 1
+            const smallStock = await createTestStock({
+                trip,
+                tripVendor,
+                vendor,
+                productType,
+                overrides: {
+                    quantity: 1,
+                    buyingPricePaise: 100000,
+                    sellingPricePaise: 200000,
+                    floorPricePaise: 150000,
+                    channel: 'RETAIL',
+                },
             });
 
-            // Scan one unit
-            await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${smallLot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '111111111111',
-                    stockIntakeLineUuid: smallLot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: size.uuid,
-                })
-                .expect(201);
+            try {
+                // Scan one unit
+                await request(app)
+                    .post(`/api/trips/${trip.uuid}/stocks/${smallStock.uuid}/scan`)
+                    .set('Authorization', `Bearer ${testToken}`)
+                    .send({
+                        barcode: '111111111111',
+                        colourUuid: colour.uuid,
+                        sizeUuid: size.uuid,
+                    })
+                    .expect(201);
 
-            // Try to scan another
-            const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${smallLot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '222222222222',
-                    stockIntakeLineUuid: smallLot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: size.uuid,
-                })
-                .expect(400);
+                // Try to scan another
+                const res = await request(app)
+                    .post(`/api/trips/${trip.uuid}/stocks/${smallStock.uuid}/scan`)
+                    .set('Authorization', `Bearer ${testToken}`)
+                    .send({
+                        barcode: '222222222222',
+                        colourUuid: colour.uuid,
+                        sizeUuid: size.uuid,
+                    })
+                    .expect(400);
 
-            expect(res.body.message).toContain('Lot has reached its declared quantity of 1');
+                expect(res.body.message).toContain('Stock has reached its declared quantity of 1');
+            } finally {
+                await db.Unit.destroy({ where: { stockId: smallStock.id }, force: true });
+                await db.Stock.destroy({ where: { id: smallStock.id }, force: true });
+            }
         });
 
         it('should reject scan with inactive colour', async () => {
@@ -194,16 +203,11 @@ describe('Story 3.3: Scan units into a lot', () => {
                 isActive: false,
             });
 
-            const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '333333333333',
-                    stockIntakeLineUuid: lot.uuid,
-                    colourUuid: inactiveColour.uuid,
-                    sizeUuid: size.uuid,
-                })
-                .expect(400);
+            const res = await scan({
+                barcode: '333333333333',
+                colourUuid: inactiveColour.uuid,
+                sizeUuid: size.uuid,
+            }).expect(400);
 
             expect(res.body.message).toContain('Colour is inactive');
         });
@@ -214,100 +218,102 @@ describe('Story 3.3: Scan units into a lot', () => {
                 isActive: false,
             });
 
-            const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '444444444444',
-                    stockIntakeLineUuid: lot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: inactiveSize.uuid,
-                })
-                .expect(400);
+            const res = await scan({
+                barcode: '444444444444',
+                colourUuid: colour.uuid,
+                sizeUuid: inactiveSize.uuid,
+            }).expect(400);
 
             expect(res.body.message).toContain('Size is inactive');
         });
 
         it('should return 404 when colour UUID not found', async () => {
-            const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '555555555555',
-                    stockIntakeLineUuid: lot.uuid,
-                    colourUuid: '00000000-0000-0000-0000-000000000000',
-                    sizeUuid: size.uuid,
-                })
-                .expect(404);
+            const res = await scan({
+                barcode: '555555555555',
+                colourUuid: '00000000-0000-0000-0000-000000000000',
+                sizeUuid: size.uuid,
+            }).expect(404);
 
             expect(res.body.message).toContain('Colour not found');
         });
 
         it('should return 404 when size UUID not found', async () => {
-            const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '666666666666',
-                    stockIntakeLineUuid: lot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: '00000000-0000-0000-0000-000000000000',
-                })
-                .expect(404);
+            const res = await scan({
+                barcode: '666666666666',
+                colourUuid: colour.uuid,
+                sizeUuid: '00000000-0000-0000-0000-000000000000',
+            }).expect(404);
 
             expect(res.body.message).toContain('Size not found');
         });
 
-        it('should scan into a RENTAL lot with pricing snapshot', async () => {
-            const rentalLot = await db.StockIntakeLine.create({
-                stockIntakeId: trip.id,
-                productTypeId: productType.id,
-                quantity: 5,
-                buyingPricePaise: 100000,
-                sellingPricePaise: 200000,
-                floorPricePaise: 150000,
-                channel: 'RENTAL',
-                rentPerDayPaise: 10000,
-                depositPaise: 100000,
-                overduePerDayPaise: 50000,
-            });
-
+        it('should return 404 when stock UUID not found', async () => {
             const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${rentalLot.uuid}/scan`)
+                .post(`/api/trips/${trip.uuid}/stocks/00000000-0000-0000-0000-000000000000/scan`)
                 .set('Authorization', `Bearer ${testToken}`)
                 .send({
-                    barcode: '777777777777',
-                    stockIntakeLineUuid: rentalLot.uuid,
+                    barcode: '555555555556',
                     colourUuid: colour.uuid,
                     sizeUuid: size.uuid,
                 })
-                .expect(201);
+                .expect(404);
 
-            expect(res.body.data.channel).toBe('RENTAL');
-            expect(res.body.data.rentPerDayPaise).toBe('10000');
-            expect(res.body.data.depositPaise).toBe('100000');
-            expect(res.body.data.overduePerDayPaise).toBe('50000');
+            expect(res.body.message).toContain('Stock not found');
         });
 
-        it('should preserve unit prices after lot edit', async () => {
+        it('should scan into a RENTAL stock with pricing snapshot', async () => {
+            const rentalStock = await createTestStock({
+                trip,
+                tripVendor,
+                vendor,
+                productType,
+                overrides: {
+                    quantity: 5,
+                    buyingPricePaise: 100000,
+                    sellingPricePaise: 200000,
+                    floorPricePaise: 150000,
+                    channel: 'RENTAL',
+                    rentPerDayPaise: 10000,
+                    depositPaise: 100000,
+                    overduePerDayPaise: 50000,
+                },
+            });
+
+            try {
+                const res = await request(app)
+                    .post(`/api/trips/${trip.uuid}/stocks/${rentalStock.uuid}/scan`)
+                    .set('Authorization', `Bearer ${testToken}`)
+                    .send({
+                        barcode: '777777777777',
+                        colourUuid: colour.uuid,
+                        sizeUuid: size.uuid,
+                    })
+                    .expect(201);
+
+                expect(res.body.data.channel).toBe('RENTAL');
+                expect(res.body.data.rentPerDayPaise).toBe('10000');
+                expect(res.body.data.depositPaise).toBe('100000');
+                expect(res.body.data.overduePerDayPaise).toBe('50000');
+            } finally {
+                await db.Unit.destroy({ where: { stockId: rentalStock.id }, force: true });
+                await db.Stock.destroy({ where: { id: rentalStock.id }, force: true });
+            }
+        });
+
+        it('should preserve unit prices after stock edit', async () => {
             // Scan unit at T1
-            const scanRes = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '888888888888',
-                    stockIntakeLineUuid: lot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: size.uuid,
-                })
-                .expect(201);
+            const scanRes = await scan({
+                barcode: '888888888888',
+                colourUuid: colour.uuid,
+                sizeUuid: size.uuid,
+            }).expect(201);
 
             const unitUuid = scanRes.body.data.uuid;
             const originalPrice = scanRes.body.data.buyingPricePaise;
 
-            // Edit lot prices at T2
+            // Edit stock prices at T2
             await request(app)
-                .patch(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}`)
+                .patch(`/api/trips/${trip.uuid}/stocks/${stock.uuid}`)
                 .set('Authorization', `Bearer ${testToken}`)
                 .send({
                     buyingPricePaise: 500000,
@@ -324,60 +330,66 @@ describe('Story 3.3: Scan units into a lot', () => {
         });
     });
 
-    describe('GET /api/stock-intake-lines/:uuid', () => {
+    describe('GET /api/trips/:tripUuid/stocks/:uuid', () => {
         it('should include unitsScannedCount in response', async () => {
-            // Create a fresh lot to isolate this test from previous scans
-            const freshLot = await db.StockIntakeLine.create({
-                stockIntakeId: trip.id,
-                productTypeId: productType.id,
-                quantity: 10,
-                buyingPricePaise: 100000,
-                sellingPricePaise: 200000,
-                floorPricePaise: 150000,
-                channel: 'RETAIL',
+            // Create a fresh stock to isolate this test from previous scans
+            const freshStock = await createTestStock({
+                trip,
+                tripVendor,
+                vendor,
+                productType,
+                overrides: {
+                    quantity: 10,
+                    buyingPricePaise: 100000,
+                    sellingPricePaise: 200000,
+                    floorPricePaise: 150000,
+                    channel: 'RETAIL',
+                },
             });
 
-            // Scan two units into the fresh lot
-            await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${freshLot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '111222333444',
-                    stockIntakeLineUuid: freshLot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: size.uuid,
-                })
-                .expect(201);
+            try {
+                // Scan two units into the fresh stock
+                await request(app)
+                    .post(`/api/trips/${trip.uuid}/stocks/${freshStock.uuid}/scan`)
+                    .set('Authorization', `Bearer ${testToken}`)
+                    .send({
+                        barcode: '111222333444',
+                        colourUuid: colour.uuid,
+                        sizeUuid: size.uuid,
+                    })
+                    .expect(201);
 
-            await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${freshLot.uuid}/scan`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .send({
-                    barcode: '555666777888',
-                    stockIntakeLineUuid: freshLot.uuid,
-                    colourUuid: colour.uuid,
-                    sizeUuid: size.uuid,
-                })
-                .expect(201);
+                await request(app)
+                    .post(`/api/trips/${trip.uuid}/stocks/${freshStock.uuid}/scan`)
+                    .set('Authorization', `Bearer ${testToken}`)
+                    .send({
+                        barcode: '555666777888',
+                        colourUuid: colour.uuid,
+                        sizeUuid: size.uuid,
+                    })
+                    .expect(201);
 
-            // Get fresh lot
-            const res = await request(app)
-                .get(`/api/stock-intakes/${trip.uuid}/lines/${freshLot.uuid}`)
-                .set('Authorization', `Bearer ${testToken}`)
-                .expect(200);
+                // Get fresh stock
+                const res = await request(app)
+                    .get(`/api/trips/${trip.uuid}/stocks/${freshStock.uuid}`)
+                    .set('Authorization', `Bearer ${testToken}`)
+                    .expect(200);
 
-            expect(res.body.data).toHaveProperty('unitsScannedCount');
-            expect(res.body.data.unitsScannedCount).toBe(2);
+                expect(res.body.data).toHaveProperty('unitsScannedCount');
+                expect(res.body.data.unitsScannedCount).toBe(2);
+            } finally {
+                await db.Unit.destroy({ where: { stockId: freshStock.id }, force: true });
+                await db.Stock.destroy({ where: { id: freshStock.id }, force: true });
+            }
         });
     });
 
     describe('Authentication and Authorization', () => {
         it('should return 401 Unauthorized when no auth header', async () => {
             const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
+                .post(`/api/trips/${trip.uuid}/stocks/${stock.uuid}/scan`)
                 .send({
                     barcode: '999888777666',
-                    stockIntakeLineUuid: lot.uuid,
                     colourUuid: colour.uuid,
                     sizeUuid: size.uuid,
                 })
@@ -412,11 +424,10 @@ describe('Story 3.3: Scan units into a lot', () => {
             const unauthorizedToken = unauthorizedLoginRes.body.data.accessToken;
 
             const res = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
+                .post(`/api/trips/${trip.uuid}/stocks/${stock.uuid}/scan`)
                 .set('Authorization', `Bearer ${unauthorizedToken}`)
                 .send({
                     barcode: '111222333555',
-                    stockIntakeLineUuid: lot.uuid,
                     colourUuid: colour.uuid,
                     sizeUuid: size.uuid,
                 })

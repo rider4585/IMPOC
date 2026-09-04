@@ -8,16 +8,32 @@ export async function initializeTestDatabase() {
     if (!isInitialized) {
       await db.sequelize.sync({ force: true });
 
-      // Create partial unique index on vendors name (for deactivation safety)
-      // This index allows name reuse after soft-delete while preventing active duplicates
+      // Partial unique indexes that are in migrations but not created by sync()
+      // (sync does not build partial index expressions)
+
+      // Allows reusing names after soft-delete while preventing active duplicates
       await db.sequelize.query(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_vendors_name ON vendors (name) WHERE deleted_at IS NULL'
       );
 
-      // Create partial unique index on stock_intakes (vendor_id, bill_reference) for duplicate prevention
-      // This index allows reusing bill references after soft-delete while preventing active duplicates
+      // Prevents the same vendor appearing twice on one trip while allowing reuse after soft-delete
       await db.sequelize.query(
-        'CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_intakes_vendor_bill ON stock_intakes (vendor_id, bill_reference) WHERE deleted_at IS NULL'
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_vendors_trip_vendor ON trip_vendors (trip_id, vendor_id) WHERE deleted_at IS NULL'
+      );
+
+      // Ensures a stock UUID is unique per trip while allowing reuse after soft-delete
+      await db.sequelize.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_stocks_trip_uuid ON stocks (trip_id, uuid) WHERE deleted_at IS NULL'
+      );
+
+      // Prevents duplicate template names per vendor/product-type while allowing reuse after soft-delete
+      await db.sequelize.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_templates_vendor_product_name ON stock_templates (vendor_id, product_type_id, name) WHERE deleted_at IS NULL'
+      );
+
+      // Ensures barcodes are unique across live units (from migration 20260828000001)
+      await db.sequelize.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_units_barcode_unique ON units (barcode) WHERE deleted_at IS NULL'
       );
 
       // Create triggers and constraints that are in migrations but not created by sync()
@@ -334,4 +350,66 @@ export function generateTestProductType(overrides = {}) {
     name: `TestProductType_${suffix}`,
     ...overrides,
   };
+}
+
+/**
+ * Schema V2 fixtures
+ * A trip is no longer tied to a single vendor; the vendor is linked through a
+ * trip_vendors junction row that carries its own bill (billReference,
+ * totalPaidPaise, notes). Tests mocking stock intake must build
+ * Vendor -> Trip + TripVendor -> Stock instead of the old StockIntake/Lots.
+ */
+
+export function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Create a Trip plus a TripVendor bill for the given vendor.
+ * @param {Object} params
+ * @returns {{trip: Object, tripVendor: Object}}
+ */
+export async function createTripWithVendor({ vendor, name, purchasedOn, billReference, totalPaidPaise, notes } = {}) {
+  if (!vendor) {
+    throw new Error('createTripWithVendor requires a vendor instance');
+  }
+  const trip = await db.Trip.create({
+    name: name || `TEST_Trip_${uniqueSuffix()}`,
+    purchasedOn: purchasedOn || todayStr(),
+  });
+  const tripVendor = await db.TripVendor.create({
+    tripId: trip.id,
+    vendorId: vendor.id,
+    billReference: billReference || null,
+    totalPaidPaise: totalPaidPaise ?? 100000,
+    notes: notes || null,
+  });
+  return { trip, tripVendor };
+}
+
+/**
+ * Create a Stock for a trip/vendor. The vendor must already be a member of the
+ * trip (a trip_vendors row must exist) to mirror createStock's constraint.
+ * @param {Object} params
+ * @returns {Object} Stock instance
+ */
+export async function createTestStock({ trip, tripVendor, vendor, productType, overrides = {} } = {}) {
+  if (!trip || !tripVendor || !vendor || !productType) {
+    throw new Error('createTestStock requires trip, tripVendor, vendor and productType');
+  }
+  return db.Stock.create({
+    tripId: trip.id,
+    tripVendorId: tripVendor.id,
+    vendorId: vendor.id,
+    productTypeId: productType.id,
+    quantity: 10,
+    buyingPricePaise: 100000,
+    sellingPricePaise: 200000,
+    floorPricePaise: 150000,
+    channel: 'RETAIL',
+    rentPerDayPaise: null,
+    depositPaise: null,
+    overduePerDayPaise: null,
+    ...overrides,
+  });
 }

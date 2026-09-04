@@ -10,31 +10,8 @@ const paiseOptional = z
     })
     .transform((v) => (v === undefined ? undefined : Number(v)));
 
-/**
- * POST /api/intake-records
- */
-export const createIntakeRecordSchema = z.object({
-    name: z.string().trim().min(1, 'Name is required').max(200),
-    purchasedOn: z.string().date('Invalid date'),
-    vendorUuid: uuidSchema.optional().nullable(),
-    notes: z.string().trim().max(2000).optional().nullable(),
-});
-
-/**
- * PATCH /api/intake-records/:uuid
- */
-export const updateIntakeRecordSchema = z.object({
-    name: z.string().trim().min(1).max(200).optional(),
-    purchasedOn: z.string().date('Invalid date').optional(),
-    vendorUuid: uuidSchema.optional().nullable(),
-    notes: z.string().trim().max(2000).optional().nullable(),
-    status: z.enum(['active', 'closed']).optional(),
-});
-
-/**
- * POST /api/intake-records/:intakeUuid/templates
- */
-export const createIntakeTemplateSchema = z.object({
+export const createTemplateSchema = z.object({
+    vendorUuid: uuidSchema,
     name: z.string().trim().max(200).optional().nullable(),
     productTypeUuid: uuidSchema,
     buyingPricePaise: z
@@ -48,10 +25,8 @@ export const createIntakeTemplateSchema = z.object({
     defaultFloorPricePaise: paiseOptional,
 });
 
-/**
- * PATCH /api/intake-records/:intakeUuid/templates/:uuid
- */
-export const updateIntakeTemplateSchema = z.object({
+export const updateTemplateSchema = z.object({
+    vendorUuid: uuidSchema.optional(),
     name: z.string().trim().max(200).optional().nullable(),
     productTypeUuid: uuidSchema.optional(),
     buyingPricePaise: z
@@ -66,11 +41,10 @@ export const updateIntakeTemplateSchema = z.object({
     defaultFloorPricePaise: paiseOptional,
 });
 
-export const intakeRecordUuidParamSchema = z.object({
-    intakeUuid: uuidSchema,
+export const templateUuidParamSchema = z.object({
+    uuid: uuidSchema,
 });
 
-export const intakeTemplateUuidParamSchema = z.object({
-    intakeUuid: uuidSchema,
-    uuid: uuidSchema,
+export const listTemplatesQuerySchema = z.object({
+    vendorUuid: uuidSchema.optional(),
 });

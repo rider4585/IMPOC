@@ -1,15 +1,13 @@
-import { StockIntakeLine, StockIntake, ProductType, Unit, Colour, Size, sequelize } from '../../../database/models/index.js';
+import { Stock, Trip, TripVendor, Vendor, ProductType, Unit, Colour, Size, sequelize } from '../../../database/models/index.js';
 
 /**
- * Verify that the user has access to the given trip
- * Currently, all authenticated users have access to all trips (can be enhanced with trip ownership)
+ * Verify that the given trip exists (access check for nested stock routes)
  * @param {string} tripUuid - Trip UUID to verify access to
  * @param {Object} user - User object from authentication middleware
- * @throws {Error} with statusCode 404 if trip not found or 403 if access denied
+ * @throws {Error} with statusCode 404 if trip not found
  */
 export const verifyTripAccess = async (tripUuid, user) => {
-    // Verify trip exists (implicitly verifies user has access if trip is accessible)
-    const trip = await StockIntake.findOne({
+    const trip = await Trip.findOne({
         where: { uuid: tripUuid },
     });
 
@@ -18,13 +16,28 @@ export const verifyTripAccess = async (tripUuid, user) => {
         error.statusCode = 404;
         throw error;
     }
-
-    // For now, all authenticated users have access to all trips
-    // This can be enhanced with trip ownership checks or permission-based access
 };
 
-export const createStockIntakeLine = async ({
+/**
+ * Create a stock line for a vendor/channel within a trip.
+ * The vendor must already be part of the trip (via trip_vendors) so the stock
+ * can be attributed to that vendor's bill.
+ * @param {Object} params
+ * @param {string} params.tripUuid - Trip UUID
+ * @param {string} params.vendorUuid - Vendor UUID
+ * @param {string} params.productTypeUuid - Product type UUID
+ * @param {number} params.quantity - Declared quantity
+ * @param {number} params.buyingPricePaise - Buying price (paise)
+ * @param {number} params.sellingPricePaise - Selling price (paise)
+ * @param {number} params.floorPricePaise - Floor price (paise)
+ * @param {string} params.channel - RETAIL or RENTAL
+ * @param {number|null} [params.rentPerDayPaise]
+ * @param {number|null} [params.depositPaise]
+ * @param {number|null} [params.overduePerDayPaise]
+ */
+export const createStock = async ({
     tripUuid,
+    vendorUuid,
     productTypeUuid,
     quantity,
     buyingPricePaise,
@@ -39,7 +52,7 @@ export const createStockIntakeLine = async ({
 
     try {
         // Validate trip exists
-        const trip = await StockIntake.findOne({
+        const trip = await Trip.findOne({
             where: { uuid: tripUuid },
             transaction,
         });
@@ -47,6 +60,36 @@ export const createStockIntakeLine = async ({
         if (!trip) {
             const error = new Error('Trip not found');
             error.statusCode = 404;
+            throw error;
+        }
+
+        // Validate vendor exists and is active
+        const vendor = await Vendor.findOne({
+            where: { uuid: vendorUuid, deletedAt: null },
+            transaction,
+        });
+
+        if (!vendor) {
+            const error = new Error('Vendor not found');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        if (!vendor.isActive) {
+            const error = new Error('Vendor is inactive');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        // The vendor must have a bill recorded on this trip (trip_vendors junction)
+        const tripVendor = await TripVendor.findOne({
+            where: { tripId: trip.id, vendorId: vendor.id },
+            transaction,
+        });
+
+        if (!tripVendor) {
+            const error = new Error('Vendor is not part of this trip. Add the vendor to the trip first.');
+            error.statusCode = 400;
             throw error;
         }
 
@@ -83,10 +126,12 @@ export const createStockIntakeLine = async ({
             }
         }
 
-        // Create the stock intake line
-        const line = await StockIntakeLine.create(
+        // Create the stock
+        const stock = await Stock.create(
             {
-                stockIntakeId: trip.id,
+                tripId: trip.id,
+                tripVendorId: tripVendor.id,
+                vendorId: vendor.id,
                 productTypeId: productType.id,
                 quantity,
                 buyingPricePaise,
@@ -102,16 +147,16 @@ export const createStockIntakeLine = async ({
 
         await transaction.commit();
 
-        return mapStockIntakeLineDTO(line, tripUuid, productTypeUuid);
+        return mapStockDTO(stock, tripUuid, vendorUuid, productTypeUuid);
     } catch (error) {
         await transaction.rollback();
         throw error;
     }
 };
 
-export const getStockIntakeLines = async (tripUuid) => {
+export const getStocksByTrip = async (tripUuid) => {
     // Validate trip exists
-    const trip = await StockIntake.findOne({
+    const trip = await Trip.findOne({
         where: { uuid: tripUuid },
     });
 
@@ -121,12 +166,13 @@ export const getStockIntakeLines = async (tripUuid) => {
         throw error;
     }
 
-    const lines = await StockIntakeLine.findAll({
-        where: { stockIntakeId: trip.id },
+    const stocks = await Stock.findAll({
+        where: { tripId: trip.id },
         attributes: [
             'id',
             'uuid',
-            'stockIntakeId',
+            'tripVendorId',
+            'vendorId',
             'productTypeId',
             'quantity',
             'buyingPricePaise',
@@ -143,18 +189,28 @@ export const getStockIntakeLines = async (tripUuid) => {
             {
                 model: ProductType,
                 as: 'productType',
+                attributes: ['uuid'],
+            },
+            {
+                model: Vendor,
+                as: 'vendor',
+                attributes: ['uuid'],
+            },
+            {
+                model: TripVendor,
+                as: 'tripVendor',
                 attributes: ['uuid'],
             },
         ],
         order: [['createdAt', 'ASC']],
     });
 
-    return lines.map((line) => mapStockIntakeLineDTO(line, tripUuid, line.productType.uuid));
+    return stocks.map((stock) => mapStockDTO(stock, tripUuid, stock.vendor?.uuid || null, stock.productType?.uuid || null));
 };
 
-export const getStockIntakeLineByUuid = async (tripUuid, lotUuid) => {
+export const getStockByUuid = async (tripUuid, stockUuid) => {
     // Validate trip exists
-    const trip = await StockIntake.findOne({
+    const trip = await Trip.findOne({
         where: { uuid: tripUuid },
     });
 
@@ -164,15 +220,16 @@ export const getStockIntakeLineByUuid = async (tripUuid, lotUuid) => {
         throw error;
     }
 
-    const line = await StockIntakeLine.findOne({
+    const stock = await Stock.findOne({
         where: {
-            uuid: lotUuid,
-            stockIntakeId: trip.id,
+            uuid: stockUuid,
+            tripId: trip.id,
         },
         attributes: [
             'id',
             'uuid',
-            'stockIntakeId',
+            'tripVendorId',
+            'vendorId',
             'productTypeId',
             'quantity',
             'buyingPricePaise',
@@ -191,35 +248,44 @@ export const getStockIntakeLineByUuid = async (tripUuid, lotUuid) => {
                 as: 'productType',
                 attributes: ['uuid'],
             },
+            {
+                model: Vendor,
+                as: 'vendor',
+                attributes: ['uuid'],
+            },
+            {
+                model: TripVendor,
+                as: 'tripVendor',
+                attributes: ['uuid'],
+            },
         ],
     });
 
-    if (!line) {
-        const error = new Error('Lot not found');
+    if (!stock) {
+        const error = new Error('Stock not found');
         error.statusCode = 404;
         throw error;
     }
 
-    // Count non-deleted units scanned into this lot
-    const { Unit } = await import('../../../database/models/index.js');
+    // Count non-deleted units scanned into this stock
     const unitsScannedCount = await Unit.count({
         where: {
-            stockIntakeLineId: line.id,
+            stockId: stock.id,
             deletedAt: null,
         },
     });
 
-    const dto = mapStockIntakeLineDTO(line, tripUuid, line.productType.uuid);
+    const dto = mapStockDTO(stock, tripUuid, stock.vendor?.uuid || null, stock.productType?.uuid || null);
     dto.unitsScannedCount = unitsScannedCount;
     return dto;
 };
 
-export const updateStockIntakeLine = async (tripUuid, lotUuid, updates) => {
+export const updateStock = async (tripUuid, stockUuid, updates) => {
     const transaction = await sequelize.transaction();
 
     try {
         // Validate trip exists
-        const trip = await StockIntake.findOne({
+        const trip = await Trip.findOne({
             where: { uuid: tripUuid },
             transaction,
         });
@@ -230,26 +296,26 @@ export const updateStockIntakeLine = async (tripUuid, lotUuid, updates) => {
             throw error;
         }
 
-        // Find the line
-        const line = await StockIntakeLine.findOne({
+        // Find the stock
+        const stock = await Stock.findOne({
             where: {
-                uuid: lotUuid,
-                stockIntakeId: trip.id,
+                uuid: stockUuid,
+                tripId: trip.id,
             },
             transaction,
         });
 
-        if (!line) {
-            const error = new Error('Lot not found');
+        if (!stock) {
+            const error = new Error('Stock not found');
             error.statusCode = 404;
             throw error;
         }
 
         // Get current values for constraint validation
-        const currentSellingPrice = updates.sellingPricePaise !== undefined ? updates.sellingPricePaise : line.sellingPricePaise;
-        const currentFloorPrice = updates.floorPricePaise !== undefined ? updates.floorPricePaise : line.floorPricePaise;
-        const currentRentPerDay = updates.rentPerDayPaise !== undefined ? updates.rentPerDayPaise : line.rentPerDayPaise;
-        const currentOverduePerDay = updates.overduePerDayPaise !== undefined ? updates.overduePerDayPaise : line.overduePerDayPaise;
+        const currentSellingPrice = updates.sellingPricePaise !== undefined ? updates.sellingPricePaise : stock.sellingPricePaise;
+        const currentFloorPrice = updates.floorPricePaise !== undefined ? updates.floorPricePaise : stock.floorPricePaise;
+        const currentRentPerDay = updates.rentPerDayPaise !== undefined ? updates.rentPerDayPaise : stock.rentPerDayPaise;
+        const currentOverduePerDay = updates.overduePerDayPaise !== undefined ? updates.overduePerDayPaise : stock.overduePerDayPaise;
 
         // Validate floor price constraint
         if (currentFloorPrice > currentSellingPrice) {
@@ -259,7 +325,7 @@ export const updateStockIntakeLine = async (tripUuid, lotUuid, updates) => {
         }
 
         // Validate rental constraint
-        if (line.channel === 'RENTAL' && currentOverduePerDay !== null && currentRentPerDay !== null) {
+        if (stock.channel === 'RENTAL' && currentOverduePerDay !== null && currentRentPerDay !== null) {
             if (currentOverduePerDay <= currentRentPerDay) {
                 const error = new Error('Overdue per day must be greater than rent per day');
                 error.statusCode = 400;
@@ -267,18 +333,23 @@ export const updateStockIntakeLine = async (tripUuid, lotUuid, updates) => {
             }
         }
 
-        // Update the line
-        await line.update(updates, { transaction });
+        // Update the stock
+        await stock.update(updates, { transaction });
 
         await transaction.commit();
 
-        // Fetch the product type UUID for the response
+        // Fetch the product type + vendor UUIDs for the response
         const productType = await ProductType.findOne({
-            where: { id: line.productTypeId },
+            where: { id: stock.productTypeId },
             attributes: ['uuid'],
         });
 
-        return mapStockIntakeLineDTO(line, tripUuid, productType.uuid);
+        const vendor = await Vendor.findOne({
+            where: { id: stock.vendorId },
+            attributes: ['uuid'],
+        });
+
+        return mapStockDTO(stock, tripUuid, vendor?.uuid || null, productType?.uuid || null);
     } catch (error) {
         await transaction.rollback();
         throw error;
@@ -286,54 +357,27 @@ export const updateStockIntakeLine = async (tripUuid, lotUuid, updates) => {
 };
 
 /**
- * Map StockIntakeLine to DTO response
- * Paise values are returned as STRINGS (not Number) to preserve BIGINT precision
- * @param {Object} line - StockIntakeLine from database
- * @param {string} tripUuid - Trip UUID
- * @param {string} productTypeUuid - Product Type UUID
- * @returns {Object} DTO with uuid, tripUuid, productTypeUuid, quantity, prices as strings, channel, rental fields, createdAt, updatedAt
- */
-function mapStockIntakeLineDTO(line, tripUuid, productTypeUuid) {
-    return {
-        uuid: line.uuid,
-        tripUuid,
-        productTypeUuid,
-        quantity: line.quantity,
-        buyingPricePaise: String(line.buyingPricePaise),
-        sellingPricePaise: String(line.sellingPricePaise),
-        floorPricePaise: String(line.floorPricePaise),
-        channel: line.channel,
-        rentPerDayPaise: line.rentPerDayPaise !== null ? String(line.rentPerDayPaise) : null,
-        depositPaise: line.depositPaise !== null ? String(line.depositPaise) : null,
-        overduePerDayPaise: line.overduePerDayPaise !== null ? String(line.overduePerDayPaise) : null,
-        createdAt: line.createdAt,
-        updatedAt: line.updatedAt,
-    };
-}
-
-/**
- * Scan a barcode into a lot (stock intake line)
- * Validates barcode uniqueness, lot quantity limits, inactive picklists
+ * Scan a barcode into a stock (atomic unit create with INTAKE status event, CAS protected)
  * Delegates unit row insertion to units.service to preserve AD-8's invariant
  * A successful scan inserts both a units row and its first unit_status_events row atomically
- * 
+ *
  * @param {Object} params
+ * @param {string} params.stockUuid - Stock UUID
  * @param {string} params.barcode - Barcode to scan (1-12 chars)
- * @param {string} params.stockIntakeLineUuid - Lot UUID
  * @param {string} params.colourUuid - Colour UUID
  * @param {string} params.sizeUuid - Size UUID
  * @param {integer} params.actorUserId - User ID of the actor performing the scan
  * @returns {Object} Created unit DTO
  * @throws {Error} with statusCode property for HTTP mapping
  */
-export const scanIntoLot = async ({
+export const scanIntoStock = async ({
+    stockUuid,
     barcode,
-    stockIntakeLineUuid,
     colourUuid,
     sizeUuid,
     actorUserId,
 }) => {
-    // Patch 4: Null check for actorUserId
+    // Null check for actorUserId
     if (actorUserId == null) {
         const error = new Error('Actor user ID required');
         error.statusCode = 400;
@@ -345,34 +389,34 @@ export const scanIntoLot = async ({
     try {
         const { createUnitFromScan } = await import('../units/units.service.js');
 
-        // Resolve stock intake line by UUID
-        const lot = await StockIntakeLine.findOne({
-            where: { uuid: stockIntakeLineUuid },
+        // Resolve stock by UUID
+        const stock = await Stock.findOne({
+            where: { uuid: stockUuid },
             transaction,
         });
 
-        if (!lot) {
-            const error = new Error('Lot not found');
+        if (!stock) {
+            const error = new Error('Stock not found');
             error.statusCode = 404;
             throw error;
         }
 
-        // Patch 2: Soft-deleted lot check
-        if (lot.deletedAt) {
-            const error = new Error('Lot is deleted');
+        // Soft-deleted stock check
+        if (stock.deletedAt) {
+            const error = new Error('Stock is deleted');
             error.statusCode = 400;
             throw error;
         }
 
-        // Patch 3: Null check for lot.quantity
-        if (lot.quantity == null) {
-            const error = new Error('Lot quantity not set');
+        // Null check for stock.quantity
+        if (stock.quantity == null) {
+            const error = new Error('Stock quantity not set');
             error.statusCode = 500;
             throw error;
         }
 
-        // Patch 1: Lock the lot row to prevent race conditions on quantity check
-        await StockIntakeLine.findByPk(lot.id, { transaction, lock: 'UPDATE' });
+        // Lock the stock row to prevent race conditions on quantity check
+        await Stock.findByPk(stock.id, { transaction, lock: 'UPDATE' });
 
         // Resolve colour by UUID
         const colour = await Colour.findOne({
@@ -442,18 +486,18 @@ export const scanIntoLot = async ({
             throw error;
         }
 
-        // Validate lot quantity not reached: count non-deleted units in this lot
+        // Validate stock quantity not reached: count non-deleted units in this stock
         const unitCount = await Unit.count({
             where: {
-                stockIntakeLineId: lot.id,
+                stockId: stock.id,
                 deletedAt: null,
             },
             transaction,
         });
 
-        if (unitCount >= lot.quantity) {
+        if (unitCount >= stock.quantity) {
             const error = new Error(
-                `Lot has reached its declared quantity of ${lot.quantity}`
+                `Stock has reached its declared quantity of ${stock.quantity}`
             );
             error.statusCode = 400;
             throw error;
@@ -461,7 +505,7 @@ export const scanIntoLot = async ({
 
         // Create unit atomically with its first status event (delegation to units.service, AD-8)
         const unit = await createUnitFromScan({
-            lot,
+            stock,
             colour,
             size,
             barcode,
@@ -470,9 +514,10 @@ export const scanIntoLot = async ({
         });
 
         // Enrich DTO with UUIDs from resolved models
+        const stockIdValue = stock.uuid;
         const enrichedUnit = {
             ...unit,
-            stockIntakeLineUuid,
+            stockUuid: stockIdValue,
             colourUuid,
             sizeUuid,
         };
@@ -484,3 +529,32 @@ export const scanIntoLot = async ({
         throw error;
     }
 };
+
+/**
+ * Map Stock to DTO response
+ * Paise values are returned as STRINGS (not Number) to preserve BIGINT precision
+ * @param {Object} stock - Stock from database
+ * @param {string} tripUuid - Trip UUID
+ * @param {string|null} vendorUuid - Vendor UUID (may be null when not eager-loaded)
+ * @param {string|null} productTypeUuid - Product Type UUID
+ * @returns {Object} DTO
+ */
+function mapStockDTO(stock, tripUuid, vendorUuid, productTypeUuid) {
+    return {
+        uuid: stock.uuid,
+        tripUuid,
+        tripVendorUuid: stock.tripVendor?.uuid || null,
+        vendorUuid,
+        productTypeUuid,
+        quantity: stock.quantity,
+        buyingPricePaise: String(stock.buyingPricePaise),
+        sellingPricePaise: String(stock.sellingPricePaise),
+        floorPricePaise: String(stock.floorPricePaise),
+        channel: stock.channel,
+        rentPerDayPaise: stock.rentPerDayPaise !== null ? String(stock.rentPerDayPaise) : null,
+        depositPaise: stock.depositPaise !== null ? String(stock.depositPaise) : null,
+        overduePerDayPaise: stock.overduePerDayPaise !== null ? String(stock.overduePerDayPaise) : null,
+        createdAt: stock.createdAt,
+        updatedAt: stock.updatedAt,
+    };
+}

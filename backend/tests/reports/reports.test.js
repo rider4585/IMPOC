@@ -1,7 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import * as db from '../../database/models/index.js';
-import { initializeTestDatabase, generateTestUser, closeDatabase } from '../utils/test-setup.js';
+import { initializeTestDatabase, generateTestUser, closeDatabase, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
 import argon2 from 'argon2';
 import app from '../../app.js';
 import reportsRoutes from '../../src/modules/reports/reports.routes.js';
@@ -27,23 +27,32 @@ describe('Reports module (T-14)', () => {
     let colour;
     let size;
     let productType;
+    let trip;
+    let tripVendor;
+    let vendor;
+    let createdStockIds = [];
 
     async function makeUnit({ barcode, channel, retail = true }) {
-        const lot = await db.StockIntakeLine.create({
-            stockIntakeId: null,
-            productTypeId: productType.id,
-            quantity: 1,
-            buyingPricePaise: 100000,
-            sellingPricePaise: 200000,
-            floorPricePaise: 150000,
-            channel,
-            rentPerDayPaise: retail ? null : 1000,
-            depositPaise: retail ? null : 5000,
-            overduePerDayPaise: retail ? null : 200,
+        const stock = await createTestStock({
+            trip,
+            tripVendor,
+            vendor,
+            productType,
+            overrides: {
+                quantity: 1,
+                buyingPricePaise: 100000,
+                sellingPricePaise: 200000,
+                floorPricePaise: 150000,
+                channel,
+                rentPerDayPaise: retail ? null : 1000,
+                depositPaise: retail ? null : 5000,
+                overduePerDayPaise: retail ? null : 200,
+            },
         });
+        createdStockIds.push(stock.id);
         return db.Unit.create({
             barcode,
-            stockIntakeLineId: lot.id,
+            stockId: stock.id,
             colourId: colour.id,
             sizeId: size.id,
             status: 'in_stock',
@@ -78,6 +87,15 @@ describe('Reports module (T-14)', () => {
         colour = await db.Colour.create({ name: 'Blue', hexValue: '#0000FF', isActive: true });
         size = await db.Size.create({ name: 'L', isActive: true });
         productType = await db.ProductType.create({ name: `PT_${Date.now()}` });
+
+        vendor = await db.Vendor.create({ name: 'Test Vendor' });
+        const pair = await createTripWithVendor({
+            vendor,
+            name: 'TEST Reports Trip',
+            totalPaidPaise: 1000000,
+        });
+        trip = pair.trip;
+        tripVendor = pair.tripVendor;
 
         // --- Sales fixtures ---
         const retail = await makeUnit({ barcode: 'A1000000011', channel: 'RETAIL' });
@@ -159,6 +177,10 @@ describe('Reports module (T-14)', () => {
         await db.User.destroy({
             where: { username: { [db.Sequelize.Op.like]: 'testuser_%' } },
         });
+        await db.Unit.destroy({ where: { stockId: { [db.Sequelize.Op.in]: createdStockIds } }, force: true });
+        await db.Stock.destroy({ where: { id: { [db.Sequelize.Op.in]: createdStockIds } }, force: true });
+        await db.TripVendor.destroy({ where: { tripId: trip.id }, force: true });
+        await db.Trip.destroy({ where: { id: trip.id }, force: true });
         await closeDatabase();
     });
 

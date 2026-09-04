@@ -1,6 +1,6 @@
 import request from 'supertest';
 import * as db from '../../database/models/index.js';
-import { initializeTestDatabase, generateTestUser, closeDatabase } from '../utils/test-setup.js';
+import { initializeTestDatabase, generateTestUser, closeDatabase, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
 import argon2 from 'argon2';
 import app from '../../app.js';
 
@@ -9,6 +9,11 @@ describe('Unit transition HTTP routes (T-06)', () => {
     let unit;
     let colour;
     let size;
+    let trip;
+    let tripVendor;
+    let vendor;
+    let stock;
+    let productType;
 
     beforeAll(async () => {
         await initializeTestDatabase();
@@ -32,31 +37,36 @@ describe('Unit transition HTTP routes (T-06)', () => {
 
         colour = await db.Colour.create({ name: 'Red', hexValue: '#FF0000', isActive: true });
         size = await db.Size.create({ name: 'M', isActive: true });
-        const productType = await db.ProductType.create({ name: `PT_${Date.now()}` });
+        productType = await db.ProductType.create({ name: `PT_${Date.now()}` });
 
-        // Create a vendor + trip + lot + scan a RETAIL unit
-        const vendor = await db.Vendor.create({ name: 'Test Vendor' });
-        const trip = await db.StockIntake.create({
-            vendorId: vendor.id,
-            purchasedOn: new Date().toISOString().split('T')[0],
+        // Create a vendor + trip + stock + scan a RETAIL unit
+        vendor = await db.Vendor.create({ name: 'Test Vendor' });
+        const pair = await createTripWithVendor({
+            vendor,
+            name: 'TEST Transition Trip',
             totalPaidPaise: 1000000,
         });
-        const lot = await db.StockIntakeLine.create({
-            stockIntakeId: trip.id,
-            productTypeId: productType.id,
-            quantity: 5,
-            buyingPricePaise: 100000,
-            sellingPricePaise: 200000,
-            floorPricePaise: 150000,
-            channel: 'RETAIL',
+        trip = pair.trip;
+        tripVendor = pair.tripVendor;
+        stock = await createTestStock({
+            trip,
+            tripVendor,
+            vendor,
+            productType,
+            overrides: {
+                quantity: 5,
+                buyingPricePaise: 100000,
+                sellingPricePaise: 200000,
+                floorPricePaise: 150000,
+                channel: 'RETAIL',
+            },
         });
 
         const scanRes = await request(app)
-            .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
+            .post(`/api/trips/${trip.uuid}/stocks/${stock.uuid}/scan`)
             .set('Authorization', `Bearer ${testToken}`)
             .send({
                 barcode: '111111111111',
-                stockIntakeLineUuid: lot.uuid,
                 colourUuid: colour.uuid,
                 sizeUuid: size.uuid,
             })
@@ -69,6 +79,10 @@ describe('Unit transition HTTP routes (T-06)', () => {
         await db.User.destroy({
             where: { username: { [db.Sequelize.Op.like]: 'testuser_%' } },
         });
+        await db.Unit.destroy({ where: { stockId: stock.id }, force: true });
+        await db.Stock.destroy({ where: { id: stock.id }, force: true });
+        await db.TripVendor.destroy({ where: { tripId: trip.id }, force: true });
+        await db.Trip.destroy({ where: { id: trip.id }, force: true });
         await closeDatabase();
     });
 

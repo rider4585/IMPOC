@@ -1,7 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import * as db from '../../database/models/index.js';
-import { initializeTestDatabase, generateTestUser, closeDatabase } from '../utils/test-setup.js';
+import { initializeTestDatabase, generateTestUser, closeDatabase, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
 import argon2 from 'argon2';
 import app from '../../app.js';
 import salesRoutes from '../../src/modules/sales/sales.routes.js';
@@ -21,7 +21,9 @@ describe('Sales / POS module (T-08)', () => {
     let managerToken;
     let cashierToken;
     let trip;
-    let lot;
+    let tripVendor;
+    let vendor;
+    let stock;
     let colour;
     let size;
     let productType;
@@ -30,11 +32,10 @@ describe('Sales / POS module (T-08)', () => {
 
     async function scanUnit(barcode) {
         const res = await request(app)
-            .post(`/api/stock-intakes/${trip.uuid}/lines/${lot.uuid}/scan`)
+            .post(`/api/trips/${trip.uuid}/stocks/${stock.uuid}/scan`)
             .set('Authorization', `Bearer ${managerToken}`)
             .send({
                 barcode,
-                stockIntakeLineUuid: lot.uuid,
                 colourUuid: colour.uuid,
                 sizeUuid: size.uuid,
             })
@@ -81,20 +82,28 @@ describe('Sales / POS module (T-08)', () => {
         colour = await db.Colour.create({ name: 'Blue', hexValue: '#0000FF', isActive: true });
         size = await db.Size.create({ name: 'L', isActive: true });
         productType = await db.ProductType.create({ name: `PT_${Date.now()}` });
-        const vendor = await db.Vendor.create({ name: 'Test Vendor' });
-        trip = await db.StockIntake.create({
-            vendorId: vendor.id,
-            purchasedOn: new Date().toISOString().split('T')[0],
+        vendor = await db.Vendor.create({ name: 'Test Vendor' });
+
+        const pair = await createTripWithVendor({
+            vendor,
+            name: 'TEST Sales Trip',
             totalPaidPaise: 1000000,
         });
-        lot = await db.StockIntakeLine.create({
-            stockIntakeId: trip.id,
-            productTypeId: productType.id,
-            quantity: 10,
-            buyingPricePaise: 100000,
-            sellingPricePaise: 200000,
-            floorPricePaise: 150000,
-            channel: 'RETAIL',
+        trip = pair.trip;
+        tripVendor = pair.tripVendor;
+
+        stock = await createTestStock({
+            trip,
+            tripVendor,
+            vendor,
+            productType,
+            overrides: {
+                quantity: 10,
+                buyingPricePaise: 100000,
+                sellingPricePaise: 200000,
+                floorPricePaise: 150000,
+                channel: 'RETAIL',
+            },
         });
 
         unit1 = await scanUnit('A1000000001');
@@ -105,6 +114,10 @@ describe('Sales / POS module (T-08)', () => {
         await db.User.destroy({
             where: { username: { [db.Sequelize.Op.like]: 'testuser_%' } },
         });
+        await db.Unit.destroy({ where: { stockId: stock.id }, force: true });
+        await db.Stock.destroy({ where: { id: stock.id }, force: true });
+        await db.TripVendor.destroy({ where: { tripId: trip.id }, force: true });
+        await db.Trip.destroy({ where: { id: trip.id }, force: true });
         await closeDatabase();
     });
 
@@ -144,24 +157,27 @@ describe('Sales / POS module (T-08)', () => {
         });
 
         it('should reject selling a non-sellable (rental) unit', async () => {
-            const rLot = await db.StockIntakeLine.create({
-                stockIntakeId: trip.id,
-                productTypeId: productType.id,
-                quantity: 2,
-                buyingPricePaise: 50000,
-                sellingPricePaise: 30000,
-                floorPricePaise: 25000,
-                channel: 'RENTAL',
-                rentPerDayPaise: 10000,
-                depositPaise: 1000,
-                overduePerDayPaise: 500,
+            const rStock = await createTestStock({
+                trip,
+                tripVendor,
+                vendor,
+                productType,
+                overrides: {
+                    quantity: 2,
+                    buyingPricePaise: 50000,
+                    sellingPricePaise: 30000,
+                    floorPricePaise: 25000,
+                    channel: 'RENTAL',
+                    rentPerDayPaise: 10000,
+                    depositPaise: 1000,
+                    overduePerDayPaise: 500,
+                },
             });
             const scanRes = await request(app)
-                .post(`/api/stock-intakes/${trip.uuid}/lines/${rLot.uuid}/scan`)
+                .post(`/api/trips/${trip.uuid}/stocks/${rStock.uuid}/scan`)
                 .set('Authorization', `Bearer ${managerToken}`)
                 .send({
                     barcode: 'R1000000001',
-                    stockIntakeLineUuid: rLot.uuid,
                     colourUuid: colour.uuid,
                     sizeUuid: size.uuid,
                 })

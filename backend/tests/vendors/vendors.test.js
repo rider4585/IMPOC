@@ -1,7 +1,7 @@
 import request from 'supertest';
 import app from '../../app.js';
 import * as db from '../../database/models/index.js';
-import { initializeTestDatabase, cleanupTestDatabase, closeDatabase, generateTestUser } from '../utils/test-setup.js';
+import { initializeTestDatabase, cleanupTestDatabase, closeDatabase, generateTestUser, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
 import argon2 from 'argon2';
 
 
@@ -558,45 +558,46 @@ describe('Vendors Module - /api/vendors', () => {
       expect(res.body.data.trips.length).toBe(0);
     });
 
-    it('should return vendor history with trips/lots/units sorted correctly', async () => {
+    it('should return vendor history with everything nested and sorted correctly', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_HistoryVendor' });
 
-      // Create a trip (stock intake)
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      // Trip + TripVendor bill
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL001',
         totalPaidPaise: 100000,
       });
 
       // Create a product type
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product' });
 
-      // Create a lot (stock intake line)
-      const lot = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
+      // Create a stock
+      const stock = await createTestStock({
+        trip,
+        tripVendor,
+        vendor,
+        productType,
+        overrides: {
+          quantity: 10,
+          buyingPricePaise: 5000,
+          sellingPricePaise: 8000,
+          floorPricePaise: 7000,
+          channel: 'RETAIL',
+        },
       });
 
       // Create colour and size
       const colour = await db.Colour.create({ name: 'TEST_Red' });
       const size = await db.Size.create({ name: 'TEST_M' });
 
-      // Create units
+      // Create a unit
       const unit = await db.Unit.create({
-        stockIntakeLineId: lot.id,
+        stockId: stock.id,
         barcode: '123456789012',
         colourId: colour.id,
         sizeId: size.id,
-        status: 'IN_STOCK',
+        status: 'in_stock',
         channel: 'RETAIL',
         buyingPricePaise: 5000,
         sellingPricePaise: 8000,
@@ -614,25 +615,27 @@ describe('Vendors Module - /api/vendors', () => {
 
       const tripData = res.body.data.trips[0];
       expect(tripData.uuid).toBe(trip.uuid);
+      expect(tripData.tripVendorUuid).toBe(tripVendor.uuid);
+      expect(tripData.name).toBeTruthy();
       expect(tripData.purchasedOn).toBe('2026-08-20');
       expect(tripData.totalPaidPaise).toBe('100000');
       expect(typeof tripData.variancePaise).toBe('string');
-      expect(tripData.lines).toHaveLength(1);
+      expect(tripData.stocks).toHaveLength(1);
 
-      const lotData = tripData.lines[0];
-      expect(lotData.uuid).toBe(lot.uuid);
-      expect(lotData.productTypeUuid).toBe(productType.uuid);
-      expect(lotData.quantity).toBe(10);
-      expect(lotData.buyingPricePaise).toBe('5000');
-      expect(lotData.sellingPricePaise).toBe('8000');
-      expect(lotData.floorPricePaise).toBe('7000');
-      expect(lotData.channel).toBe('RETAIL');
-      expect(lotData.units).toHaveLength(1);
+      const stockData = tripData.stocks[0];
+      expect(stockData.uuid).toBe(stock.uuid);
+      expect(stockData.productTypeUuid).toBe(productType.uuid);
+      expect(stockData.quantity).toBe(10);
+      expect(stockData.buyingPricePaise).toBe('5000');
+      expect(stockData.sellingPricePaise).toBe('8000');
+      expect(stockData.floorPricePaise).toBe('7000');
+      expect(stockData.channel).toBe('RETAIL');
+      expect(stockData.units).toHaveLength(1);
 
-      const unitData = lotData.units[0];
+      const unitData = stockData.units[0];
       expect(unitData.uuid).toBe(unit.uuid);
       expect(unitData.barcode).toBe('123456789012');
-      expect(unitData.status).toBe('IN_STOCK');
+      expect(unitData.status).toBe('in_stock');
       expect(unitData.channel).toBe('RETAIL');
       expect(unitData.colour).toBe(colour.uuid);
       expect(unitData.size).toBe(size.uuid);
@@ -643,38 +646,25 @@ describe('Vendors Module - /api/vendors', () => {
       const vendor = await db.Vendor.create({ name: 'TEST_VarianceVendor' });
 
       // Trip with totalPaidPaise = 100000
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL002',
         totalPaidPaise: 100000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product2',
-        category: 'TEST_Category',
+      const productType = await db.ProductType.create({ name: 'TEST_Product2' });
+
+      // Stock 1: quantity=10, buyingPricePaise=5000 => 50000
+      await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 10, buyingPricePaise: 5000, sellingPricePaise: 8000, floorPricePaise: 7000, channel: 'RETAIL' },
       });
 
-      // Lot 1: quantity=10, buyingPricePaise=5000 => 50000
-      const lot1 = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
-      });
-
-      // Lot 2: quantity=5, buyingPricePaise=8000 => 40000
-      const lot2 = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 5,
-        buyingPricePaise: 8000,
-        sellingPricePaise: 10000,
-        floorPricePaise: 9000,
-        channel: 'RETAIL',
+      // Stock 2: quantity=5, buyingPricePaise=8000 => 40000
+      await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 5, buyingPricePaise: 8000, sellingPricePaise: 10000, floorPricePaise: 9000, channel: 'RETAIL' },
       });
 
       // Expected variance = 100000 - (10*5000 + 5*8000) = 100000 - 90000 = 10000
@@ -688,12 +678,12 @@ describe('Vendors Module - /api/vendors', () => {
       expect(tripData.variancePaise).toBe('10000');
     });
 
-    it('should return empty lines array for trip with no lots', async () => {
-      const vendor = await db.Vendor.create({ name: 'TEST_TripNoLots' });
+    it('should return empty stocks array for trip bill with no stocks', async () => {
+      const vendor = await db.Vendor.create({ name: 'TEST_TripNoStocks' });
 
-      // Create a trip with no lots
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      // Create a trip + bill with no stocks
+      const { trip } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL003',
         totalPaidPaise: 50000,
@@ -705,35 +695,27 @@ describe('Vendors Module - /api/vendors', () => {
 
       expect(res.statusCode).toBe(200);
       const tripData = res.body.data.trips[0];
-      expect(tripData.lines).toHaveLength(0);
-      // Variance should equal totalPaidPaise when there are no lots
+      expect(tripData.stocks).toHaveLength(0);
+      // Variance should equal totalPaidPaise when there are no stocks
       expect(tripData.variancePaise).toBe('50000');
     });
 
-    it('should return empty units array for lot with no units', async () => {
-      const vendor = await db.Vendor.create({ name: 'TEST_LotNoUnits' });
+    it('should return empty units array for stock with no units', async () => {
+      const vendor = await db.Vendor.create({ name: 'TEST_StockNoUnits' });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL004',
         totalPaidPaise: 50000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product3',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product3' });
 
-      // Create a lot with no units
-      const lot = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
+      // Create a stock with no units
+      await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 10, buyingPricePaise: 5000, sellingPricePaise: 8000, floorPricePaise: 7000, channel: 'RETAIL' },
       });
 
       const res = await request(app)
@@ -741,33 +723,25 @@ describe('Vendors Module - /api/vendors', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.statusCode).toBe(200);
-      const lotData = res.body.data.trips[0].lines[0];
-      expect(lotData.units).toHaveLength(0);
+      const stockData = res.body.data.trips[0].stocks[0];
+      expect(stockData.units).toHaveLength(0);
     });
 
     it('should return full history for deactivated vendor', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_DeactivatedVendor', isActive: false });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL005',
         totalPaidPaise: 100000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product4',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product4' });
 
-      const lot = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
+      await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 10, buyingPricePaise: 5000, sellingPricePaise: 8000, floorPricePaise: 7000, channel: 'RETAIL' },
       });
 
       const res = await request(app)
@@ -778,87 +752,74 @@ describe('Vendors Module - /api/vendors', () => {
       expect(res.body.data.vendor.isActive).toBe(false);
       // Full history is still returned for deactivated vendor
       expect(res.body.data.trips).toHaveLength(1);
-      expect(res.body.data.trips[0].lines).toHaveLength(1);
+      expect(res.body.data.trips[0].stocks).toHaveLength(1);
     });
 
-    it('should filter out soft-deleted trips', async () => {
+    it('should filter out trip bills that were removed from a vendor', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_SoftDeleteTrip' });
 
-      // Create two trips
-      const trip1 = await db.StockIntake.create({
-        vendorId: vendor.id,
+      // Create two trip bills for this vendor
+      const { tripVendor: tv1 } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL006',
         totalPaidPaise: 100000,
       });
 
-      const trip2 = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip: trip2, tripVendor: tv2 } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-21',
         billReference: 'BILL007',
         totalPaidPaise: 50000,
       });
 
-      // Soft delete trip1
-      await trip1.destroy();
+      // Soft delete the first trip_vendor link
+      await tv1.destroy();
 
       const res = await request(app)
         .get(`/api/vendors/${vendor.uuid}/history`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.statusCode).toBe(200);
-      // Only trip2 should appear (trip1 is soft-deleted)
+      // Only the surviving bill should appear (tv1 is soft-deleted)
       expect(res.body.data.trips).toHaveLength(1);
       expect(res.body.data.trips[0].uuid).toBe(trip2.uuid);
     });
 
-    it('should filter out soft-deleted lots', async () => {
-      const vendor = await db.Vendor.create({ name: 'TEST_SoftDeleteLot' });
+    it('should filter out soft-deleted stocks', async () => {
+      const vendor = await db.Vendor.create({ name: 'TEST_SoftDeleteStock' });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL008',
         totalPaidPaise: 100000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product5',
-        category: 'TEST_Category',
+      const productType = await db.ProductType.create({ name: 'TEST_Product5' });
+
+      // Create two stocks
+      const stock1 = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 10, buyingPricePaise: 5000, sellingPricePaise: 8000, floorPricePaise: 7000, channel: 'RETAIL' },
       });
 
-      // Create two lots
-      const lot1 = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
+      const stock2 = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 5, buyingPricePaise: 8000, sellingPricePaise: 10000, floorPricePaise: 9000, channel: 'RETAIL' },
       });
 
-      const lot2 = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 5,
-        buyingPricePaise: 8000,
-        sellingPricePaise: 10000,
-        floorPricePaise: 9000,
-        channel: 'RETAIL',
-      });
-
-      // Soft delete lot1
-      await lot1.destroy();
+      // Soft delete stock1
+      await stock1.destroy();
 
       const res = await request(app)
         .get(`/api/vendors/${vendor.uuid}/history`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.statusCode).toBe(200);
-      // Only lot2 should appear (lot1 is soft-deleted)
-      expect(res.body.data.trips[0].lines).toHaveLength(1);
-      expect(res.body.data.trips[0].lines[0].uuid).toBe(lot2.uuid);
+      // Only stock2 should appear (stock1 is soft-deleted)
+      expect(res.body.data.trips[0].stocks).toHaveLength(1);
+      expect(res.body.data.trips[0].stocks[0].uuid).toBe(stock2.uuid);
       // Variance should be recalculated: 100000 - (5 * 8000) = 60000
       expect(res.body.data.trips[0].variancePaise).toBe('60000');
     });
@@ -866,26 +827,18 @@ describe('Vendors Module - /api/vendors', () => {
     it('should filter out soft-deleted units', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_SoftDeleteUnit' });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL009',
         totalPaidPaise: 100000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product6',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product6' });
 
-      const lot = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
+      const stock = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 10, buyingPricePaise: 5000, sellingPricePaise: 8000, floorPricePaise: 7000, channel: 'RETAIL' },
       });
 
       const colour = await db.Colour.create({ name: 'TEST_Blue' });
@@ -893,11 +846,11 @@ describe('Vendors Module - /api/vendors', () => {
 
       // Create two units
       const unit1 = await db.Unit.create({
-        stockIntakeLineId: lot.id,
+        stockId: stock.id,
         barcode: '111111111111',
         colourId: colour.id,
         sizeId: size.id,
-        status: 'IN_STOCK',
+        status: 'in_stock',
         channel: 'RETAIL',
         buyingPricePaise: 5000,
         sellingPricePaise: 8000,
@@ -905,11 +858,11 @@ describe('Vendors Module - /api/vendors', () => {
       });
 
       const unit2 = await db.Unit.create({
-        stockIntakeLineId: lot.id,
+        stockId: stock.id,
         barcode: '222222222222',
         colourId: colour.id,
         sizeId: size.id,
-        status: 'IN_STOCK',
+        status: 'in_stock',
         channel: 'RETAIL',
         buyingPricePaise: 5000,
         sellingPricePaise: 8000,
@@ -925,47 +878,45 @@ describe('Vendors Module - /api/vendors', () => {
 
       expect(res.statusCode).toBe(200);
       // Only unit2 should appear (unit1 is soft-deleted)
-      expect(res.body.data.trips[0].lines[0].units).toHaveLength(1);
-      expect(res.body.data.trips[0].lines[0].units[0].uuid).toBe(unit2.uuid);
+      expect(res.body.data.trips[0].stocks[0].units).toHaveLength(1);
+      expect(res.body.data.trips[0].stocks[0].units[0].uuid).toBe(unit2.uuid);
     });
 
     it('should return all money fields as strings for precision', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_MoneyStrings' });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL010',
         totalPaidPaise: 12345678,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product7',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product7' });
 
-      const lot = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 9876543,
-        sellingPricePaise: 11111111,
-        floorPricePaise: 10000000,
-        channel: 'RETAIL',
-        rentPerDayPaise: 1000,
-        depositPaise: 50000,
-        overduePerDayPaise: 200,
+      const stock = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: {
+          quantity: 10,
+          buyingPricePaise: 9876543,
+          sellingPricePaise: 11111111,
+          floorPricePaise: 10000000,
+          channel: 'RETAIL',
+          rentPerDayPaise: 1000,
+          depositPaise: 50000,
+          overduePerDayPaise: 200,
+        },
       });
 
       const colour = await db.Colour.create({ name: 'TEST_Green' });
       const size = await db.Size.create({ name: 'TEST_XL' });
 
       const unit = await db.Unit.create({
-        stockIntakeLineId: lot.id,
+        stockId: stock.id,
         barcode: '333333333333',
         colourId: colour.id,
         sizeId: size.id,
-        status: 'IN_STOCK',
+        status: 'in_stock',
         channel: 'RETAIL',
         buyingPricePaise: 9876543,
         sellingPricePaise: 11111111,
@@ -986,21 +937,21 @@ describe('Vendors Module - /api/vendors', () => {
       expect(tripData.totalPaidPaise).toBe('12345678');
       expect(typeof tripData.variancePaise).toBe('string');
 
-      const lotData = tripData.lines[0];
-      expect(typeof lotData.buyingPricePaise).toBe('string');
-      expect(lotData.buyingPricePaise).toBe('9876543');
-      expect(typeof lotData.sellingPricePaise).toBe('string');
-      expect(lotData.sellingPricePaise).toBe('11111111');
-      expect(typeof lotData.floorPricePaise).toBe('string');
-      expect(lotData.floorPricePaise).toBe('10000000');
-      expect(typeof lotData.rentPerDayPaise).toBe('string');
-      expect(lotData.rentPerDayPaise).toBe('1000');
-      expect(typeof lotData.depositPaise).toBe('string');
-      expect(lotData.depositPaise).toBe('50000');
-      expect(typeof lotData.overduePerDayPaise).toBe('string');
-      expect(lotData.overduePerDayPaise).toBe('200');
+      const stockData = tripData.stocks[0];
+      expect(typeof stockData.buyingPricePaise).toBe('string');
+      expect(stockData.buyingPricePaise).toBe('9876543');
+      expect(typeof stockData.sellingPricePaise).toBe('string');
+      expect(stockData.sellingPricePaise).toBe('11111111');
+      expect(typeof stockData.floorPricePaise).toBe('string');
+      expect(stockData.floorPricePaise).toBe('10000000');
+      expect(typeof stockData.rentPerDayPaise).toBe('string');
+      expect(stockData.rentPerDayPaise).toBe('1000');
+      expect(typeof stockData.depositPaise).toBe('string');
+      expect(stockData.depositPaise).toBe('50000');
+      expect(typeof stockData.overduePerDayPaise).toBe('string');
+      expect(stockData.overduePerDayPaise).toBe('200');
 
-      const unitData = lotData.units[0];
+      const unitData = stockData.units[0];
       expect(typeof unitData.buyingPricePaise).toBe('string');
       expect(unitData.buyingPricePaise).toBe('9876543');
       expect(typeof unitData.sellingPricePaise).toBe('string');
@@ -1018,41 +969,39 @@ describe('Vendors Module - /api/vendors', () => {
     it('should return null for optional price fields when not set', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_NullPrices' });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL011',
         totalPaidPaise: 100000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product8',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product8' });
 
-      // Create lot without rental fields
-      const lot = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
-        rentPerDayPaise: null,
-        depositPaise: null,
-        overduePerDayPaise: null,
+      // Create stock without rental fields
+      const stock = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: {
+          quantity: 10,
+          buyingPricePaise: 5000,
+          sellingPricePaise: 8000,
+          floorPricePaise: 7000,
+          channel: 'RETAIL',
+          rentPerDayPaise: null,
+          depositPaise: null,
+          overduePerDayPaise: null,
+        },
       });
 
       const colour = await db.Colour.create({ name: 'TEST_Yellow' });
       const size = await db.Size.create({ name: 'TEST_S' });
 
       const unit = await db.Unit.create({
-        stockIntakeLineId: lot.id,
+        stockId: stock.id,
         barcode: '444444444444',
         colourId: colour.id,
         sizeId: size.id,
-        status: 'IN_STOCK',
+        status: 'in_stock',
         channel: 'RETAIL',
         buyingPricePaise: 5000,
         sellingPricePaise: 8000,
@@ -1067,41 +1016,33 @@ describe('Vendors Module - /api/vendors', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.statusCode).toBe(200);
-      const lotData = res.body.data.trips[0].lines[0];
-      expect(lotData.rentPerDayPaise).toBeNull();
-      expect(lotData.depositPaise).toBeNull();
-      expect(lotData.overduePerDayPaise).toBeNull();
+      const stockData = res.body.data.trips[0].stocks[0];
+      expect(stockData.rentPerDayPaise).toBeNull();
+      expect(stockData.depositPaise).toBeNull();
+      expect(stockData.overduePerDayPaise).toBeNull();
 
-      const unitData = lotData.units[0];
+      const unitData = stockData.units[0];
       expect(unitData.rentPerDayPaise).toBeNull();
       expect(unitData.depositPaise).toBeNull();
       expect(unitData.overduePerDayPaise).toBeNull();
     });
 
-    it('should preserve unit prices unchanged from lot edit (AD-24)', async () => {
+    it('should preserve unit prices unchanged from stock edit (AD-24)', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_PriceDifference' });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL012',
         totalPaidPaise: 100000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product9',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product9' });
 
-      // Create lot with original prices
-      const lot = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
+      // Create stock with original prices
+      const stock = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 10, buyingPricePaise: 5000, sellingPricePaise: 8000, floorPricePaise: 7000, channel: 'RETAIL' },
       });
 
       const colour = await db.Colour.create({ name: 'TEST_Purple' });
@@ -1109,19 +1050,19 @@ describe('Vendors Module - /api/vendors', () => {
 
       // Unit created with original prices
       const unit = await db.Unit.create({
-        stockIntakeLineId: lot.id,
+        stockId: stock.id,
         barcode: '555555555555',
         colourId: colour.id,
         sizeId: size.id,
-        status: 'IN_STOCK',
+        status: 'in_stock',
         channel: 'RETAIL',
         buyingPricePaise: 5000,
         sellingPricePaise: 8000,
         floorPricePaise: 7000,
       });
 
-      // Edit the lot to change prices (Story 3.2)
-      await lot.update({
+      // Edit the stock to change prices (Story 3.2)
+      await stock.update({
         buyingPricePaise: 6000,
         sellingPricePaise: 9000,
         floorPricePaise: 8000,
@@ -1132,43 +1073,43 @@ describe('Vendors Module - /api/vendors', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.statusCode).toBe(200);
-      const lotData = res.body.data.trips[0].lines[0];
-      const unitData = lotData.units[0];
+      const stockData = res.body.data.trips[0].stocks[0];
+      const unitData = stockData.units[0];
 
       // Unit prices should remain at original intake values
       expect(unitData.buyingPricePaise).toBe('5000');
       expect(unitData.sellingPricePaise).toBe('8000');
       expect(unitData.floorPricePaise).toBe('7000');
 
-      // Lot prices should be updated
-      expect(lotData.buyingPricePaise).toBe('6000');
-      expect(lotData.sellingPricePaise).toBe('9000');
-      expect(lotData.floorPricePaise).toBe('8000');
+      // Stock prices should be updated
+      expect(stockData.buyingPricePaise).toBe('6000');
+      expect(stockData.sellingPricePaise).toBe('9000');
+      expect(stockData.floorPricePaise).toBe('8000');
 
       // Verify they differ (AD-24 assertion)
-      expect(unitData.buyingPricePaise).not.toBe(lotData.buyingPricePaise);
+      expect(unitData.buyingPricePaise).not.toBe(stockData.buyingPricePaise);
     });
 
     it('should return trips sorted by purchasedOn DESC (most recent first)', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_SortTrips' });
 
-      // Create trips in non-sorted order
-      const trip1 = await db.StockIntake.create({
-        vendorId: vendor.id,
+      // Create trip bills in non-sorted order
+      const { trip: trip1 } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-19',
         billReference: 'BILL013',
         totalPaidPaise: 50000,
       });
 
-      const trip2 = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip: trip2 } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-21',
         billReference: 'BILL014',
         totalPaidPaise: 75000,
       });
 
-      const trip3 = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip: trip3 } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL015',
         totalPaidPaise: 100000,
@@ -1187,43 +1128,30 @@ describe('Vendors Module - /api/vendors', () => {
       expect(res.body.data.trips[2].uuid).toBe(trip1.uuid);
     });
 
-    it('should return lots sorted by createdAt ASC (creation order)', async () => {
-      const vendor = await db.Vendor.create({ name: 'TEST_SortLots' });
+    it('should return stocks sorted by createdAt ASC (creation order)', async () => {
+      const vendor = await db.Vendor.create({ name: 'TEST_SortStocks' });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL016',
         totalPaidPaise: 100000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product10',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product10' });
 
-      // Create lots and capture their creation times
-      const lot1 = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
+      // Create stocks and capture their creation times
+      const stock1 = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 10, buyingPricePaise: 5000, sellingPricePaise: 8000, floorPricePaise: 7000, channel: 'RETAIL' },
       });
 
       // Add a slight delay to ensure different timestamps
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      const lot2 = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 5,
-        buyingPricePaise: 8000,
-        sellingPricePaise: 10000,
-        floorPricePaise: 9000,
-        channel: 'RETAIL',
+      const stock2 = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 5, buyingPricePaise: 8000, sellingPricePaise: 10000, floorPricePaise: 9000, channel: 'RETAIL' },
       });
 
       const res = await request(app)
@@ -1231,37 +1159,29 @@ describe('Vendors Module - /api/vendors', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.statusCode).toBe(200);
-      const lotDatas = res.body.data.trips[0].lines;
-      expect(lotDatas).toHaveLength(2);
+      const stockDatas = res.body.data.trips[0].stocks;
+      expect(stockDatas).toHaveLength(2);
 
-      // Should be sorted by createdAt ASC: lot1 first, then lot2
-      expect(lotDatas[0].uuid).toBe(lot1.uuid);
-      expect(lotDatas[1].uuid).toBe(lot2.uuid);
+      // Should be sorted by createdAt ASC: stock1 first, then stock2
+      expect(stockDatas[0].uuid).toBe(stock1.uuid);
+      expect(stockDatas[1].uuid).toBe(stock2.uuid);
     });
 
     it('should return units sorted by createdAt ASC (scan order)', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_SortUnits' });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL017',
         totalPaidPaise: 100000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product11',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product11' });
 
-      const lot = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
+      const stock = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 10, buyingPricePaise: 5000, sellingPricePaise: 8000, floorPricePaise: 7000, channel: 'RETAIL' },
       });
 
       const colour = await db.Colour.create({ name: 'TEST_Orange' });
@@ -1269,11 +1189,11 @@ describe('Vendors Module - /api/vendors', () => {
 
       // Create units and capture their creation times
       const unit1 = await db.Unit.create({
-        stockIntakeLineId: lot.id,
+        stockId: stock.id,
         barcode: '666666666666',
         colourId: colour.id,
         sizeId: size.id,
-        status: 'IN_STOCK',
+        status: 'in_stock',
         channel: 'RETAIL',
         buyingPricePaise: 5000,
         sellingPricePaise: 8000,
@@ -1284,11 +1204,11 @@ describe('Vendors Module - /api/vendors', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       const unit2 = await db.Unit.create({
-        stockIntakeLineId: lot.id,
+        stockId: stock.id,
         barcode: '777777777777',
         colourId: colour.id,
         sizeId: size.id,
-        status: 'IN_STOCK',
+        status: 'in_stock',
         channel: 'RETAIL',
         buyingPricePaise: 5000,
         sellingPricePaise: 8000,
@@ -1300,7 +1220,7 @@ describe('Vendors Module - /api/vendors', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.statusCode).toBe(200);
-      const unitDatas = res.body.data.trips[0].lines[0].units;
+      const unitDatas = res.body.data.trips[0].stocks[0].units;
       expect(unitDatas).toHaveLength(2);
 
       // Should be sorted by createdAt ASC: unit1 first, then unit2
@@ -1311,37 +1231,29 @@ describe('Vendors Module - /api/vendors', () => {
     it('should not expose internal id fields', async () => {
       const vendor = await db.Vendor.create({ name: 'TEST_NoInternalId' });
 
-      const trip = await db.StockIntake.create({
-        vendorId: vendor.id,
+      const { trip, tripVendor } = await createTripWithVendor({
+        vendor,
         purchasedOn: '2026-08-20',
         billReference: 'BILL018',
         totalPaidPaise: 100000,
       });
 
-      const productType = await db.ProductType.create({
-        name: 'TEST_Product12',
-        category: 'TEST_Category',
-      });
+      const productType = await db.ProductType.create({ name: 'TEST_Product12' });
 
-      const lot = await db.StockIntakeLine.create({
-        stockIntakeId: trip.id,
-        productTypeId: productType.id,
-        quantity: 10,
-        buyingPricePaise: 5000,
-        sellingPricePaise: 8000,
-        floorPricePaise: 7000,
-        channel: 'RETAIL',
+      const stock = await createTestStock({
+        trip, tripVendor, vendor, productType,
+        overrides: { quantity: 10, buyingPricePaise: 5000, sellingPricePaise: 8000, floorPricePaise: 7000, channel: 'RETAIL' },
       });
 
       const colour = await db.Colour.create({ name: 'TEST_Pink' });
       const size = await db.Size.create({ name: 'TEST_3XL' });
 
       const unit = await db.Unit.create({
-        stockIntakeLineId: lot.id,
+        stockId: stock.id,
         barcode: '888888888888',
         colourId: colour.id,
         sizeId: size.id,
-        status: 'IN_STOCK',
+        status: 'in_stock',
         channel: 'RETAIL',
         buyingPricePaise: 5000,
         sellingPricePaise: 8000,
@@ -1362,13 +1274,13 @@ describe('Vendors Module - /api/vendors', () => {
       expect(tripData).not.toHaveProperty('id');
       expect(tripData).toHaveProperty('uuid');
 
-      const lotData = tripData.lines[0];
-      expect(lotData).not.toHaveProperty('id');
-      expect(lotData).toHaveProperty('uuid');
-      expect(lotData).not.toHaveProperty('productTypeId');
-      expect(lotData).toHaveProperty('productTypeUuid');
+      const stockData = tripData.stocks[0];
+      expect(stockData).not.toHaveProperty('id');
+      expect(stockData).toHaveProperty('uuid');
+      expect(stockData).not.toHaveProperty('productTypeId');
+      expect(stockData).toHaveProperty('productTypeUuid');
 
-      const unitData = lotData.units[0];
+      const unitData = stockData.units[0];
       expect(unitData).not.toHaveProperty('id');
       expect(unitData).toHaveProperty('uuid');
       expect(unitData).not.toHaveProperty('colourId');
