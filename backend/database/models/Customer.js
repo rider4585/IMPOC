@@ -1,8 +1,8 @@
 import { DataTypes } from 'sequelize';
 
 export default (sequelize) => {
-    const Sale = sequelize.define(
-        'Sale',
+    const Customer = sequelize.define(
+        'Customer',
         {
             id: {
                 type: DataTypes.INTEGER,
@@ -17,47 +17,29 @@ export default (sequelize) => {
                 unique: true,
             },
 
-            saleNumber: {
-                type: DataTypes.STRING(20),
-                field: 'sale_number',
-                allowNull: false,
-                unique: true,
-            },
-
-            customerName: {
+            name: {
                 type: DataTypes.STRING(255),
-                field: 'customer_name',
-                allowNull: true,
+                allowNull: false,
             },
 
-            customerMobile: {
+            phone: {
                 type: DataTypes.STRING(30),
-                field: 'customer_mobile',
                 allowNull: true,
             },
 
-            customerId: {
-                type: DataTypes.INTEGER,
-                field: 'customer_id',
+            email: {
+                type: DataTypes.STRING(255),
                 allowNull: true,
             },
 
-            soldAt: {
+            dob: {
                 type: DataTypes.DATEONLY,
-                field: 'sold_at',
-                allowNull: false,
+                allowNull: true,
             },
 
-            totalPaise: {
-                type: DataTypes.BIGINT,
-                field: 'total_paise',
-                allowNull: false,
-            },
-
-            status: {
-                type: DataTypes.STRING(20),
-                allowNull: false,
-                defaultValue: 'completed',
+            address: {
+                type: DataTypes.TEXT,
+                allowNull: true,
             },
 
             notes: {
@@ -65,9 +47,37 @@ export default (sequelize) => {
                 allowNull: true,
             },
 
-            createdBy: {
-                type: DataTypes.INTEGER,
-                field: 'created_by',
+            consentWhatsapp: {
+                type: DataTypes.BOOLEAN,
+                field: 'consent_whatsapp',
+                allowNull: false,
+                defaultValue: false,
+            },
+
+            consentEmail: {
+                type: DataTypes.BOOLEAN,
+                field: 'consent_email',
+                allowNull: false,
+                defaultValue: false,
+            },
+
+            consentSms: {
+                type: DataTypes.BOOLEAN,
+                field: 'consent_sms',
+                allowNull: false,
+                defaultValue: false,
+            },
+
+            consentWhatsappGroup: {
+                type: DataTypes.BOOLEAN,
+                field: 'consent_whatsapp_group',
+                allowNull: false,
+                defaultValue: false,
+            },
+
+            consentRecordedAt: {
+                type: DataTypes.DATE,
+                field: 'consent_recorded_at',
                 allowNull: true,
             },
 
@@ -88,12 +98,12 @@ export default (sequelize) => {
             },
         },
         {
-            tableName: 'sales',
+            tableName: 'customers',
             timestamps: true,
             underscored: true,
             paranoid: true,
         }
     );
 
-    return Sale;
+    return Customer;
 };

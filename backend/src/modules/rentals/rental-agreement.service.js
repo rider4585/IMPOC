@@ -5,11 +5,33 @@ import {
     RentalReversal,
     Unit,
     DamageGrade,
+    Customer,
     sequelize,
 } from '../../../database/models/index.js';
 import { transitionUnit } from '../units/units.service.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { DAMAGE_GRADE_OUTCOMES } from '../../constants/damage-grade-outcome.js';
+
+/**
+ * Resolve a linked customer by uuid (if supplied).
+ * @returns {Promise<{id: number, name: string, phone: string, email: string}|null>}
+ */
+async function resolveCustomer(customerUuid, transaction) {
+    if (!customerUuid) {
+        return null;
+    }
+    const customer = await Customer.findOne({
+        where: { uuid: customerUuid, deletedAt: null },
+        attributes: ['id', 'name', 'phone', 'email'],
+        transaction,
+    });
+    if (!customer) {
+        const error = new Error('Customer not found');
+        error.statusCode = 404;
+        throw error;
+    }
+    return customer;
+}
 
 // Default hand-out period when no rentalDays is supplied. Due date is derived
 // from this + start date; it is never stored as a mutable field.
@@ -89,10 +111,17 @@ async function resolveRentableUnit({ unitUuid, barcode }, transaction) {
 }
 
 function mapAgreementDTO(agreement, lines = [], returns = [], reversals = []) {
+    const customer = agreement.customer && agreement.customer.deletedAt === null
+        ? { name: agreement.customer.name, phone: agreement.customer.phone, email: agreement.customer.email }
+        : null;
+
     return {
         uuid: agreement.uuid,
         agreementNumber: agreement.agreementNumber,
         customerName: agreement.customerName,
+        customerMobile: agreement.customerMobile,
+        customerId: agreement.customerId,
+        customer,
         startDate: agreement.startDate,
         dueDate: agreement.dueDate,
         depositRefundablePaise: String(agreement.depositRefundablePaise),
@@ -146,10 +175,10 @@ function mapAgreementDTO(agreement, lines = [], returns = [], reversals = []) {
  * transitions each unit in_stock -> rented (HAND_OVER), and computes due_date
  * from start_date + rental period, all inside one transaction.
  *
- * @param {Object} params - { customerName, startDate, rentalDays, notes, items, actorUserId }
+ * @param {Object} params - { customerName, customerUuid, startDate, rentalDays, notes, items, actorUserId }
  * @returns {Object} agreement DTO
  */
-export const createRental = async ({ customerName, startDate, rentalDays, notes, items, actorUserId }) => {
+export const createRental = async ({ customerName, customerUuid, startDate, rentalDays, notes, items, actorUserId }) => {
     const transaction = await sequelize.transaction();
     try {
         const units = [];
@@ -158,6 +187,8 @@ export const createRental = async ({ customerName, startDate, rentalDays, notes,
             const unit = await resolveRentableUnit(item, transaction);
             units.push(unit);
         }
+
+        const linkedCustomer = await resolveCustomer(customerUuid, transaction);
 
         const start = startDate || new Date().toISOString().split('T')[0];
         const days = rentalDays || DEFAULT_RENTAL_DAYS;
@@ -170,7 +201,9 @@ export const createRental = async ({ customerName, startDate, rentalDays, notes,
         const agreement = await RentalAgreement.create(
             {
                 agreementNumber,
-                customerName: customerName || null,
+                customerName: linkedCustomer ? linkedCustomer.name : (customerName || null),
+                customerMobile: linkedCustomer ? linkedCustomer.phone : null,
+                customerId: linkedCustomer ? linkedCustomer.id : null,
                 startDate: start,
                 dueDate: due,
                 depositRefundablePaise,
@@ -216,6 +249,7 @@ export const createRental = async ({ customerName, startDate, rentalDays, notes,
         const fullAgreement = await RentalAgreement.findByPk(agreement.id, {
             include: [
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }, { association: 'returns' }] },
+                { association: 'customer' },
                 { association: 'returns' },
                 { association: 'reversals' },
             ],
@@ -237,6 +271,7 @@ export const listRentals = async () => {
         order: [['createdAt', 'DESC']],
         include: [
             { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }, { association: 'returns' }] },
+            { association: 'customer' },
             { association: 'returns' },
             { association: 'reversals' },
         ],
@@ -255,6 +290,7 @@ export const getRentalByUuid = async (uuid) => {
         where: { uuid, deletedAt: null },
         include: [
             { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }, { association: 'returns' }] },
+            { association: 'customer' },
             { association: 'returns' },
             { association: 'reversals' },
         ],
@@ -431,6 +467,7 @@ export const processRentalReturn = async ({ uuid, actualReturnDate, items, actor
         const fullAgreement = await RentalAgreement.findByPk(agreement.id, {
             include: [
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }, { association: 'returns' }] },
+                { association: 'customer' },
                 { association: 'returns' },
                 { association: 'reversals' },
             ],
@@ -507,6 +544,7 @@ export const cancelRental = async ({ uuid, reason, actorUserId }) => {
         const fullAgreement = await RentalAgreement.findByPk(agreement.id, {
             include: [
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }, { association: 'returns' }] },
+                { association: 'customer' },
                 { association: 'returns' },
                 { association: 'reversals' },
             ],
@@ -517,4 +555,65 @@ export const cancelRental = async ({ uuid, reason, actorUserId }) => {
         await transaction.rollback();
         throw error;
     }
+};
+
+/**
+ * Update an agreement's linkable fields: link/unlink a customer (customerUuid)
+ * and optionally refresh snapshot contact fields. Financial fields are never mutable.
+ *
+ * @param {Object} params - { uuid, payload: { customerUuid, customerName, notes } }
+ * @returns {Object} agreement DTO
+ */
+export const patchRental = async ({ uuid, payload }) => {
+    const agreement = await RentalAgreement.findOne({
+        where: { uuid, deletedAt: null },
+        include: [
+            { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }, { association: 'returns' }] },
+            { association: 'returns' },
+            { association: 'reversals' },
+        ],
+    });
+
+    if (!agreement) {
+        const error = new Error('Rental agreement not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const updates = {};
+
+    if (payload.customerName !== undefined) {
+        updates.customerName = payload.customerName === null ? null : payload.customerName;
+    }
+
+    if (payload.notes !== undefined) {
+        updates.notes = payload.notes === null ? null : payload.notes;
+    }
+
+    if (payload.customerUuid !== undefined) {
+        if (payload.customerUuid === null) {
+            // Explicitly unlink; keep snapshot contact fields for backward compat
+            updates.customerId = null;
+        } else {
+            const linkedCustomer = await resolveCustomer(payload.customerUuid);
+            updates.customerId = linkedCustomer.id;
+            updates.customerName = linkedCustomer.name;
+            updates.customerMobile = linkedCustomer.phone;
+        }
+    }
+
+    if (Object.keys(updates).length > 0) {
+        await agreement.update(updates);
+    }
+
+    const fullAgreement = await RentalAgreement.findByPk(agreement.id, {
+        include: [
+            { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }, { association: 'returns' }] },
+            { association: 'customer' },
+            { association: 'returns' },
+            { association: 'reversals' },
+        ],
+    });
+
+    return mapAgreementDTO(fullAgreement, fullAgreement.lines, fullAgreement.returns, fullAgreement.reversals);
 };

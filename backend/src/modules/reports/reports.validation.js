@@ -19,3 +19,10 @@ export const expensesQuerySchema = z.object({
     to: isoDate,
     category: z.string().trim().max(100).optional(),
 });
+
+/**
+ * Query schema for the stock-levels report: optional low-stock threshold.
+ */
+export const stockLevelsQuerySchema = z.object({
+    lowStockThreshold: z.coerce.number().int().min(0).optional(),
+});

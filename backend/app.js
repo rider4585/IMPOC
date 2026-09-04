@@ -20,6 +20,9 @@ import salesRoutes from './src/modules/sales/sales.routes.js';
 import rentalRoutes from './src/modules/rentals/rental-agreement.routes.js';
 import expensesRoutes from './src/modules/expenses/expenses.routes.js';
 import reportsRoutes from './src/modules/reports/reports.routes.js';
+import customerRoutes from './src/modules/customers/customers.routes.js';
+import deliveryRoutes from './src/modules/delivery/delivery.routes.js';
+import receiptRoutes from './src/modules/receipts/receipts.routes.js';
 import errorMiddleware from './src/middleware/error.middleware.js';
 
 const app = express();
@@ -70,6 +73,9 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/rentals', rentalRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/delivery', deliveryRoutes);
+app.use('/api/receipts', receiptRoutes);
 
 app.use(errorMiddleware);
 
