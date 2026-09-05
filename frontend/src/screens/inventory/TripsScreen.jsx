@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Dialog, useToast } from '../../components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Dialog, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrips, createTrip } from '../../services/tripsApi.js';
 import { getVendors } from '../../services/vendorsApi.js';
 import { formatPaise } from '../../platform/money.js';
-import { parseRupeesToPaise } from '../../platform/moneyInput.js';
 
 function todayISO() {
   const d = new Date();
@@ -32,7 +31,7 @@ export function TripsScreen() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ vendorUuid: '', purchasedOn: todayISO(), billReference: '', totalPaidPaise: '' });
+  const [form, setForm] = useState({ name: '', purchasedOn: todayISO(), notes: '' });
   const [formError, setFormError] = useState('');
 
   const vendorName = useCallback(
@@ -45,6 +44,7 @@ export function TripsScreen() {
 
   const tripLabel = useCallback(
     (t) => {
+      if (t.name) return t.name;
       const firstTv = Array.isArray(t.trip_vendors) ? t.trip_vendors[0] : null;
       const name = firstTv?.vendor?.name || vendorName(t.vendorUuid);
       const extra = Array.isArray(t.trip_vendors) && t.trip_vendors.length > 1
@@ -87,21 +87,20 @@ export function TripsScreen() {
   const handleCreateTrip = async (e) => {
     e.preventDefault();
     setFormError('');
-    if (!form.vendorUuid) { setFormError('Please select a vendor.'); return; }
+    const name = form.name.trim();
+    if (!name) { setFormError('Please enter a trip name.'); return; }
     if (!form.purchasedOn) { setFormError('Please choose a purchase date.'); return; }
-    const totalPaidPaise = parseRupeesToPaise(form.totalPaidPaise);
-    if (Number.isNaN(totalPaidPaise)) { setFormError('Total paid must be a valid rupee amount.'); return; }
     setSaving(true);
     try {
       const created = await createTrip({
-        vendorUuid: form.vendorUuid,
+        name,
         purchasedOn: form.purchasedOn,
-        billReference: form.billReference.trim() || null,
-        totalPaidPaise,
+        notes: form.notes.trim() || null,
+        vendors: [],
       });
       toast.success({ title: 'Trip created' });
       setFormOpen(false);
-      setForm({ vendorUuid: '', purchasedOn: todayISO(), billReference: '', totalPaidPaise: '' });
+      setForm({ name: '', purchasedOn: todayISO(), notes: '' });
       if (created?.uuid) {
         navigate(`/trips/${created.uuid}`);
       } else {
@@ -121,6 +120,8 @@ export function TripsScreen() {
       </div>
     );
   }
+
+  const canSubmitCreate = form.name.trim().length > 0 && !!form.purchasedOn;
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
@@ -203,20 +204,14 @@ export function TripsScreen() {
         footer={
           <>
             <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancel</Button>
-            <Button type="submit" form="trip-create-form" loading={saving}>Create trip</Button>
+            <Button type="submit" form="trip-create-form" loading={saving} disabled={!canSubmitCreate}>Create trip</Button>
           </>
         }
       >
         <form id="trip-create-form" onSubmit={handleCreateTrip} className="flex flex-col gap-4">
-          <Select label="Vendor" value={form.vendorUuid} onChange={set('vendorUuid')} required>
-            <option value="">Select a vendor…</option>
-            {vendors.filter((v) => v.isActive !== false).map((v) => (
-              <option key={v.uuid} value={v.uuid}>{v.name}</option>
-            ))}
-          </Select>
+          <Input label="Trip name" value={form.name} onChange={set('name')} placeholder="e.g. Delhi Akshardham trip" required maxLength={200} autoFocus />
           <Input label="Purchased on" type="date" value={form.purchasedOn} onChange={set('purchasedOn')} required />
-          <Input label="Bill reference" value={form.billReference} onChange={set('billReference')} placeholder="Optional" maxLength={100} />
-          <Input label="Total paid (₹)" value={form.totalPaidPaise} onChange={set('totalPaidPaise')} placeholder="e.g. 14400" inputMode="decimal" hint="Enter in rupees; stored as whole paise." />
+          <Input label="Notes" value={form.notes} onChange={set('notes')} placeholder="Optional" maxLength={2000} />
           {formError && (
             <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{formError}</div>
           )}

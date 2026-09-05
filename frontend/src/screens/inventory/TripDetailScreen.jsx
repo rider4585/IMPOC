@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Dialog
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrip, getStocks, cloneLastStock, addTripVendor } from '../../services/tripsApi.js';
-import { getVendors } from '../../services/vendorsApi.js';
+import { getVendors, createVendor } from '../../services/vendorsApi.js';
 import { getProductTypes } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { parseRupeesToPaise } from '../../platform/moneyInput.js';
@@ -26,7 +26,10 @@ export function TripDetailScreen() {
   const [error, setError] = useState('');
 
   const [addVendorOpen, setAddVendorOpen] = useState(false);
-  const [vendorForm, setVendorForm] = useState({ vendorUuid: '', billReference: '', totalPaidPaise: '' });
+  const [vendorMode, setVendorMode] = useState('existing'); // 'existing' | 'new'
+  const [vendorQuery, setVendorQuery] = useState('');
+  const [vendorForm, setVendorForm] = useState({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '' });
+  const [newVendor, setNewVendor] = useState({ name: '', address: '', phone: '' });
   const [vendorFormError, setVendorFormError] = useState('');
   const [savingVendor, setSavingVendor] = useState(false);
 
@@ -39,8 +42,9 @@ export function TripDetailScreen() {
     const map = new Map();
     tripVendors.forEach((tv) => {
       const v = tv.vendor || {};
-      if (v.uuid) map.set(v.uuid, v.name || 'Vendor');
-      if (tv.vendorUuid) map.set(tv.vendorUuid, v.name || 'Vendor');
+      const name = tv.vendorName || v.name;
+      if (v.uuid) map.set(v.uuid, name || 'Vendor');
+      if (tv.vendorUuid) map.set(tv.vendorUuid, name || 'Vendor');
     });
     return map;
   }, [tripVendors]);
@@ -57,7 +61,9 @@ export function TripDetailScreen() {
     try {
       const data = await getTrip(tripUuid);
       setTrip(data);
-      const tv = Array.isArray(data?.trip_vendors) ? data.trip_vendors : [];
+      const tv = Array.isArray(data?.vendors)
+        ? data.vendors
+        : Array.isArray(data?.trip_vendors) ? data.trip_vendors : [];
       if (tv.length > 0) {
         setTripVendors(tv);
       } else if (data?.vendorUuid) {
@@ -109,25 +115,48 @@ export function TripDetailScreen() {
   const handleAddVendor = async (e) => {
     e.preventDefault();
     setVendorFormError('');
-    if (!vendorForm.vendorUuid) {
-      setVendorFormError('Please select a vendor.');
-      return;
+
+    let vendorUuid = vendorForm.vendorUuid;
+    if (vendorMode === 'existing') {
+      if (!vendorUuid) {
+        setVendorFormError('Please select a vendor.');
+        return;
+      }
+    } else {
+      if (!newVendor.name.trim()) {
+        setVendorFormError('Please enter the vendor name.');
+        return;
+      }
     }
+
     const totalPaidPaise = parseRupeesToPaise(vendorForm.totalPaidPaise);
     if (Number.isNaN(totalPaidPaise)) {
       setVendorFormError('Total paid must be a valid rupee amount.');
       return;
     }
+
     setSavingVendor(true);
     try {
+      if (vendorMode === 'new') {
+        const created = await createVendor({
+          name: newVendor.name.trim(),
+          phone: newVendor.phone.trim() || undefined,
+          address: newVendor.address.trim() || undefined,
+        });
+        vendorUuid = created.uuid;
+        setVendors((prev) => [...prev.filter((v) => v.uuid !== created.uuid), created]);
+      }
       await addTripVendor(tripUuid, {
-        vendorUuid: vendorForm.vendorUuid,
+        vendorUuid,
         billReference: vendorForm.billReference.trim() || null,
         totalPaidPaise,
+        notes: vendorForm.notes.trim() || null,
       });
       toast.success({ title: 'Vendor added' });
       setAddVendorOpen(false);
-      setVendorForm({ vendorUuid: '', billReference: '', totalPaidPaise: '' });
+      setVendorForm({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '' });
+      setNewVendor({ name: '', address: '', phone: '' });
+      setVendorQuery('');
       await loadTrip();
     } catch (err) {
       setVendorFormError(err.message);
@@ -138,14 +167,47 @@ export function TripDetailScreen() {
 
   const openAddVendor = () => {
     const existing = new Set(tripVendors.map((tv) => tv.vendor?.uuid || tv.vendorUuid).filter(Boolean));
-    setVendorForm({ vendorUuid: '', billReference: '', totalPaidPaise: '' });
+    setVendorForm({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '' });
+    setNewVendor({ name: '', address: '', phone: '' });
+    setVendorQuery('');
     setVendorFormError('');
+    setVendorMode('existing');
     setAddVendorOpen(true);
     const available = vendors.filter((v) => v.isActive !== false && !existing.has(v.uuid));
     if (available.length === 1) {
       setVendorForm((f) => ({ ...f, vendorUuid: available[0].uuid }));
     }
   };
+
+  const stockByVendorGroups = useMemo(() => {
+    const groups = [];
+    tripVendors.forEach((tv) => {
+      const key = tv.vendor?.uuid || tv.vendorUuid;
+      if (!key) return;
+      groups.push({ key, name: vendorName(key), stocks: [] });
+    });
+    const byKey = new Map(groups.map((g) => [g.key, g]));
+    stocks.forEach((stock) => {
+      const key = stock.vendorUuid || '';
+      const group = byKey.get(key);
+      if (group) group.stocks.push(stock);
+      else {
+        if (!byKey.has('__unknown')) {
+          byKey.set('__unknown', { key: '__unknown', name: '—', stocks: [] });
+          groups.push(byKey.get('__unknown'));
+        }
+        byKey.get('__unknown').stocks.push(stock);
+      }
+    });
+    return groups.filter((g) => g.stocks.length > 0 || (g.key && g.key !== '__unknown'));
+  }, [tripVendors, stocks, vendorName]);
+
+  const totalStockCost = useMemo(
+    () => stocks.reduce((sum, stock) => sum + (Number(stock.quantity) * Number(stock.buyingPricePaise)), 0),
+    [stocks]
+  );
+
+  const setNewV = (key) => (e) => setNewVendor((f) => ({ ...f, [key]: e.target.value }));
 
   if (!can(PERMISSIONS.INVENTORY.VIEW)) {
     return (
@@ -176,30 +238,7 @@ export function TripDetailScreen() {
   const existingVendorUuids = new Set(tripVendors.map((tv) => tv.vendor?.uuid || tv.vendorUuid).filter(Boolean));
   const availableVendors = vendors.filter((v) => v.isActive !== false && !existingVendorUuids.has(v.uuid));
 
-  const stocksByVendor = useMemo(() => {
-    const groups = [];
-    tripVendors.forEach((tv) => {
-      const key = tv.vendor?.uuid || tv.vendorUuid;
-      if (!key) return;
-      groups.push({ key, name: vendorName(key), stocks: [] });
-    });
-    const byKey = new Map(groups.map((g) => [g.key, g]));
-    stocks.forEach((stock) => {
-      const key = stock.vendorUuid || '';
-      const group = byKey.get(key);
-      if (group) group.stocks.push(stock);
-      else {
-        if (!byKey.has('__unknown')) {
-          byKey.set('__unknown', { key: '__unknown', name: '—', stocks: [] });
-          groups.push(byKey.get('__unknown'));
-        }
-        byKey.get('__unknown').stocks.push(stock);
-      }
-    });
-    return groups.filter((g) => g.stocks.length > 0 || (g.key && g.key !== '__unknown'));
-  }, [tripVendors, stocks, vendorName]);
-
-  const totalStockCost = stocks.reduce((sum, stock) => sum + (Number(stock.quantity) * Number(stock.buyingPricePaise)), 0);
+  const stocksByVendor = stockByVendorGroups;
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
@@ -207,11 +246,11 @@ export function TripDetailScreen() {
         <div>
           <Button variant="ghost" size="sm" onClick={() => navigate('/trips')}>&larr; All trips</Button>
           <h1 className="typography-heading mb-1 mt-1">
-            Trip &middot; {new Date(trip.purchasedOn).toLocaleDateString()}
+            {trip.name || `Trip`} &middot; {new Date(trip.purchasedOn).toLocaleDateString()}
             {tripVendors.length > 0 && <span className="text-[var(--ink-muted)]"> &middot; {tripVendors.length} vendor{tripVendors.length > 1 ? 's' : ''}</span>}
           </h1>
           <p className="typography-body-sm text-[var(--ink-muted)]">
-            {trip.billReference || 'No bill reference'} &middot; Paid {formatPaise(Number(trip.totalPaidPaise))}
+            Paid {formatPaise(Number(trip.totalPaidPaise))}
           </p>
         </div>
         {canCreate && (
@@ -377,12 +416,60 @@ export function TripDetailScreen() {
         }
       >
         <form id="add-vendor-form" onSubmit={handleAddVendor} className="flex flex-col gap-4">
-          <Select label="Vendor" value={vendorForm.vendorUuid} onChange={(e) => setVendorForm((f) => ({ ...f, vendorUuid: e.target.value }))} required>
-            <option value="">Select a vendor…</option>
-            {availableVendors.map((v) => (
-              <option key={v.uuid} value={v.uuid}>{v.name}</option>
-            ))}
-          </Select>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={vendorMode === 'existing' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setVendorMode('existing')}
+              data-testid="existing-vendor-tab"
+            >
+              Existing vendor
+            </Button>
+            <Button
+              type="button"
+              variant={vendorMode === 'new' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setVendorMode('new')}
+              data-testid="new-vendor-tab"
+            >
+              New vendor
+            </Button>
+          </div>
+
+          {vendorMode === 'existing' ? (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[var(--ink)]">Search vendor</label>
+                <Input
+                  value={vendorQuery}
+                  onChange={(e) => setVendorQuery(e.target.value)}
+                  placeholder="Search by name…"
+                  autoComplete="off"
+                />
+                <Select
+                  label="Vendor"
+                  value={vendorForm.vendorUuid}
+                  onChange={(e) => setVendorForm((f) => ({ ...f, vendorUuid: e.target.value }))}
+                  required
+                >
+                  <option value="">Select a vendor…</option>
+                  {availableVendors
+                    .filter((v) => !vendorQuery || v.name.toLowerCase().includes(vendorQuery.toLowerCase()))
+                    .map((v) => (
+                      <option key={v.uuid} value={v.uuid}>{v.name}</option>
+                    ))}
+                </Select>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              <Input label="Name" value={newVendor.name} onChange={setNewV('name')} placeholder="Vendor name" required autoFocus />
+              <Input label="Contact number" value={newVendor.phone} onChange={setNewV('phone')} placeholder="Phone number" inputMode="tel" />
+              <Input label="Address" value={newVendor.address} onChange={setNewV('address')} placeholder="Address" />
+            </div>
+          )}
+
           <Input
             label="Bill reference"
             value={vendorForm.billReference}
@@ -397,6 +484,13 @@ export function TripDetailScreen() {
             placeholder="e.g. 14400"
             inputMode="decimal"
             hint="Enter in rupees; stored as whole paise."
+          />
+          <Input
+            label="Notes"
+            value={vendorForm.notes}
+            onChange={(e) => setVendorForm((f) => ({ ...f, notes: e.target.value }))}
+            placeholder="Optional"
+            maxLength={2000}
           />
           {vendorFormError && (
             <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{vendorFormError}</div>
