@@ -11,6 +11,8 @@ import StockForm from './screens/inventory/StockForm';
 import StockIntake from './screens/inventory/StockIntake';
 import TemplateForm from './screens/inventory/TemplateForm';
 import VendorDetail from './screens/inventory/VendorDetail';
+import StocksScreen from './screens/inventory/StocksScreen';
+import UnitsScreen from './screens/inventory/UnitsScreen';
 
 /**
  * App.jsx — top-level router and auth setup
@@ -80,6 +82,8 @@ function App() {
                 <Route path="/trips/:tripUuid/stocks/new" element={<StockForm />} />
                 <Route path="/trips/:tripUuid/stocks/:stockUuid/scan" element={<StockIntake />} />
                 <Route path="/trips/:tripUuid/templates" element={<TemplateForm />} />
+                <Route path="/stocks" element={<StocksScreen />} />
+                <Route path="/units" element={<UnitsScreen />} />
 
                 {/* Nested vendor detail route */}
                 <Route path="/vendors/:uuid" element={<VendorDetail />} />

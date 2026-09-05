@@ -28,6 +28,8 @@ export const TRIP_ROUTES = {
 
 // Stock endpoints (the per-vendor buying unit of a trip), mounted under /trips/:tripUuid/stocks
 export const STOCK_ROUTES = {
+  /** GET /stocks - List ALL stocks (bare list-all; ?tripUuid, ?vendorUuid, ?search) */
+  LIST_ALL: '/stocks',
   /** GET /trips/{tripUuid}/stocks - List stocks for a trip */
   LIST: (tripUuid) => `/trips/${encodeURIComponent(tripUuid)}/stocks`,
   /** POST /trips/{tripUuid}/stocks - Create a stock (for one of the trip's vendors) */
@@ -99,6 +101,8 @@ export const EXPENSE_ROUTES = {
 
 // Unit endpoints
 export const UNIT_ROUTES = {
+  /** GET /units - List ALL units (bare list-all; ?search, ?status, ?stockUuid) */
+  LIST: '/units',
   /** GET /units/by-barcode/{barcode} - Get a unit by its barcode */
   BY_BARCODE: (barcode) => `/units/by-barcode/${encodeURIComponent(barcode)}`,
   /** GET /units/{uuid} - Get a unit by uuid */

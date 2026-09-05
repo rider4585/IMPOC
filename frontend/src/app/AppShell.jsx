@@ -25,6 +25,8 @@ import {
   ListChecks,
   Settings,
   Layers,
+  Package,
+  Tags,
 } from 'lucide-react';
 
 const iconClass = 'h-4 w-4';
@@ -50,6 +52,8 @@ const ICONS = {
   picklists: <ListChecks {...iconProps} />,
   customers: <Users {...iconProps} />,
   dashboardItem: <Layers {...iconProps} />,
+  stocks: <Package {...iconProps} />,
+  units: <Tags {...iconProps} />,
 };
 
 function iconFor(name) {
@@ -59,6 +63,8 @@ function iconFor(name) {
 const itemIcon = {
   '/trips': 'intake',
   '/vendors': 'vendors',
+  '/stocks': 'stocks',
+  '/units': 'units',
   '/barcode-sheets': 'barcode',
   '/pos': 'cart',
   '/sales': 'sales',

@@ -111,6 +111,27 @@ export async function cloneLastStock(tripUuid) {
 }
 
 /**
+ * GET /stocks (bare list-all)
+ * @param {Object} [query] - {tripUuid?, vendorUuid?, search?}
+ * @returns {Promise<Array>} list of stock DTOs ordered newest-first
+ */
+export async function listAllStocks({ tripUuid = '', vendorUuid = '', search = '' } = {}) {
+  try {
+    const params = {};
+    if (tripUuid) params.tripUuid = tripUuid;
+    if (vendorUuid) params.vendorUuid = vendorUuid;
+    if (search) params.search = search;
+    const response = await apiClient.get(STOCK_ROUTES.LIST_ALL, { params });
+    if (response.data?.success) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to fetch stocks');
+  } catch (error) {
+    throw buildError(error, 'Failed to fetch stocks');
+  }
+}
+
+/**
  * GET /trips/:tripUuid/stocks
  * @param {string} tripUuid
  * @returns {Promise<Array>} list of stock DTOs

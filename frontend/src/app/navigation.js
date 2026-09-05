@@ -9,6 +9,8 @@ import TripsScreen from '../screens/inventory/TripsScreen';
 import TripDetailScreen from '../screens/inventory/TripDetailScreen';
 import StockForm from '../screens/inventory/StockForm';
 import StockIntake from '../screens/inventory/StockIntake';
+import StocksScreen from '../screens/inventory/StocksScreen';
+import UnitsScreen from '../screens/inventory/UnitsScreen';
 import VendorDetail from '../screens/inventory/VendorDetail';
 import POSScreen from '../screens/pos/POSScreen';
 import SalesListScreen from '../screens/pos/SalesListScreen';
@@ -35,6 +37,8 @@ export const navigationRegistry = [
   { permission: PERMISSIONS.PICKLISTS.VIEW, label: 'Picklists', path: '/picklists', element: PicklistManagementScreen },
   { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Vendors', path: '/vendors', element: VendorsScreen },
   { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Trips', path: '/trips', element: TripsScreen },
+  { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Stocks', path: '/stocks', element: StocksScreen },
+  { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Units', path: '/units', element: UnitsScreen },
   { permission: PERMISSIONS.SALES.CREATE, label: 'POS', path: '/pos', element: POSScreen },
   { permission: PERMISSIONS.SALES.VIEW, label: 'Sales', path: '/sales', element: SalesListScreen },
   { permission: PERMISSIONS.RENTALS.VIEW, label: 'Rentals', path: '/rentals', element: RentalsScreen },
@@ -59,6 +63,8 @@ export const navigationSections = [
     items: [
       { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Trips', path: '/trips' },
       { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Vendors', path: '/vendors' },
+      { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Stocks', path: '/stocks' },
+      { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Units', path: '/units' },
       { permission: PERMISSIONS.INVENTORY.BARCODE_GENERATE, label: 'Print labels', path: '/barcode-sheets' },
     ],
   },

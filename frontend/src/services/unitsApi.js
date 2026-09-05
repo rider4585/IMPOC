@@ -19,6 +19,27 @@ function buildError(error, fallback) {
 }
 
 /**
+ * GET /units (bare list-all)
+ * @param {Object} [query] - {search?, status?, stockUuid?}
+ * @returns {Promise<Array>} list of unit DTOs
+ */
+export async function listAllUnits({ search = '', status = '', stockUuid = '' } = {}) {
+  try {
+    const params = {};
+    if (search) params.search = search;
+    if (status) params.status = status;
+    if (stockUuid) params.stockUuid = stockUuid;
+    const response = await apiClient.get(UNIT_ROUTES.LIST, { params });
+    if (response.data?.success) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to fetch units');
+  } catch (error) {
+    throw buildError(error, 'Failed to fetch units');
+  }
+}
+
+/**
  * GET /units/by-barcode/:barcode
  * @param {string} barcode
  * @returns {Promise<Object|null>} unit DTO, or null when not found (404)
