@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Dialog, useToast } from '../../components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Dialog, SearchableSelect, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrip, getStocks, cloneLastStock, addTripVendor } from '../../services/tripsApi.js';
@@ -8,6 +8,8 @@ import { getVendors, createVendor } from '../../services/vendorsApi.js';
 import { getProductTypes } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { parseRupeesToPaise } from '../../platform/moneyInput.js';
+
+const MAX_RECEIPT_BYTES = 5 * 1024 * 1024; // ~5MB cap for bill receipt images (base64 dataURL)
 
 export function TripDetailScreen() {
   const { tripUuid } = useParams();
@@ -26,12 +28,13 @@ export function TripDetailScreen() {
   const [error, setError] = useState('');
 
   const [addVendorOpen, setAddVendorOpen] = useState(false);
-  const [vendorMode, setVendorMode] = useState('existing'); // 'existing' | 'new'
-  const [vendorQuery, setVendorQuery] = useState('');
-  const [vendorForm, setVendorForm] = useState({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '' });
+  const [creatingNewVendor, setCreatingNewVendor] = useState(false);
+  const [vendorForm, setVendorForm] = useState({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '', receiptImage: null });
   const [newVendor, setNewVendor] = useState({ name: '', address: '', phone: '' });
   const [vendorFormError, setVendorFormError] = useState('');
+  const [receiptError, setReceiptError] = useState('');
   const [savingVendor, setSavingVendor] = useState(false);
+  const [receiptView, setReceiptView] = useState(null);
 
   const ptName = useCallback(
     (uuid) => productTypes.find((p) => p.uuid === uuid)?.name || 'Product',
@@ -117,16 +120,14 @@ export function TripDetailScreen() {
     setVendorFormError('');
 
     let vendorUuid = vendorForm.vendorUuid;
-    if (vendorMode === 'existing') {
-      if (!vendorUuid) {
-        setVendorFormError('Please select a vendor.');
-        return;
-      }
-    } else {
+    if (creatingNewVendor) {
       if (!newVendor.name.trim()) {
         setVendorFormError('Please enter the vendor name.');
         return;
       }
+    } else if (!vendorUuid) {
+      setVendorFormError('Please select a vendor.');
+      return;
     }
 
     const totalPaidPaise = parseRupeesToPaise(vendorForm.totalPaidPaise);
@@ -137,7 +138,7 @@ export function TripDetailScreen() {
 
     setSavingVendor(true);
     try {
-      if (vendorMode === 'new') {
+      if (creatingNewVendor) {
         const created = await createVendor({
           name: newVendor.name.trim(),
           phone: newVendor.phone.trim() || undefined,
@@ -151,12 +152,11 @@ export function TripDetailScreen() {
         billReference: vendorForm.billReference.trim() || null,
         totalPaidPaise,
         notes: vendorForm.notes.trim() || null,
+        receiptImage: vendorForm.receiptImage || null,
       });
       toast.success({ title: 'Vendor added' });
       setAddVendorOpen(false);
-      setVendorForm({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '' });
-      setNewVendor({ name: '', address: '', phone: '' });
-      setVendorQuery('');
+      resetVendorDialog();
       await loadTrip();
     } catch (err) {
       setVendorFormError(err.message);
@@ -165,18 +165,56 @@ export function TripDetailScreen() {
     }
   };
 
-  const openAddVendor = () => {
-    const existing = new Set(tripVendors.map((tv) => tv.vendor?.uuid || tv.vendorUuid).filter(Boolean));
-    setVendorForm({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '' });
+  const resetVendorDialog = () => {
+    setVendorForm({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '', receiptImage: null });
     setNewVendor({ name: '', address: '', phone: '' });
-    setVendorQuery('');
+    setCreatingNewVendor(false);
     setVendorFormError('');
-    setVendorMode('existing');
-    setAddVendorOpen(true);
+    setReceiptError('');
+  };
+
+  const openAddVendor = () => {
+    resetVendorDialog();
+    const existing = new Set(tripVendors.map((tv) => tv.vendor?.uuid || tv.vendorUuid).filter(Boolean));
     const available = vendors.filter((v) => v.isActive !== false && !existing.has(v.uuid));
     if (available.length === 1) {
       setVendorForm((f) => ({ ...f, vendorUuid: available[0].uuid }));
     }
+    setAddVendorOpen(true);
+  };
+
+  const handleCreateVendor = (q) => {
+    setCreatingNewVendor(true);
+    setNewVendor((f) => ({ ...f, name: q }));
+    setVendorForm((f) => ({ ...f, vendorUuid: '' }));
+  };
+
+  const handleChangeDirection = () => {
+    setCreatingNewVendor(false);
+    setNewVendor({ name: '', address: '', phone: '' });
+  };
+
+  const handleReceiptFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setReceiptError('');
+    if (!file.type.startsWith('image/')) {
+      setReceiptError('Please choose an image file.');
+      return;
+    }
+    if (file.size > MAX_RECEIPT_BYTES) {
+      setReceiptError('Receipt image must be 5 MB or smaller.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setVendorForm((f) => ({ ...f, receiptImage: reader.result }));
+      }
+    };
+    reader.onerror = () => setReceiptError('Could not read the image file.');
+    reader.readAsDataURL(file);
   };
 
   const stockByVendorGroups = useMemo(() => {
@@ -237,6 +275,12 @@ export function TripDetailScreen() {
 
   const existingVendorUuids = new Set(tripVendors.map((tv) => tv.vendor?.uuid || tv.vendorUuid).filter(Boolean));
   const availableVendors = vendors.filter((v) => v.isActive !== false && !existingVendorUuids.has(v.uuid));
+  const selectedVendor = availableVendors.find((v) => v.uuid === vendorForm.vendorUuid);
+  const vendorComboboxOptions = availableVendors.map((v) => ({
+    value: v.uuid,
+    label: v.name,
+    description: v.phone || undefined,
+  }));
 
   const stocksByVendor = stockByVendorGroups;
 
@@ -319,6 +363,7 @@ export function TripDetailScreen() {
                 const name = tv.vendor?.name || vendorName(tv.vendorUuid);
                 const billRef = tv.bill_reference ?? tv.billReference;
                 const paid = tv.total_paid ?? tv.totalPaidPaise;
+                const receipt = tv.receiptImage ?? tv.receipt_image ?? null;
                 return (
                   <li
                     key={tv.uuid || tv.vendor?.uuid || tv.vendorUuid || idx}
@@ -331,14 +376,28 @@ export function TripDetailScreen() {
                         {paid != null && <> &middot; Paid {formatPaise(Number(paid))}</>}
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/vendors/${tv.vendor?.uuid || tv.vendorUuid}`)}
-                      disabled={!tv.vendor?.uuid && !tv.vendorUuid}
-                    >
-                      View vendor
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {receipt && (
+                        <button
+                          type="button"
+                          onClick={() => setReceiptView({ src: receipt, name })}
+                          data-testid="view-receipt"
+                          className="h-12 w-12 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] transition-opacity hover:opacity-80"
+                          title={`View receipt — ${name}`}
+                          aria-label={`View receipt for ${name}`}
+                        >
+                          <img src={receipt} alt="" className="h-full w-full object-cover" />
+                        </button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/vendors/${tv.vendor?.uuid || tv.vendorUuid}`)}
+                        disabled={!tv.vendor?.uuid && !tv.vendorUuid}
+                      >
+                        View vendor
+                      </Button>
+                    </div>
                   </li>
                 );
               })}
@@ -416,59 +475,74 @@ export function TripDetailScreen() {
         }
       >
         <form id="add-vendor-form" onSubmit={handleAddVendor} className="flex flex-col gap-4">
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={vendorMode === 'existing' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setVendorMode('existing')}
-              data-testid="existing-vendor-tab"
-            >
-              Existing vendor
-            </Button>
-            <Button
-              type="button"
-              variant={vendorMode === 'new' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setVendorMode('new')}
-              data-testid="new-vendor-tab"
-            >
-              New vendor
-            </Button>
-          </div>
-
-          {vendorMode === 'existing' ? (
-            <>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-[var(--ink)]">Search vendor</label>
-                <Input
-                  value={vendorQuery}
-                  onChange={(e) => setVendorQuery(e.target.value)}
-                  placeholder="Search by name…"
-                  autoComplete="off"
-                />
-                <Select
-                  label="Vendor"
-                  value={vendorForm.vendorUuid}
-                  onChange={(e) => setVendorForm((f) => ({ ...f, vendorUuid: e.target.value }))}
-                  required
+          {creatingNewVendor ? (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-[var(--ink)]">Vendor</label>
+              <div className="flex items-center justify-between gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-sm">
+                <span className="truncate">
+                  <span className="font-semibold text-[var(--primary)]">+ New vendor</span>
+                  {newVendor.name ? <span className="ml-1 font-medium">{newVendor.name}</span> : null}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleChangeDirection}
+                  data-testid="change-vendor-direction"
                 >
-                  <option value="">Select a vendor…</option>
-                  {availableVendors
-                    .filter((v) => !vendorQuery || v.name.toLowerCase().includes(vendorQuery.toLowerCase()))
-                    .map((v) => (
-                      <option key={v.uuid} value={v.uuid}>{v.name}</option>
-                    ))}
-                </Select>
+                  Change
+                </Button>
               </div>
-            </>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              <Input label="Name" value={newVendor.name} onChange={setNewV('name')} placeholder="Vendor name" required autoFocus />
-              <Input label="Contact number" value={newVendor.phone} onChange={setNewV('phone')} placeholder="Phone number" inputMode="tel" />
-              <Input label="Address" value={newVendor.address} onChange={setNewV('address')} placeholder="Address" />
             </div>
+          ) : (
+            <SearchableSelect
+              label="Vendor"
+              value={vendorForm.vendorUuid}
+              onChange={(val) => setVendorForm((f) => ({ ...f, vendorUuid: val }))}
+              options={vendorComboboxOptions}
+              placeholder="Search or select a vendor…"
+              searchPlaceholder="Search vendors…"
+              emptyMessage="No vendors found."
+              creatable
+              createLabel={(q) => `+ Create "${q}"`}
+              onCreate={handleCreateVendor}
+              dataTestid="vendor-search"
+            />
           )}
+
+          {creatingNewVendor ? (
+            <div className="grid grid-cols-1 gap-4 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)]/40 p-3">
+              <Input
+                label="Name"
+                value={newVendor.name}
+                onChange={setNewV('name')}
+                placeholder="Vendor name"
+                required
+                autoFocus
+              />
+              <Input
+                label="Contact number"
+                value={newVendor.phone}
+                onChange={setNewV('phone')}
+                placeholder="Phone number"
+                inputMode="tel"
+              />
+              <Input
+                label="Address"
+                value={newVendor.address}
+                onChange={setNewV('address')}
+                placeholder="Address"
+              />
+            </div>
+          ) : selectedVendor ? (
+            <Input
+              label="Address"
+              value={selectedVendor.address || ''}
+              placeholder={selectedVendor.address ? 'Address' : 'No address on file'}
+              readOnly
+              hint={selectedVendor.address ? 'Auto-filled from the vendor record.' : undefined}
+            />
+          ) : null}
 
           <Input
             label="Bill reference"
@@ -492,10 +566,59 @@ export function TripDetailScreen() {
             placeholder="Optional"
             maxLength={2000}
           />
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-[var(--ink)]">Bill receipt image</label>
+            {vendorForm.receiptImage ? (
+              <div className="flex items-center gap-3">
+                <img
+                  src={vendorForm.receiptImage}
+                  alt="Bill receipt preview"
+                  className="h-16 w-16 rounded-md border border-[var(--border)] object-cover"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVendorForm((f) => ({ ...f, receiptImage: null }))}
+                  data-testid="clear-receipt"
+                >
+                  Remove
+                </Button>
+                <span className="text-xs text-[var(--ink-muted)]">Attached to this vendor&apos;s bill.</span>
+              </div>
+            ) : (
+              <input
+                type="file"
+                accept="image/*"
+                data-testid="receipt-file-input"
+                className="text-sm text-[var(--ink)] file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-[var(--surface-sunken)] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-[var(--ink)] hover:file:bg-[var(--border-strong)]"
+                onChange={handleReceiptFile}
+              />
+            )}
+            {receiptError && (
+              <p className="text-xs font-medium text-[var(--danger)]" role="alert">{receiptError}</p>
+            )}
+          </div>
+
           {vendorFormError && (
             <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{vendorFormError}</div>
           )}
         </form>
+      </Dialog>
+
+      <Dialog
+        open={!!receiptView}
+        onClose={() => setReceiptView(null)}
+        title={receiptView ? `Bill receipt — ${receiptView.name}` : 'Bill receipt'}
+      >
+        {receiptView && (
+          <img
+            src={receiptView.src}
+            alt={`Bill receipt for ${receiptView.name}`}
+            className="max-h-[70vh] w-full rounded-md object-contain"
+          />
+        )}
       </Dialog>
     </div>
   );

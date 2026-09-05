@@ -79,7 +79,7 @@ describe('TripsScreen — create trip (R-10, name + date only)', () => {
   });
 });
 
-describe('TripDetailScreen — add vendor with bill (R-10)', () => {
+describe('TripDetailScreen — single-mode searchable combobox add-vendor with bill (R-15)', () => {
   let tripState;
 
   const makeTrip = (vendors = []) => ({
@@ -95,8 +95,8 @@ describe('TripDetailScreen — add vendor with bill (R-10)', () => {
   });
 
   const VENDORS = [
-    { uuid: 'v1', name: 'Sharma Fabrics', phone: '9876543210', isActive: true },
-    { uuid: 'v2', name: 'Southern Silk', phone: '9123456789', isActive: true },
+    { uuid: 'v1', name: 'Sharma Fabrics', phone: '9876543210', address: 'Lajpat Nagar Extn', isActive: true },
+    { uuid: 'v2', name: 'Southern Silk', phone: '9123456789', address: 'MG Road', isActive: true },
   ];
 
   function renderDetail() {
@@ -118,29 +118,56 @@ describe('TripDetailScreen — add vendor with bill (R-10)', () => {
     vendorsService.getVendors.mockResolvedValue(VENDORS);
   });
 
-  it('attaches an existing vendor to the trip with a bill and refreshes the detail', async () => {
-    tripsService.addTripVendor.mockImplementation(async (tripUuid, { vendorUuid, billReference, totalPaidPaise }) => {
-      const vendor = VENDORS.find((v) => v.uuid === vendorUuid);
+  it('has ONE add-vendor mode: a searchable combobox (no Existing/New tabs), and searches vendors', async () => {
+    renderDetail();
+    await waitFor(() => expect(screen.getByTestId('add-vendor')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('add-vendor'));
+    const dialog = await screen.findByRole('dialog');
+
+    expect(within(dialog).queryByTestId('existing-vendor-tab')).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId('new-vendor-tab')).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByTestId('vendor-search'));
+    const searchInput = await screen.findByRole('combobox', { name: /^vendor$/i });
+    expect(screen.getByRole('option', { name: /Sharma Fabrics/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Southern Silk/ })).toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: 'Sharma' } });
+    expect(screen.getByRole('option', { name: /Sharma Fabrics/ })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('option', { name: /Southern Silk/ })).not.toBeInTheDocument();
+    });
+  });
+
+  it('selects an existing vendor, auto-fills a read-only Address, and posts the bill with receiptImage null', async () => {
+    tripsService.addTripVendor.mockImplementation(async (tripUuid, payload) => {
       tripState = makeTrip([{
         uuid: 'tv1',
         tripUuid,
-        vendorUuid,
-        vendorName: vendor.name,
-        billReference,
-        totalPaidPaise,
+        vendorUuid: payload.vendorUuid,
+        vendorName: 'Sharma Fabrics',
+        billReference: payload.billReference,
+        totalPaidPaise: payload.totalPaidPaise,
         notes: null,
+        receiptImage: payload.receiptImage,
       }]);
       return { ok: true };
     });
 
     renderDetail();
     await waitFor(() => expect(screen.getByTestId('add-vendor')).toBeInTheDocument());
-
     fireEvent.click(screen.getByTestId('add-vendor'));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByTestId('existing-vendor-tab')).toBeInTheDocument();
 
-    fireEvent.change(within(dialog).getByLabelText(/^vendor$/i), { target: { value: 'v1' } });
+    fireEvent.click(within(dialog).getByTestId('vendor-search'));
+    const searchInput = await screen.findByRole('combobox', { name: /^vendor$/i });
+    fireEvent.change(searchInput, { target: { value: 'Sharma' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Sharma Fabrics/ }));
+
+    const address = within(dialog).getByLabelText(/^address$/i);
+    expect(address).toHaveValue('Lajpat Nagar Extn');
+    expect(address).toHaveAttribute('readonly');
+
     fireEvent.change(within(dialog).getByLabelText(/bill reference/i), { target: { value: 'B-123' } });
     fireEvent.change(within(dialog).getByLabelText(/total paid/i), { target: { value: '1250' } });
     fireEvent.click(within(dialog).getByRole('button', { name: /^add vendor$/i }));
@@ -148,7 +175,7 @@ describe('TripDetailScreen — add vendor with bill (R-10)', () => {
     await waitFor(() => {
       expect(tripsService.addTripVendor).toHaveBeenCalledWith(
         't1',
-        { vendorUuid: 'v1', billReference: 'B-123', totalPaidPaise: 125000, notes: null }
+        { vendorUuid: 'v1', billReference: 'B-123', totalPaidPaise: 125000, notes: null, receiptImage: null }
       );
     });
 
@@ -157,17 +184,18 @@ describe('TripDetailScreen — add vendor with bill (R-10)', () => {
     expect(screen.getAllByText(/Paid ₹1,250.00/).length).toBeGreaterThan(0);
   });
 
-  it('creates a NEW vendor inline (name/address/phone), attaches it with a bill, and re-renders', async () => {
+  it('creates a NEW vendor inline via "+ Create <query>" (name prefilled), attaches it with a bill', async () => {
     vendorsService.createVendor.mockResolvedValue({ uuid: 'v-new', name: 'Ghanshyam Exports', phone: '9000000001', address: 'MG Road' });
-    tripsService.addTripVendor.mockImplementation(async (tripUuid, { vendorUuid, billReference, totalPaidPaise }) => {
+    tripsService.addTripVendor.mockImplementation(async (tripUuid, payload) => {
       tripState = makeTrip([{
         uuid: 'tv-new',
         tripUuid,
-        vendorUuid,
+        vendorUuid: payload.vendorUuid,
         vendorName: 'Ghanshyam Exports',
-        billReference,
-        totalPaidPaise,
+        billReference: payload.billReference,
+        totalPaidPaise: payload.totalPaidPaise,
         notes: null,
+        receiptImage: payload.receiptImage,
       }]);
       return { ok: true };
     });
@@ -177,8 +205,13 @@ describe('TripDetailScreen — add vendor with bill (R-10)', () => {
     fireEvent.click(screen.getByTestId('add-vendor'));
     const dialog = await screen.findByRole('dialog');
 
-    fireEvent.click(within(dialog).getByTestId('new-vendor-tab'));
-    fireEvent.change(within(dialog).getByLabelText(/^name$/i), { target: { value: 'Ghanshyam Exports' } });
+    fireEvent.click(within(dialog).getByTestId('vendor-search'));
+    const searchInput = await screen.findByRole('combobox', { name: /^vendor$/i });
+    fireEvent.change(searchInput, { target: { value: 'Ghanshyam Exports' } });
+    fireEvent.click(await screen.findByRole('option', { name: /\+ Create "Ghanshyam Exports"/ }));
+
+    const nameInput = within(dialog).getByLabelText(/^name$/i);
+    expect(nameInput).toHaveValue('Ghanshyam Exports');
     fireEvent.change(within(dialog).getByLabelText(/contact number/i), { target: { value: '9000000001' } });
     fireEvent.change(within(dialog).getByLabelText(/^address$/i), { target: { value: 'MG Road' } });
     fireEvent.change(within(dialog).getByLabelText(/bill reference/i), { target: { value: 'B-099' } });
@@ -193,13 +226,68 @@ describe('TripDetailScreen — add vendor with bill (R-10)', () => {
       });
       expect(tripsService.addTripVendor).toHaveBeenCalledWith(
         't1',
-        { vendorUuid: 'v-new', billReference: 'B-099', totalPaidPaise: 500000, notes: null }
+        { vendorUuid: 'v-new', billReference: 'B-099', totalPaidPaise: 500000, notes: null, receiptImage: null }
       );
     });
 
     await waitFor(() => expect(screen.getByText('Ghanshyam Exports')).toBeInTheDocument());
     expect(screen.getByText(/Bill B-099/)).toBeInTheDocument();
     expect(screen.getAllByText(/Paid ₹5,000.00/).length).toBeGreaterThan(0);
+  });
+
+  it('uploads a receipt image via FileReader → dataURL with preview + remove, posts it, and shows a clickable thumbnail', async () => {
+    tripsService.addTripVendor.mockImplementation(async (tripUuid, payload) => {
+      tripState = makeTrip([{
+        uuid: 'tv1',
+        tripUuid,
+        vendorUuid: payload.vendorUuid,
+        vendorName: 'Sharma Fabrics',
+        billReference: payload.billReference,
+        totalPaidPaise: payload.totalPaidPaise,
+        notes: null,
+        receiptImage: payload.receiptImage,
+      }]);
+      return { ok: true };
+    });
+
+    renderDetail();
+    await waitFor(() => expect(screen.getByTestId('add-vendor')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('add-vendor'));
+    const dialog = await screen.findByRole('dialog');
+
+    fireEvent.click(within(dialog).getByTestId('vendor-search'));
+    const searchInput = await screen.findByRole('combobox', { name: /^vendor$/i });
+    fireEvent.change(searchInput, { target: { value: 'Sharma' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Sharma Fabrics/ }));
+
+    const file = new File(['fake-png-bytes'], 'receipt.png', { type: 'image/png' });
+    fireEvent.change(within(dialog).getByTestId('receipt-file-input'), { target: { files: [file] } });
+
+    const preview = await within(dialog).findByRole('img', { name: /bill receipt preview/i });
+    expect(preview).toHaveAttribute('src', expect.stringMatching(/^data:image\/png;base64,/));
+    const dataUrl = preview.getAttribute('src');
+
+    fireEvent.click(within(dialog).getByTestId('clear-receipt'));
+    expect(within(dialog).queryByRole('img', { name: /bill receipt preview/i })).not.toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByTestId('receipt-file-input'), { target: { files: [file] } });
+    await within(dialog).findByRole('img', { name: /bill receipt preview/i });
+
+    fireEvent.change(within(dialog).getByLabelText(/bill reference/i), { target: { value: 'B-777' } });
+    fireEvent.change(within(dialog).getByLabelText(/total paid/i), { target: { value: '2500' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: /^add vendor$/i }));
+
+    await waitFor(() => {
+      expect(tripsService.addTripVendor).toHaveBeenCalledWith(
+        't1',
+        { vendorUuid: 'v1', billReference: 'B-777', totalPaidPaise: 250000, notes: null, receiptImage: dataUrl }
+      );
+    });
+
+    await waitFor(() => expect(screen.getByTestId('view-receipt')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('view-receipt'));
+    const lightbox = await screen.findByRole('dialog', { name: /bill receipt/i });
+    expect(within(lightbox).getByRole('img', { name: /bill receipt for Sharma Fabrics/i })).toHaveAttribute('src', dataUrl);
   });
 
   it('surfaces a duplicate-vendor error (backend 409) in the dialog', async () => {
@@ -210,7 +298,10 @@ describe('TripDetailScreen — add vendor with bill (R-10)', () => {
     fireEvent.click(screen.getByTestId('add-vendor'));
     const dialog = await screen.findByRole('dialog');
 
-    fireEvent.change(within(dialog).getByLabelText(/^vendor$/i), { target: { value: 'v2' } });
+    fireEvent.click(within(dialog).getByTestId('vendor-search'));
+    const searchInput = await screen.findByRole('combobox', { name: /^vendor$/i });
+    fireEvent.change(searchInput, { target: { value: 'Southern' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Southern Silk/ }));
     fireEvent.change(within(dialog).getByLabelText(/total paid/i), { target: { value: '1000' } });
     fireEvent.click(within(dialog).getByRole('button', { name: /^add vendor$/i }));
 

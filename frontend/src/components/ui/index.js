@@ -1,6 +1,7 @@
 export { default as Button } from './Button.jsx';
 export { default as Input } from './Input.jsx';
 export { default as Select } from './Select.jsx';
+export { default as SearchableSelect } from './SearchableSelect.jsx';
 export {
   default as Card,
   CardHeader,
