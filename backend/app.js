@@ -27,7 +27,7 @@ import errorMiddleware from './src/middleware/error.middleware.js';
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 app.use(cookieParser());
 
 // CORS configuration with explicit origin from FRONTEND_ORIGIN env var

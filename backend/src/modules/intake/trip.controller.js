@@ -39,6 +39,9 @@ function escapeTripDTO(trip) {
 function escapeTripVendorDTO(tripVendor) {
     return {
         ...tripVendor,
+        // receiptImage is a base64 data-URI and must pass through UNESCAPED
+        // (HTML-escaping would corrupt the image payload)
+        receiptImage: tripVendor.receiptImage ?? null,
         billReference: tripVendor.billReference ? escapeHtml(tripVendor.billReference) : null,
         notes: tripVendor.notes ? escapeHtml(tripVendor.notes) : null,
     };

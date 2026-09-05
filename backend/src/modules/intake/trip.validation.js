@@ -23,6 +23,12 @@ export const tripVendorBillSchema = z.object({
         .nullable()
         .optional()
         .default(null),
+    receiptImage: z
+        .string()
+        .max(10000000, 'Receipt image cannot exceed 10MB')
+        .nullable()
+        .optional()
+        .default(null),
 });
 
 /**
@@ -75,6 +81,12 @@ export const addTripVendorSchema = z.object({
     notes: z
         .string()
         .max(2000, 'Notes cannot exceed 2000 characters')
+        .nullable()
+        .optional()
+        .default(null),
+    receiptImage: z
+        .string()
+        .max(10000000, 'Receipt image cannot exceed 10MB')
         .nullable()
         .optional()
         .default(null),

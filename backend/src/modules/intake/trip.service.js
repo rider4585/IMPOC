@@ -60,7 +60,7 @@ const TRIP_VENDOR_INCLUDE = (whereDeleted = { [Sequelize.Op.is]: null }) => ({
     as: 'tripVendors',
     where: { deletedAt: whereDeleted },
     required: false,
-    attributes: ['id', 'uuid', 'tripId', 'vendorId', 'billReference', 'totalPaidPaise', 'notes', 'createdAt', 'updatedAt'],
+    attributes: ['id', 'uuid', 'tripId', 'vendorId', 'billReference', 'totalPaidPaise', 'notes', 'receiptImage', 'createdAt', 'updatedAt'],
     include: [
         {
             model: Vendor,
@@ -141,6 +141,7 @@ export const createTrip = async ({ name, purchasedOn, notes, vendors = [] }) => 
                     billReference: vendorBill.billReference || null,
                     totalPaidPaise: vendorBill.totalPaidPaise,
                     notes: vendorBill.notes || null,
+                    receiptImage: vendorBill.receiptImage || null,
                 },
                 { transaction }
             );
@@ -226,7 +227,7 @@ export const verifyTripAccess = async (tripUuid, user) => {
  * @param {string} tripUuid - Trip UUID
  * @param {Object} data - { vendorUuid, billReference, totalPaidPaise, notes }
  */
-export const addTripVendor = async (tripUuid, { vendorUuid, billReference, totalPaidPaise, notes }) => {
+export const addTripVendor = async (tripUuid, { vendorUuid, billReference, totalPaidPaise, notes, receiptImage }) => {
     const transaction = await sequelize.transaction();
 
     try {
@@ -265,6 +266,7 @@ export const addTripVendor = async (tripUuid, { vendorUuid, billReference, total
                 billReference: billReference || null,
                 totalPaidPaise,
                 notes: notes || null,
+                receiptImage: receiptImage || null,
             },
             { transaction }
         );
@@ -426,6 +428,7 @@ function mapTripVendorDTO(tripVendor, vendor, tripUuid) {
         billReference: tripVendor.billReference,
         totalPaidPaise: Number(tripVendor.totalPaidPaise),
         notes: tripVendor.notes,
+        receiptImage: tripVendor.receiptImage ?? null,
         createdAt: tripVendor.createdAt,
         updatedAt: tripVendor.updatedAt,
     };

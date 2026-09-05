@@ -387,6 +387,93 @@ describe('Trips Module - /api/trips', () => {
     });
   });
 
+  describe('Receipt image (R-14)', () => {
+    const receiptDataUri = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAPh9kHmVvL2GhGYxYWpLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS3//2Q==';
+
+    it('should persist and return receiptImage on createTrip vendor bills', async () => {
+      const res = await request(app)
+        .post('/api/trips')
+        .set('Authorization', `Bearer ${inventoryToken}`)
+        .send({
+          name: 'TEST_Trip ReceiptImage',
+          purchasedOn: '2026-08-26',
+          vendors: [
+            {
+              vendorUuid: activeVendor.uuid,
+              billReference: 'TEST_INV-RECEIPT',
+              totalPaidPaise: 45000,
+              receiptImage: receiptDataUri,
+            },
+          ],
+        });
+
+      expect(res.statusCode).toBe(201);
+      const trip = await trackTripByUuid(res.body.data.uuid);
+      expect(res.body.data.vendors).toHaveLength(1);
+      expect(res.body.data.vendors[0].receiptImage).toBe(receiptDataUri);
+
+      const stored = await db.TripVendor.findOne({
+        where: { tripId: trip.id },
+      });
+      expect(stored.receiptImage).toBe(receiptDataUri);
+    });
+
+    it('should persist and return receiptImage on addTripVendor', async () => {
+      const trip = await db.Trip.create({ name: 'TEST_Trip ReceiptImage Add', purchasedOn: '2026-08-26' });
+      createdTrips.push(trip);
+
+      const res = await request(app)
+        .post(`/api/trips/${trip.uuid}/vendors`)
+        .set('Authorization', `Bearer ${inventoryToken}`)
+        .send({
+          vendorUuid: activeVendor.uuid,
+          totalPaidPaise: 60000,
+          receiptImage: receiptDataUri,
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.data.receiptImage).toBe(receiptDataUri);
+    });
+
+    it('should return 400 when receiptImage exceeds the size limit', async () => {
+      const res = await request(app)
+        .post('/api/trips')
+        .set('Authorization', `Bearer ${inventoryToken}`)
+        .send({
+          name: 'TEST_Trip ReceiptImage Oversize',
+          purchasedOn: '2026-08-26',
+          vendors: [
+            {
+              vendorUuid: activeVendor.uuid,
+              totalPaidPaise: 1000,
+              receiptImage: 'data:image/png;base64,' + 'a'.repeat(10000001),
+            },
+          ],
+        });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('should return receiptImage in getTrip vendors', async () => {
+      const trip = await db.Trip.create({ name: 'TEST_Trip ReceiptImage Get', purchasedOn: '2026-08-26' });
+      createdTrips.push(trip);
+      await db.TripVendor.create({
+        tripId: trip.id,
+        vendorId: activeVendor.id,
+        totalPaidPaise: 50000,
+        receiptImage: receiptDataUri,
+      });
+
+      const res = await request(app)
+        .get(`/api/trips/${trip.uuid}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data.vendors).toHaveLength(1);
+      expect(res.body.data.vendors[0].receiptImage).toBe(receiptDataUri);
+    });
+  });
+
   describe('GET /trips/:uuid', () => {
     it('should get trip by uuid with authentication', async () => {
       const { trip, tripVendor } = await createTripWithVendor({

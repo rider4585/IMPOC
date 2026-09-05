@@ -46,6 +46,12 @@ export default (sequelize) => {
                 allowNull: true,
             },
 
+            receiptImage: {
+                type: DataTypes.TEXT,
+                field: 'receipt_image',
+                allowNull: true,
+            },
+
             deletedAt: {
                 type: DataTypes.DATE,
                 field: 'deleted_at',
