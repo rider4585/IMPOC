@@ -9,6 +9,7 @@ import { navigationRegistry } from './app/navigation';
 import TripDetailScreen from './screens/inventory/TripDetailScreen';
 import StockForm from './screens/inventory/StockForm';
 import StockIntake from './screens/inventory/StockIntake';
+import TemplateForm from './screens/inventory/TemplateForm';
 import VendorDetail from './screens/inventory/VendorDetail';
 
 /**
@@ -78,6 +79,7 @@ function App() {
                 <Route path="/trips/:tripUuid" element={<TripDetailScreen />} />
                 <Route path="/trips/:tripUuid/stocks/new" element={<StockForm />} />
                 <Route path="/trips/:tripUuid/stocks/:stockUuid/scan" element={<StockIntake />} />
+                <Route path="/trips/:tripUuid/templates" element={<TemplateForm />} />
 
                 {/* Nested vendor detail route */}
                 <Route path="/vendors/:uuid" element={<VendorDetail />} />

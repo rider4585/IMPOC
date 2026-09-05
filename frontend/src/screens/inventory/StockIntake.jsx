@@ -4,7 +4,7 @@ import { Button, Select, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getStock, scanBarcodeIntoStock } from '../../services/tripsApi.js';
-import { getColours, getSizes } from '../../services/picklistsApi.js';
+import { getColours, getSizes, getProductTypes } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { wakingRequest } from '../../platform/wakingRequest.js';
 import { createRequestKey } from '../../platform/requestKey.js';
@@ -23,6 +23,7 @@ export function StockIntake() {
   const [stock, setStock] = useState(null);
   const [colours, setColours] = useState([]);
   const [sizes, setSizes] = useState([]);
+  const [productTypes, setProductTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -61,12 +62,13 @@ export function StockIntake() {
   useEffect(() => {
     if (!stockUuid) return;
     setLoading(true);
-    Promise.all([getStock(stockUuid), getColours(), getSizes()])
-      .then(([stockData, colData, szData]) => {
+    Promise.all([getStock(stockUuid), getColours(), getSizes(), getProductTypes()])
+      .then(([stockData, colData, szData, typeData]) => {
         if (stockData) setStock(stockData);
         else setError('Stock not found');
         setColours(Array.isArray(colData) ? colData : colData?.items || []);
         setSizes(Array.isArray(szData) ? szData : szData?.items || []);
+        setProductTypes(Array.isArray(typeData) ? typeData : typeData?.items || []);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -232,6 +234,13 @@ export function StockIntake() {
     ? sizes.find((s) => s.uuid === sizeRunSequence[sizeRunIndex % sizeRunSequence.length])?.name || '?'
     : null;
 
+  const stockTypeName = stock?.productType?.name
+    || productTypes.find((t) => t.uuid === stock?.productTypeUuid)?.name
+    || '';
+  const stockSubTypeName = stock?.subType?.name
+    || productTypes.find((t) => t.uuid === stock?.subTypeUuid)?.name
+    || '';
+
   return (
     <div className="flex min-h-screen flex-col bg-[var(--surface-scan)]">
       {/* Back button */}
@@ -336,6 +345,16 @@ export function StockIntake() {
                     {scannedBarcode}
                   </span>
                 </div>
+
+                {/* Stock type + subtype */}
+                {(stockTypeName || stockSubTypeName) && (
+                  <div className="mb-1 text-center text-sm">
+                    <span className="font-semibold text-[var(--ink)]">{stockTypeName || 'Type'}</span>
+                    {stockSubTypeName && (
+                      <span className="ml-1 font-medium text-[var(--ink-muted)]">· {stockSubTypeName}</span>
+                    )}
+                  </div>
+                )}
 
                 {/* Stock prices */}
                 <div className="mb-4 text-center text-xs text-[var(--ink-muted)]">

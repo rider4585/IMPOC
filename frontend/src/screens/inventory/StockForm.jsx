@@ -32,9 +32,11 @@ export function StockForm() {
   const [form, setForm] = useState(() => ({
     vendorUuid: prefill?.vendorUuid || '',
     productTypeUuid: prefill?.productTypeUuid || '',
+    subTypeUuid: prefill?.subTypeUuid || '',
     name: prefill?.name || '',
     quantity: prefill?.quantity != null ? String(prefill.quantity) : '1',
     buyingPricePaise: rupeeOrEmpty(prefill?.buyingPricePaise),
+    wholeBuyingPricePaise: rupeeOrEmpty(prefill?.wholeBuyingPricePaise),
     sellingPricePaise: rupeeOrEmpty(prefill?.sellingPricePaise),
     floorPricePaise: rupeeOrEmpty(prefill?.floorPricePaise),
     channel: prefill?.channel || CHANNEL.RETAIL,
@@ -44,6 +46,10 @@ export function StockForm() {
     sizeRunEnabled: false,
     sizeRun: [],
   }));
+
+  const productTypeRows = Array.isArray(productTypes) ? productTypes : [];
+  const parentTypes = productTypeRows.filter((t) => !t.parentUuid && t.isActive !== false);
+  const subtypeRows = productTypeRows.filter((t) => t.parentUuid === form.productTypeUuid && t.isActive !== false);
 
   useEffect(() => {
     getProductTypes().then(setProductTypes).catch(() => {});
@@ -81,18 +87,32 @@ export function StockForm() {
     const uuid = e.target.value;
     const tpl = vendorTemplates.find((t) => t.uuid === uuid);
     if (!tpl) return;
-    setForm((f) => ({
-      ...f,
-      productTypeUuid: tpl.productTypeUuid || f.productTypeUuid,
-      name: tpl.name || f.name,
-      quantity: tpl.defaultQuantity != null ? String(tpl.defaultQuantity) : f.quantity,
-      buyingPricePaise: rupeeOrEmpty(tpl.buyingPricePaise),
-      sellingPricePaise: rupeeOrEmpty(tpl.defaultSellingPricePaise),
-      floorPricePaise: rupeeOrEmpty(tpl.defaultFloorPricePaise),
-    }));
+    setForm((f) => {
+      const next = {
+        ...f,
+        productTypeUuid: tpl.productTypeUuid || f.productTypeUuid,
+        subTypeUuid: tpl.subTypeUuid || '',
+        name: tpl.name || f.name,
+        quantity: tpl.defaultQuantity != null ? String(tpl.defaultQuantity) : f.quantity,
+        buyingPricePaise: rupeeOrEmpty(tpl.buyingPricePaise),
+        wholeBuyingPricePaise: rupeeOrEmpty(tpl.wholeBuyingPricePaise),
+        sellingPricePaise: rupeeOrEmpty(tpl.defaultSellingPricePaise),
+        floorPricePaise: rupeeOrEmpty(tpl.defaultFloorPricePaise),
+      };
+      if (next.subTypeUuid && !next.productTypeUuid) {
+        const sub = productTypes.find((t) => t.uuid === next.subTypeUuid);
+        if (sub?.parentUuid) next.productTypeUuid = sub.parentUuid;
+      }
+      return next;
+    });
   };
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleTypeChange = (e) => {
+    const typeUuid = e.target.value;
+    setForm((f) => ({ ...f, productTypeUuid: typeUuid, subTypeUuid: '' }));
+  };
 
   const toggleSizeInRun = (sizeUuid) => {
     setForm((f) => {
@@ -117,6 +137,13 @@ export function StockForm() {
     if ([buying, selling, floor].some(Number.isNaN)) { setError('Buying, selling and floor prices must be valid rupee amounts.'); return; }
     if (floor > selling) { setError('Floor price cannot exceed selling price.'); return; }
 
+    const wholeRaw = String(form.wholeBuyingPricePaise || '').trim();
+    let wholeBuying = null;
+    if (wholeRaw !== '') {
+      wholeBuying = parseRupeesToPaise(wholeRaw);
+      if (Number.isNaN(wholeBuying)) { setError('Whole stock buying price must be a valid rupee amount.'); return; }
+    }
+
     const isRental = form.channel === CHANNEL.RENTAL;
     if (isRental) {
       const rent = parseRupeesToPaise(form.rentPerDayPaise);
@@ -127,9 +154,11 @@ export function StockForm() {
       doCreate({
         vendorUuid: form.vendorUuid,
         productTypeUuid: form.productTypeUuid,
+        subTypeUuid: form.subTypeUuid || null,
         name: form.name.trim() || undefined,
         quantity,
         buyingPricePaise: buying,
+        wholeBuyingPricePaise: wholeBuying,
         sellingPricePaise: selling,
         floorPricePaise: floor,
         channel: form.channel,
@@ -141,9 +170,11 @@ export function StockForm() {
       doCreate({
         vendorUuid: form.vendorUuid,
         productTypeUuid: form.productTypeUuid,
+        subTypeUuid: form.subTypeUuid || null,
         name: form.name.trim() || undefined,
         quantity,
         buyingPricePaise: buying,
+        wholeBuyingPricePaise: wholeBuying,
         sellingPricePaise: selling,
         floorPricePaise: floor,
         channel: form.channel,
@@ -230,9 +261,33 @@ export function StockForm() {
           </p>
         )}
 
-        <Select label="Product type" value={form.productTypeUuid} onChange={set('productTypeUuid')} required>
-          <option value="">Select a product type…</option>
-          {productTypes.filter((t) => t.isActive !== false).map((t) => (
+        {form.vendorUuid && (
+          <button
+            type="button"
+            className="self-start text-xs font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+            onClick={() => navigate(`/trips/${tripUuid}/templates`, { state: { vendorUuid: form.vendorUuid } })}
+            data-testid="manage-templates"
+          >
+            Manage buying templates
+          </button>
+        )}
+
+        <Select label="Type" value={form.productTypeUuid} onChange={handleTypeChange} required>
+          <option value="">Select a type…</option>
+          {parentTypes.map((t) => (
+            <option key={t.uuid} value={t.uuid}>{t.name}</option>
+          ))}
+        </Select>
+
+        <Select
+          label="Subtype (optional)"
+          value={form.subTypeUuid}
+          onChange={set('subTypeUuid')}
+          disabled={!form.productTypeUuid}
+          hint={!form.productTypeUuid ? 'Choose a type first.' : undefined}
+        >
+          <option value="">No subtype</option>
+          {subtypeRows.map((t) => (
             <option key={t.uuid} value={t.uuid}>{t.name}</option>
           ))}
         </Select>
@@ -242,6 +297,7 @@ export function StockForm() {
         <Input label="Quantity" type="number" min={1} step={1} value={form.quantity} onChange={set('quantity')} required />
 
         <Input label="Buying price (₹)" value={form.buyingPricePaise} onChange={set('buyingPricePaise')} inputMode="decimal" required />
+        <Input label="Whole stock buying price (₹)" value={form.wholeBuyingPricePaise} onChange={set('wholeBuyingPricePaise')} inputMode="decimal" hint="Optional total for the whole stock, if you bought it as a lot." />
         <Input label="Selling price (₹)" value={form.sellingPricePaise} onChange={set('sellingPricePaise')} inputMode="decimal" required />
         <Input label="Floor price (₹)" value={form.floorPricePaise} onChange={set('floorPricePaise')} inputMode="decimal" required hint="Cannot exceed selling price." />
 
