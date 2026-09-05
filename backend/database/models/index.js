@@ -283,6 +283,15 @@ Stock.belongsTo(ProductType, {
 });
 
 /*
+ * Stock ↔ ProductType (subtype)
+ */
+Stock.belongsTo(ProductType, {
+    foreignKey: 'subTypeId',
+    as: 'subType',
+    onDelete: 'SET NULL',
+});
+
+/*
  * Stock ↔ Unit
  */
 Stock.hasMany(Unit, {
@@ -460,6 +469,15 @@ StockTemplate.belongsTo(Vendor, {
 StockTemplate.belongsTo(ProductType, {
     foreignKey: 'product_type_id',
     as: 'productType',
+});
+
+/*
+ * StockTemplate ↔ ProductType (subtype)
+ */
+StockTemplate.belongsTo(ProductType, {
+    foreignKey: 'subTypeId',
+    as: 'subType',
+    onDelete: 'SET NULL',
 });
 
 /*

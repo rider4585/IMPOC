@@ -3,6 +3,7 @@ import {
     updateStockSchema,
     stockUuidParamSchema,
     scanIntoStockSchema,
+    listAllStocksQuerySchema,
 } from './stock.validation.js';
 import {
     verifyTripAccess,
@@ -11,6 +12,7 @@ import {
     getStockByUuid as getStockByUuidService,
     updateStock as updateStockService,
     scanIntoStock as scanIntoStockService,
+    listAllStocks as listAllStocksService,
 } from './stock.service.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -142,6 +144,23 @@ export const scanIntoStock = async (req, res, next) => {
         return res.status(201).json({
             success: true,
             data: unit,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Get all stocks across trips (bare GET /api/stocks endpoint)
+ */
+export const listAllStocks = async (req, res, next) => {
+    try {
+        const query = listAllStocksQuerySchema.parse(req.query || {});
+        const stocks = await listAllStocksService(query);
+
+        return res.status(200).json({
+            success: true,
+            data: stocks,
         });
     } catch (error) {
         next(error);

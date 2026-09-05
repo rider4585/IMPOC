@@ -12,7 +12,9 @@ function mapTemplateDTO(t) {
         vendorName: t.vendor ? t.vendor.name : null,
         name: t.name,
         productTypeUuid: t.productType ? t.productType.uuid : null,
+        subTypeUuid: t.subType ? t.subType.uuid : null,
         buyingPricePaise: String(t.buyingPricePaise),
+        wholeBuyingPricePaise: t.wholeBuyingPricePaise != null ? String(t.wholeBuyingPricePaise) : null,
         defaultQuantity: t.defaultQuantity != null ? t.defaultQuantity : null,
         defaultSellingPricePaise: t.defaultSellingPricePaise != null ? String(t.defaultSellingPricePaise) : null,
         defaultFloorPricePaise: t.defaultFloorPricePaise != null ? String(t.defaultFloorPricePaise) : null,
@@ -24,6 +26,7 @@ function mapTemplateDTO(t) {
 const TEMPLATE_INCLUDE = [
     { model: Vendor, as: 'vendor', attributes: ['uuid', 'name'] },
     { model: ProductType, as: 'productType', attributes: ['uuid'] },
+    { model: ProductType, as: 'subType', attributes: ['uuid'] },
 ];
 
 export const getTemplates = async ({ vendorUuid } = {}) => {
@@ -65,8 +68,10 @@ export const getTemplateByUuid = async (templateUuid) => {
 export const createTemplate = async ({
     vendorUuid,
     productTypeUuid,
+    subTypeUuid,
     name,
     buyingPricePaise,
+    wholeBuyingPricePaise,
     defaultQuantity,
     defaultSellingPricePaise,
     defaultFloorPricePaise,
@@ -97,6 +102,11 @@ export const createTemplate = async ({
             throw error;
         }
 
+        let subTypeId = null;
+        if (subTypeUuid != null) {
+            subTypeId = (await resolveSubType(subTypeUuid, transaction)).id;
+        }
+
         if (
             defaultFloorPricePaise != null &&
             defaultSellingPricePaise != null &&
@@ -112,7 +122,9 @@ export const createTemplate = async ({
                 vendorId: vendor.id,
                 name: name || null,
                 productTypeId: productType.id,
+                subTypeId,
                 buyingPricePaise,
+                wholeBuyingPricePaise: wholeBuyingPricePaise ?? null,
                 defaultQuantity: defaultQuantity ?? null,
                 defaultSellingPricePaise: defaultSellingPricePaise ?? null,
                 defaultFloorPricePaise: defaultFloorPricePaise ?? null,
@@ -150,9 +162,18 @@ export const updateTemplate = async (templateUuid, updates) => {
         const patch = {};
         if (updates.name !== undefined) patch.name = updates.name ?? null;
         if (updates.buyingPricePaise !== undefined) patch.buyingPricePaise = updates.buyingPricePaise;
+        if (updates.wholeBuyingPricePaise !== undefined) patch.wholeBuyingPricePaise = updates.wholeBuyingPricePaise ?? null;
         if (updates.defaultQuantity !== undefined) patch.defaultQuantity = updates.defaultQuantity ?? null;
         if (updates.defaultSellingPricePaise !== undefined) patch.defaultSellingPricePaise = updates.defaultSellingPricePaise ?? null;
         if (updates.defaultFloorPricePaise !== undefined) patch.defaultFloorPricePaise = updates.defaultFloorPricePaise ?? null;
+
+        if (updates.subTypeUuid !== undefined) {
+            if (updates.subTypeUuid === null) {
+                patch.subTypeId = null;
+            } else {
+                patch.subTypeId = (await resolveSubType(updates.subTypeUuid, transaction)).id;
+            }
+        }
 
         if (updates.productTypeUuid !== undefined) {
             const productType = await ProductType.findOne({ where: { uuid: updates.productTypeUuid, deletedAt: null }, transaction });
@@ -227,6 +248,37 @@ export const deleteTemplate = async (templateUuid) => {
         throw error;
     }
 };
+
+/**
+ * Resolve a subtype UUID to an active ProductType row that itself has a parent
+ * (i.e. it must be a SUBTYPE, not a top-level product type).
+ */
+async function resolveSubType(subTypeUuid, transaction) {
+    const subType = await ProductType.findOne({
+        where: { uuid: subTypeUuid, deletedAt: null },
+        transaction,
+    });
+
+    if (!subType) {
+        const error = new Error('Sub type not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (!subType.isActive) {
+        const error = new Error('Sub type is inactive');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (!subType.parentId) {
+        const error = new Error('Sub type must belong to a parent product type');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    return subType;
+}
 
 /**
  * Convert unique-index violations on (vendor_id, product_type_id, name)

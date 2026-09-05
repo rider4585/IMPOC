@@ -15,6 +15,12 @@ export const createStockSchema = z
             .string()
             .uuid('Invalid product type UUID format'),
 
+        subTypeUuid: z
+            .string()
+            .uuid('Invalid sub type UUID format')
+            .nullable()
+            .optional(),
+
         quantity: z
             .number()
             .int('Quantity must be an integer')
@@ -26,6 +32,14 @@ export const createStockSchema = z
             .int('Buying price must be an integer')
             .min(0, 'Buying price cannot be negative')
             .max(9223372036854775807, 'Buying price exceeds maximum BIGINT value'),
+
+        wholeBuyingPricePaise: z
+            .number()
+            .int('Whole buying price must be an integer')
+            .min(0, 'Whole buying price cannot be negative')
+            .max(9223372036854775807, 'Whole buying price exceeds maximum BIGINT value')
+            .nullable()
+            .optional(),
 
         sellingPricePaise: z
             .number()
@@ -128,6 +142,20 @@ export const createStockSchema = z
 
 export const updateStockSchema = z
     .object({
+        subTypeUuid: z
+            .string()
+            .uuid('Invalid sub type UUID format')
+            .nullable()
+            .optional(),
+
+        wholeBuyingPricePaise: z
+            .number()
+            .int('Whole buying price must be an integer')
+            .min(0, 'Whole buying price cannot be negative')
+            .max(9223372036854775807, 'Whole buying price exceeds maximum BIGINT value')
+            .nullable()
+            .optional(),
+
         quantity: z
             .number()
             .int('Quantity must be an integer')
@@ -214,4 +242,13 @@ export const scanIntoStockSchema = z.object({
     sizeUuid: z
         .string()
         .uuid('Invalid size UUID format'),
+});
+
+/**
+ * Query schema for GET /api/stocks (bare list-all endpoint)
+ */
+export const listAllStocksQuerySchema = z.object({
+    tripUuid: z.string().uuid('Invalid trip UUID format').optional(),
+    vendorUuid: z.string().uuid('Invalid vendor UUID format').optional(),
+    search: z.string().trim().max(200).optional(),
 });

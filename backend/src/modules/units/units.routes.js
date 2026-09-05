@@ -10,9 +10,13 @@ import {
     getStatusEvents,
     getUnitByBarcodeRoute,
     transitionUnitRoute,
+    listAllUnitsRoute,
 } from './units.controller.js';
 
 const router = express.Router();
+
+// GET /api/units - List all units (bare list-all endpoint)
+router.get('/', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), listAllUnitsRoute);
 
 // GET /api/units/by-barcode/:barcode - Get unit by barcode
 // Must be before :uuid routes so it matches first

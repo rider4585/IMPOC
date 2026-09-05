@@ -1,5 +1,112 @@
-import { Unit, UnitStatusEvent, sequelize } from '../../../database/models/index.js';
+import {
+    Unit,
+    UnitStatusEvent,
+    Stock,
+    Colour,
+    Size,
+    Vendor,
+    Trip,
+    ProductType,
+    sequelize,
+    Sequelize,
+} from '../../../database/models/index.js';
 import { CHANNEL } from '../../constants/channel.js';
+
+/**
+ * List ALL units across stocks (bare GET /api/units endpoint).
+ * Ordered newest first. Optional filters: search (partial barcode),
+ * status, stockUuid.
+ */
+export const listAllUnits = async ({ search, status, stockUuid } = {}) => {
+    const where = {};
+
+    if (search) {
+        where.barcode = { [Sequelize.Op.like]: `%${search}%` };
+    }
+
+    if (status) {
+        where.status = status;
+    }
+
+    if (stockUuid) {
+        where['$stock.uuid$'] = stockUuid;
+    }
+
+    const units = await Unit.findAll({
+        where,
+        include: [
+            {
+                model: Stock,
+                as: 'stock',
+                attributes: ['uuid'],
+                include: [
+                    {
+                        model: ProductType,
+                        as: 'productType',
+                        attributes: ['uuid', 'name'],
+                    },
+                    {
+                        model: ProductType,
+                        as: 'subType',
+                        attributes: ['uuid', 'name'],
+                    },
+                    {
+                        model: Vendor,
+                        as: 'vendor',
+                        attributes: ['uuid', 'name'],
+                    },
+                    {
+                        model: Trip,
+                        as: 'trip',
+                        attributes: ['uuid'],
+                    },
+                ],
+            },
+            {
+                model: Colour,
+                as: 'colour',
+                attributes: ['uuid', 'name'],
+            },
+            {
+                model: Size,
+                as: 'size',
+                attributes: ['uuid', 'name'],
+            },
+        ],
+        order: [['createdAt', 'DESC']],
+    });
+
+    return units.map(mapListAllUnitsDTO);
+};
+
+function deriveStockName(stock) {
+    const parts = [];
+    if (stock.productType?.name) parts.push(stock.productType.name);
+    if (stock.subType?.name) parts.push(stock.subType.name);
+    return parts.length > 0 ? parts.join(' ') : null;
+}
+
+function mapListAllUnitsDTO(unit) {
+    return {
+        uuid: unit.uuid,
+        barcode: unit.barcode,
+        stockUuid: unit.stock?.uuid || null,
+        stockName: unit.stock ? deriveStockName(unit.stock) : null,
+        vendorUuid: unit.stock?.vendor?.uuid || null,
+        vendorName: unit.stock?.vendor?.name || null,
+        tripUuid: unit.stock?.trip?.uuid || null,
+        colourUuid: unit.colour?.uuid || null,
+        colourName: unit.colour?.name || null,
+        sizeUuid: unit.size?.uuid || null,
+        sizeName: unit.size?.name || null,
+        status: unit.status,
+        channel: unit.channel,
+        buyingPricePaise: String(unit.buyingPricePaise),
+        sellingPricePaise: String(unit.sellingPricePaise),
+        floorPricePaise: String(unit.floorPricePaise),
+        createdAt: unit.createdAt,
+    };
+}
 
 /**
  * State machine guard table defining all legal transitions

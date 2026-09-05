@@ -29,6 +29,12 @@ export default (sequelize) => {
                 allowNull: false,
             },
 
+            subTypeId: {
+                type: DataTypes.INTEGER,
+                field: 'sub_type_id',
+                allowNull: true,
+            },
+
             name: {
                 type: DataTypes.STRING(200),
                 allowNull: true,
@@ -38,6 +44,12 @@ export default (sequelize) => {
                 type: DataTypes.BIGINT,
                 field: 'buying_price_paise',
                 allowNull: false,
+            },
+
+            wholeBuyingPricePaise: {
+                type: DataTypes.BIGINT,
+                field: 'whole_buying_price_paise',
+                allowNull: true,
             },
 
             defaultQuantity: {

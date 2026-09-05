@@ -14,6 +14,7 @@ const STOCK_INCLUDE = (whereDeleted = { [Sequelize.Op.is]: null }) => ({
         'productTypeId',
         'quantity',
         'buyingPricePaise',
+        'wholeBuyingPricePaise',
         'sellingPricePaise',
         'floorPricePaise',
         'channel',
@@ -27,6 +28,11 @@ const STOCK_INCLUDE = (whereDeleted = { [Sequelize.Op.is]: null }) => ({
         {
             model: ProductType,
             as: 'productType',
+            attributes: ['uuid'],
+        },
+        {
+            model: ProductType,
+            as: 'subType',
             attributes: ['uuid'],
         },
         {
@@ -71,11 +77,12 @@ export const listTrips = async () => {
         include: [TRIP_VENDOR_INCLUDE()],
     });
 
-    // Sum of (quantity * buying_price_paise) across all active stocks per trip
+    // Sum of (whole_buying_price_paise when present, else quantity * buying_price_paise)
+    // across all active stocks per trip
     const stockSums = await Stock.findAll({
         attributes: [
             'tripId',
-            [Sequelize.fn('SUM', Sequelize.literal('quantity * buying_price_paise')), 'buyingSum'],
+            [Sequelize.fn('SUM', Sequelize.literal('COALESCE(whole_buying_price_paise, quantity * buying_price_paise)')), 'buyingSum'],
         ],
         where: { deletedAt: { [Sequelize.Op.is]: null } },
         group: ['tripId'],
@@ -312,6 +319,7 @@ export const getLastStockForTrip = async (tripUuid) => {
             'productTypeId',
             'quantity',
             'buyingPricePaise',
+            'wholeBuyingPricePaise',
             'sellingPricePaise',
             'floorPricePaise',
             'channel',
@@ -324,6 +332,11 @@ export const getLastStockForTrip = async (tripUuid) => {
             {
                 model: ProductType,
                 as: 'productType',
+                attributes: ['uuid'],
+            },
+            {
+                model: ProductType,
+                as: 'subType',
                 attributes: ['uuid'],
             },
             {
@@ -363,7 +376,12 @@ function mapTripDTO(trip, stockBuyingSum) {
     if (stockBuyingSum !== null) {
         buyingSum = stockBuyingSum;
     } else {
-        buyingSum = (trip.stocks || []).reduce((sum, s) => sum + (s.quantity * Number(s.buyingPricePaise)), 0);
+        buyingSum = (trip.stocks || []).reduce((sum, s) => {
+            const cost = s.wholeBuyingPricePaise != null
+                ? Number(s.wholeBuyingPricePaise)
+                : (s.quantity * Number(s.buyingPricePaise));
+            return sum + cost;
+        }, 0);
     }
 
     const dto = {
@@ -428,8 +446,10 @@ function mapStockDTO(stock, tripUuid) {
         tripVendorUuid: stock.tripVendor?.uuid || null,
         vendorUuid: stock.vendor?.uuid || null,
         productTypeUuid: stock.productType?.uuid || null,
+        subTypeUuid: stock.subType?.uuid || null,
         quantity: stock.quantity,
         buyingPricePaise: String(stock.buyingPricePaise),
+        wholeBuyingPricePaise: stock.wholeBuyingPricePaise != null ? String(stock.wholeBuyingPricePaise) : null,
         sellingPricePaise: String(stock.sellingPricePaise),
         floorPricePaise: String(stock.floorPricePaise),
         channel: stock.channel,
@@ -453,10 +473,12 @@ function mapStockDTO(stock, tripUuid) {
 function mapCloneStockDTO(stock) {
     return {
         productTypeUuid: stock.productType?.uuid || null,
+        subTypeUuid: stock.subType?.uuid || null,
         vendorUuid: stock.vendor?.uuid || null,
         tripVendorUuid: stock.tripVendor?.uuid || null,
         quantity: stock.quantity,
         buyingPricePaise: String(stock.buyingPricePaise),
+        wholeBuyingPricePaise: stock.wholeBuyingPricePaise != null ? String(stock.wholeBuyingPricePaise) : null,
         sellingPricePaise: String(stock.sellingPricePaise),
         floorPricePaise: String(stock.floorPricePaise),
         channel: stock.channel,

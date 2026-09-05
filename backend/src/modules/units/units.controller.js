@@ -1,5 +1,24 @@
-import { getUnitByUuid, getUnitByBarcode, getUnitStatusEvents, transitionUnitEndpoint } from './units.service.js';
-import { transitionUnitParamsSchema, transitionUnitBodySchema } from './units.validation.js';
+import { getUnitByUuid, getUnitByBarcode, getUnitStatusEvents, transitionUnitEndpoint, listAllUnits } from './units.service.js';
+import { transitionUnitParamsSchema, transitionUnitBodySchema, listAllUnitsQuerySchema } from './units.validation.js';
+
+/**
+ * GET /api/units
+ * List all units across stocks (bare list-all endpoint)
+ */
+export const listAllUnitsRoute = async (req, res, next) => {
+    try {
+        const query = listAllUnitsQuerySchema.parse(req.query || {});
+
+        const units = await listAllUnits(query);
+
+        return res.status(200).json({
+            success: true,
+            data: units,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
 
 /**
  * GET /api/units/:uuid

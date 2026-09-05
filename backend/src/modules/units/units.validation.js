@@ -36,6 +36,15 @@ export const getStatusEventsQuerySchema = z.object({
 });
 
 /**
+ * Validation schema for GET /api/units (bare list-all endpoint)
+ */
+export const listAllUnitsQuerySchema = z.object({
+    search: z.string().trim().max(200).optional(),
+    status: z.string().trim().max(20).optional(),
+    stockUuid: uuidSchema.optional(),
+});
+
+/**
  * Validation schema for GET /api/units/by-barcode/:barcode
  */
 export const getUnitByBarcodeParamsSchema = z.object({

@@ -1,4 +1,28 @@
 import { Stock, Trip, TripVendor, Vendor, ProductType, Unit, Colour, Size, sequelize } from '../../../database/models/index.js';
+import { Sequelize } from 'sequelize';
+
+const STOCK_INCLUDES = [
+    {
+        model: ProductType,
+        as: 'productType',
+        attributes: ['uuid'],
+    },
+    {
+        model: ProductType,
+        as: 'subType',
+        attributes: ['uuid'],
+    },
+    {
+        model: Vendor,
+        as: 'vendor',
+        attributes: ['uuid', 'name'],
+    },
+    {
+        model: TripVendor,
+        as: 'tripVendor',
+        attributes: ['uuid'],
+    },
+];
 
 /**
  * Verify that the given trip exists (access check for nested stock routes)
@@ -39,8 +63,10 @@ export const createStock = async ({
     tripUuid,
     vendorUuid,
     productTypeUuid,
+    subTypeUuid,
     quantity,
     buyingPricePaise,
+    wholeBuyingPricePaise,
     sellingPricePaise,
     floorPricePaise,
     channel,
@@ -111,6 +137,11 @@ export const createStock = async ({
             throw error;
         }
 
+        let subTypeId = null;
+        if (subTypeUuid != null) {
+            subTypeId = (await resolveSubType(subTypeUuid, transaction)).id;
+        }
+
         // Additional constraint validations
         if (floorPricePaise > sellingPricePaise) {
             const error = new Error('Floor price cannot exceed selling price');
@@ -133,8 +164,10 @@ export const createStock = async ({
                 tripVendorId: tripVendor.id,
                 vendorId: vendor.id,
                 productTypeId: productType.id,
+                subTypeId,
                 quantity,
                 buyingPricePaise,
+                wholeBuyingPricePaise: wholeBuyingPricePaise ?? null,
                 sellingPricePaise,
                 floorPricePaise,
                 channel,
@@ -147,7 +180,10 @@ export const createStock = async ({
 
         await transaction.commit();
 
-        return mapStockDTO(stock, tripUuid, vendorUuid, productTypeUuid);
+        const created = await Stock.findByPk(stock.id, {
+            include: STOCK_INCLUDES,
+        });
+        return mapStockDTO(created, tripUuid, created.vendor?.uuid || null, created.productType?.uuid || null);
     } catch (error) {
         await transaction.rollback();
         throw error;
@@ -176,6 +212,7 @@ export const getStocksByTrip = async (tripUuid) => {
             'productTypeId',
             'quantity',
             'buyingPricePaise',
+            'wholeBuyingPricePaise',
             'sellingPricePaise',
             'floorPricePaise',
             'channel',
@@ -185,23 +222,7 @@ export const getStocksByTrip = async (tripUuid) => {
             'createdAt',
             'updatedAt',
         ],
-        include: [
-            {
-                model: ProductType,
-                as: 'productType',
-                attributes: ['uuid'],
-            },
-            {
-                model: Vendor,
-                as: 'vendor',
-                attributes: ['uuid'],
-            },
-            {
-                model: TripVendor,
-                as: 'tripVendor',
-                attributes: ['uuid'],
-            },
-        ],
+        include: STOCK_INCLUDES,
         order: [['createdAt', 'ASC']],
     });
 
@@ -233,6 +254,7 @@ export const getStockByUuid = async (tripUuid, stockUuid) => {
             'productTypeId',
             'quantity',
             'buyingPricePaise',
+            'wholeBuyingPricePaise',
             'sellingPricePaise',
             'floorPricePaise',
             'channel',
@@ -242,23 +264,7 @@ export const getStockByUuid = async (tripUuid, stockUuid) => {
             'createdAt',
             'updatedAt',
         ],
-        include: [
-            {
-                model: ProductType,
-                as: 'productType',
-                attributes: ['uuid'],
-            },
-            {
-                model: Vendor,
-                as: 'vendor',
-                attributes: ['uuid'],
-            },
-            {
-                model: TripVendor,
-                as: 'tripVendor',
-                attributes: ['uuid'],
-            },
-        ],
+        include: STOCK_INCLUDES,
     });
 
     if (!stock) {
@@ -333,23 +339,35 @@ export const updateStock = async (tripUuid, stockUuid, updates) => {
             }
         }
 
+        // Build the patch (only validated fields reach the model; subTypeUuid maps to subTypeId)
+        const patch = {};
+        if (updates.quantity !== undefined) patch.quantity = updates.quantity;
+        if (updates.buyingPricePaise !== undefined) patch.buyingPricePaise = updates.buyingPricePaise;
+        if (updates.wholeBuyingPricePaise !== undefined) patch.wholeBuyingPricePaise = updates.wholeBuyingPricePaise ?? null;
+        if (updates.sellingPricePaise !== undefined) patch.sellingPricePaise = updates.sellingPricePaise;
+        if (updates.floorPricePaise !== undefined) patch.floorPricePaise = updates.floorPricePaise;
+        if (updates.rentPerDayPaise !== undefined) patch.rentPerDayPaise = updates.rentPerDayPaise ?? null;
+        if (updates.depositPaise !== undefined) patch.depositPaise = updates.depositPaise ?? null;
+        if (updates.overduePerDayPaise !== undefined) patch.overduePerDayPaise = updates.overduePerDayPaise ?? null;
+        if (updates.subTypeUuid !== undefined) {
+            if (updates.subTypeUuid === null) {
+                patch.subTypeId = null;
+            } else {
+                patch.subTypeId = (await resolveSubType(updates.subTypeUuid, transaction)).id;
+            }
+        }
+
         // Update the stock
-        await stock.update(updates, { transaction });
+        await stock.update(patch, { transaction });
 
         await transaction.commit();
 
-        // Fetch the product type + vendor UUIDs for the response
-        const productType = await ProductType.findOne({
-            where: { id: stock.productTypeId },
-            attributes: ['uuid'],
+        // Fetch the stock with its associations for the response
+        const updated = await Stock.findByPk(stock.id, {
+            include: STOCK_INCLUDES,
         });
 
-        const vendor = await Vendor.findOne({
-            where: { id: stock.vendorId },
-            attributes: ['uuid'],
-        });
-
-        return mapStockDTO(stock, tripUuid, vendor?.uuid || null, productType?.uuid || null);
+        return mapStockDTO(updated, tripUuid, updated.vendor?.uuid || null, updated.productType?.uuid || null);
     } catch (error) {
         await transaction.rollback();
         throw error;
@@ -546,8 +564,10 @@ function mapStockDTO(stock, tripUuid, vendorUuid, productTypeUuid) {
         tripVendorUuid: stock.tripVendor?.uuid || null,
         vendorUuid,
         productTypeUuid,
+        subTypeUuid: stock.subType?.uuid || null,
         quantity: stock.quantity,
         buyingPricePaise: String(stock.buyingPricePaise),
+        wholeBuyingPricePaise: stock.wholeBuyingPricePaise != null ? String(stock.wholeBuyingPricePaise) : null,
         sellingPricePaise: String(stock.sellingPricePaise),
         floorPricePaise: String(stock.floorPricePaise),
         channel: stock.channel,
@@ -556,5 +576,133 @@ function mapStockDTO(stock, tripUuid, vendorUuid, productTypeUuid) {
         overduePerDayPaise: stock.overduePerDayPaise !== null ? String(stock.overduePerDayPaise) : null,
         createdAt: stock.createdAt,
         updatedAt: stock.updatedAt,
+    };
+}
+
+/**
+ * Resolve a subtype UUID to an active ProductType row that itself has a parent
+ * (i.e. it must be a SUBTYPE, not a top-level product type).
+ */
+async function resolveSubType(subTypeUuid, transaction) {
+    const subType = await ProductType.findOne({
+        where: { uuid: subTypeUuid, deletedAt: null },
+        transaction,
+    });
+
+    if (!subType) {
+        const error = new Error('Sub type not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (!subType.isActive) {
+        const error = new Error('Sub type is inactive');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (!subType.parentId) {
+        const error = new Error('Sub type must belong to a parent product type');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    return subType;
+}
+
+/**
+ * List ALL stocks across trips (bare GET /api/stocks endpoint).
+ * Ordered newest first. Optional filters: tripUuid, vendorUuid, search on
+ * product type name / subtype name (partial).
+ */
+export const listAllStocks = async ({ tripUuid, vendorUuid, search } = {}) => {
+    const where = {};
+
+    if (tripUuid) {
+        const trip = await Trip.findOne({ where: { uuid: tripUuid } });
+        if (!trip) {
+            const error = new Error('Trip not found');
+            error.statusCode = 404;
+            throw error;
+        }
+        where.tripId = trip.id;
+    }
+
+    if (vendorUuid) {
+        const vendor = await Vendor.findOne({ where: { uuid: vendorUuid, deletedAt: null } });
+        if (!vendor) {
+            const error = new Error('Vendor not found');
+            error.statusCode = 404;
+            throw error;
+        }
+        where.vendorId = vendor.id;
+    }
+
+    if (search) {
+        const like = `%${search}%`;
+        where[Sequelize.Op.or] = [
+            { '$productType.name$': { [Sequelize.Op.like]: like } },
+            { '$subType.name$': { [Sequelize.Op.like]: like } },
+        ];
+    }
+
+    const stocks = await Stock.findAll({
+        where,
+        attributes: [
+            'id',
+            'uuid',
+            'tripVendorId',
+            'vendorId',
+            'productTypeId',
+            'quantity',
+            'buyingPricePaise',
+            'wholeBuyingPricePaise',
+            'sellingPricePaise',
+            'floorPricePaise',
+            'channel',
+            'createdAt',
+        ],
+        include: [
+            ...STOCK_INCLUDES,
+            {
+                model: Trip,
+                as: 'trip',
+                attributes: ['uuid'],
+            },
+            {
+                model: Unit,
+                as: 'units',
+                where: { deletedAt: null },
+                required: false,
+                attributes: ['id'],
+            },
+        ],
+        order: [['createdAt', 'DESC']],
+    });
+
+    return stocks.map(mapListAllStocksDTO);
+};
+
+/**
+ * Map Stock to the bare list-all DTO (GET /api/stocks).
+ * Paise values returned as STRINGS to preserve BIGINT precision.
+ */
+function mapListAllStocksDTO(stock) {
+    return {
+        uuid: stock.uuid,
+        tripUuid: stock.trip?.uuid || null,
+        tripVendorUuid: stock.tripVendor?.uuid || null,
+        vendorUuid: stock.vendor?.uuid || null,
+        vendorName: stock.vendor?.name || null,
+        productTypeUuid: stock.productType?.uuid || null,
+        subTypeUuid: stock.subType?.uuid || null,
+        quantity: stock.quantity,
+        buyingPricePaise: String(stock.buyingPricePaise),
+        wholeBuyingPricePaise: stock.wholeBuyingPricePaise != null ? String(stock.wholeBuyingPricePaise) : null,
+        sellingPricePaise: String(stock.sellingPricePaise),
+        floorPricePaise: String(stock.floorPricePaise),
+        channel: stock.channel,
+        unitsScannedCount: (stock.units || []).length,
+        createdAt: stock.createdAt,
     };
 }

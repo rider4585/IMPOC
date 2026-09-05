@@ -11,6 +11,7 @@ import {
     getStockByUuid,
     updateStock,
     scanIntoStock,
+    listAllStocks,
 } from './stock.controller.js';
 
 const router = express.Router({ mergeParams: true });
@@ -30,4 +31,11 @@ router.post('/:uuid/scan', authenticate, authorize(PERMISSIONS.INVENTORY.CREATE)
 // PATCH to update a stock
 router.patch('/:uuid', authenticate, authorize(PERMISSIONS.INVENTORY.UPDATE), updateStock);
 
+// Bare list-all router (mounted at /api/stocks)
+const stockListRouter = express.Router();
+
+// GET /api/stocks - list all stocks across trips
+stockListRouter.get('/', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), listAllStocks);
+
 export default router;
+export { stockListRouter };
