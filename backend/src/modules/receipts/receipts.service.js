@@ -25,7 +25,7 @@ const RENTAL_FIND_OPTIONS = {
 
 function storeInfo() {
     return {
-        name: process.env.STORE_NAME || 'Munder Difflin',
+        name: process.env.STORE_NAME || 'SHREE Fashion Store',
         address: process.env.STORE_ADDRESS || '',
         phone: process.env.STORE_PHONE || '',
     };
