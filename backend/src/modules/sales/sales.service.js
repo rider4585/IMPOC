@@ -51,6 +51,8 @@ function mapSaleDTO(sale, lines = [], reversals = []) {
         customerId: sale.customerId,
         customer,
         soldAt: sale.soldAt,
+        paymentMethod: sale.paymentMethod || null,
+        customerSource: sale.customerSource || null,
         totalPaise: String(sale.totalPaise),
         status: sale.status,
         notes: sale.notes,
@@ -111,10 +113,10 @@ async function resolveSellableUnit({ unitUuid, barcode }, transaction) {
  * Snapshots each unit's selling_price_paise at checkout and moves each unit
  * in_stock -> sold via the state machine inside one transaction.
  *
- * @param {Object} params - { customerName, customerUuid, soldAt, notes, items, actorUserId }
+ * @param {Object} params - { customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, items, actorUserId }
  * @returns {Object} sale DTO
  */
-export const createSale = async ({ customerName, customerUuid, soldAt, notes, items, actorUserId }) => {
+export const createSale = async ({ customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, items, actorUserId }) => {
     const transaction = await sequelize.transaction();
     try {
         const units = [];
@@ -140,6 +142,8 @@ export const createSale = async ({ customerName, customerUuid, soldAt, notes, it
                 soldAt: date,
                 totalPaise,
                 status: 'completed',
+                paymentMethod: paymentMethod || null,
+                customerSource: customerSource || null,
                 notes: notes || null,
                 createdBy: actorUserId || null,
             },

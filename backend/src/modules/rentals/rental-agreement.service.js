@@ -124,6 +124,8 @@ function mapAgreementDTO(agreement, lines = [], returns = [], reversals = []) {
         customer,
         startDate: agreement.startDate,
         dueDate: agreement.dueDate,
+        paymentMethod: agreement.paymentMethod || null,
+        customerSource: agreement.customerSource || null,
         depositRefundablePaise: String(agreement.depositRefundablePaise),
         status: agreement.status,
         notes: agreement.notes,
@@ -175,10 +177,10 @@ function mapAgreementDTO(agreement, lines = [], returns = [], reversals = []) {
  * transitions each unit in_stock -> rented (HAND_OVER), and computes due_date
  * from start_date + rental period, all inside one transaction.
  *
- * @param {Object} params - { customerName, customerUuid, startDate, rentalDays, notes, items, actorUserId }
+ * @param {Object} params - { customerName, customerUuid, startDate, rentalDays, paymentMethod, customerSource, notes, items, actorUserId }
  * @returns {Object} agreement DTO
  */
-export const createRental = async ({ customerName, customerUuid, startDate, rentalDays, notes, items, actorUserId }) => {
+export const createRental = async ({ customerName, customerUuid, startDate, rentalDays, paymentMethod, customerSource, notes, items, actorUserId }) => {
     const transaction = await sequelize.transaction();
     try {
         const units = [];
@@ -208,6 +210,8 @@ export const createRental = async ({ customerName, customerUuid, startDate, rent
                 dueDate: due,
                 depositRefundablePaise,
                 status: 'active',
+                paymentMethod: paymentMethod || null,
+                customerSource: customerSource || null,
                 notes: notes || null,
                 createdBy: actorUserId || null,
             },

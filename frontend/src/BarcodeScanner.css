@@ -25,33 +25,19 @@ html {
     -webkit-text-size-adjust: 100%;
 }
 
-body {
-    position: fixed;
-
-    inset: 0;
-
-    overflow: hidden;
-
-    background: #ffffff;
-
-    /*
-     * Prevent pull-to-refresh / overscroll behavior.
-     */
-    overscroll-behavior: none;
-
-    /*
-     * Prevent accidental browser gestures.
-     */
-    touch-action: manipulation;
-}
-
 
 /* =========================================================
    Scanner root
    ========================================================= */
 
+/*
+ * Fills the camera window the parent provides
+ * (an aspect-ratio box inside the intake screen),
+ * instead of taking over the whole viewport.
+ */
+
 .barcode-scanner {
-    position: fixed;
+    position: absolute;
 
     inset: 0;
 
@@ -67,20 +53,39 @@ body {
 
     box-sizing: border-box;
 
-    /*
-     * Respect iPhone safe areas.
-     */
-    padding-top: env(safe-area-inset-top);
-    padding-right: env(safe-area-inset-right);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-
     touch-action: manipulation;
 }
 
 
 /* =========================================================
-   Start screen
+   Starting screen
+   ========================================================= */
+
+.scanner-starting {
+    position: absolute;
+
+    inset: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 24px;
+
+    color: #111111;
+
+    font-size: 16px;
+    font-weight: 500;
+
+    text-align: center;
+
+    box-sizing: border-box;
+}
+
+
+/* =========================================================
+   Error / start screen
    ========================================================= */
 
 .scanner-start {
@@ -132,13 +137,6 @@ body {
 }
 
 .scanner-error {
-    position: absolute;
-
-    left: 24px;
-    right: 24px;
-
-    bottom: 24px;
-
     padding: 12px;
 
     border-radius: 10px;
@@ -242,22 +240,102 @@ body {
 
 
 /* =========================================================
+   Floating zoom control
+   ========================================================= */
+
+.scanner-zoom {
+    position: absolute;
+
+    right: 16px;
+    bottom: 16px;
+
+    z-index: 30;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 6px;
+
+    height: 42px;
+
+    padding: 6px 10px;
+
+    border: 1px solid
+    rgba(255, 255, 255, 0.35);
+
+    border-radius: 22px;
+
+    background: rgba(0, 0, 0, 0.65);
+
+    box-sizing: border-box;
+}
+
+.scanner-zoom-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 32px;
+    height: 32px;
+
+    padding: 0;
+
+    border: none;
+    border-radius: 50%;
+
+    background: rgba(255, 255, 255, 0.2);
+
+    color: #ffffff;
+
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1;
+
+    cursor: pointer;
+
+    touch-action: manipulation;
+
+    -webkit-tap-highlight-color: transparent;
+
+    user-select: none;
+    -webkit-user-select: none;
+
+    box-sizing: border-box;
+}
+
+.scanner-zoom-button:active {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.scanner-zoom-value {
+    min-width: 36px;
+
+    color: #ffffff;
+
+    text-align: center;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================================
    Camera
    ========================================================= */
 
 .scanner-camera {
     position: absolute;
 
-    /*
-     * Leave a small area at the bottom for Close.
-     */
     top: 0;
     left: 0;
     right: 0;
-    bottom: 64px;
+    bottom: 0;
 
     width: 100%;
-    height: auto;
+    height: 100%;
 
     overflow: hidden;
 
@@ -487,64 +565,10 @@ body {
 
 
 /* =========================================================
-   Close
-   ========================================================= */
-
-.scanner-close {
-    position: absolute;
-
-    left: 16px;
-    right: 16px;
-    bottom: 10px;
-
-    z-index: 20;
-
-    width: calc(100% - 32px);
-
-    height: 44px;
-
-    padding: 10px 16px;
-
-    border: 1px solid #dddddd;
-    border-radius: 10px;
-
-    background: #ffffff;
-    color: #444444;
-
-    font-size: 15px;
-    font-weight: 500;
-
-    cursor: pointer;
-
-    touch-action: manipulation;
-
-    -webkit-tap-highlight-color: transparent;
-
-    user-select: none;
-    -webkit-user-select: none;
-
-    box-sizing: border-box;
-}
-
-.scanner-close:active {
-    background: #eeeeee;
-}
-
-
-/* =========================================================
    Very small phones
    ========================================================= */
 
 @media (max-height: 600px) {
-    .scanner-camera {
-        bottom: 58px;
-    }
-
-    .scanner-close {
-        bottom: 7px;
-        height: 42px;
-    }
-
     .scanner-frame {
         width: 90%;
         height: 24%;
@@ -560,6 +584,11 @@ body {
 
     .scanner-torch {
         top: 12px;
+        right: 12px;
+    }
+
+    .scanner-zoom {
+        bottom: 12px;
         right: 12px;
     }
 }
@@ -588,19 +617,17 @@ body {
         font-size: 14px;
     }
 
-    .scanner-close {
-        left: 12px;
-        right: 12px;
-
-        width: calc(100% - 24px);
-    }
-
     .scanner-torch {
         top: 10px;
         right: 10px;
 
         min-width: 68px;
         height: 40px;
+    }
+
+    .scanner-zoom {
+        bottom: 10px;
+        right: 10px;
     }
 }
 
@@ -634,8 +661,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
     .scanner-start-button,
-    .scanner-close,
-    .scanner-torch {
+    .scanner-torch,
+    .scanner-zoom-button {
         transition: none;
     }
 }

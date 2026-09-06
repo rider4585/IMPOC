@@ -17,27 +17,60 @@ function loadSettings() {
   }
 }
 
-function applyToDocument(settings) {
+// 'system' resolves to the OS preference; light/dark are explicit overrides.
+function resolveScheme(colorScheme, systemDark) {
+  if (colorScheme !== 'system') return colorScheme;
+  return systemDark ? 'dark' : 'light';
+}
+
+function applyToDocument(settings, effectiveScheme) {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
-  root.setAttribute('data-theme', settings.colorScheme);
+  root.setAttribute('data-theme', effectiveScheme);
   root.setAttribute('data-primary', settings.primaryColor);
   root.setAttribute('data-font', settings.fontFamily);
   const meta = document.querySelector('meta[name="color-scheme"]');
-  if (meta) meta.setAttribute('content', settings.colorScheme);
+  if (meta) meta.setAttribute('content', effectiveScheme);
 }
 
 export function ThemeProvider({ children }) {
   const [settings, setSettings] = useState(loadSettings);
+  const [systemDark, setSystemDark] = useState(() => {
+    try {
+      return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
-    applyToDocument(settings);
+    let mql = null;
+    try {
+      if (typeof window.matchMedia === 'function') {
+        mql = window.matchMedia('(prefers-color-scheme: dark)');
+        const onChange = (e) => setSystemDark(e.matches);
+        mql.addEventListener('change', onChange);
+        return () => mql.removeEventListener('change', onChange);
+      }
+    } catch {
+      /* matchMedia unavailable */
+    }
+    return undefined;
+  }, []);
+
+  const resolvedColorScheme = useMemo(
+    () => resolveScheme(settings.colorScheme, systemDark),
+    [settings.colorScheme, systemDark],
+  );
+
+  useEffect(() => {
+    applyToDocument(settings, resolvedColorScheme);
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(settings));
     } catch {
       /* storage unavailable */
     }
-  }, [settings]);
+  }, [resolvedColorScheme, settings]);
 
   const setColorScheme = useCallback((colorScheme) => {
     setSettings((s) => ({ ...s, colorScheme }));
@@ -56,8 +89,8 @@ export function ThemeProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ settings, setColorScheme, setPrimaryColor, setFontFamily, reset }),
-    [settings, setColorScheme, setPrimaryColor, setFontFamily, reset],
+    () => ({ settings, resolvedColorScheme, setColorScheme, setPrimaryColor, setFontFamily, reset }),
+    [settings, resolvedColorScheme, setColorScheme, setPrimaryColor, setFontFamily, reset],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

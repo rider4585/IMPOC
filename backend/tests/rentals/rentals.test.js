@@ -155,6 +155,8 @@ describe('Rental agreements module (T-10)', () => {
                     customerName: 'Rental Customer',
                     startDate: '2026-09-01',
                     rentalDays: 5,
+                    paymentMethod: 'Cash',
+                    customerSource: 'WhatsApp group',
                     items: [{ unitUuid: u1.uuid }, { unitUuid: u2.uuid }],
                 })
                 .expect(201);
@@ -165,6 +167,8 @@ describe('Rental agreements module (T-10)', () => {
             expect(agreement.status).toBe('active');
             expect(agreement.startDate).toBe('2026-09-01');
             expect(agreement.dueDate).toBe('2026-09-06'); // +5 days
+            expect(agreement.paymentMethod).toBe('Cash');
+            expect(agreement.customerSource).toBe('WhatsApp group');
             expect(agreement.depositRefundablePaise).toBe('10000'); // 2 * 5000
             expect(agreement.lines).toHaveLength(2);
             expect(agreement.lines[0].rentPerDayPaise).toBe('10000');

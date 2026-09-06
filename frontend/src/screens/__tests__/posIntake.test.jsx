@@ -23,6 +23,25 @@ vi.mock('../../services/picklistsApi.js', () => ({
   getProductTypes: vi.fn().mockResolvedValue([]),
   getColours: vi.fn().mockResolvedValue([]),
   getSizes: vi.fn().mockResolvedValue([]),
+  getPaymentMethods: vi.fn().mockResolvedValue([
+    { uuid: 'pm-1', name: 'Cash', isActive: true },
+    { uuid: 'pm-2', name: 'UPI', isActive: true },
+  ]),
+  getCustomerSources: vi.fn().mockResolvedValue([
+    { uuid: 'cs-1', name: 'Instagram', isActive: true },
+    { uuid: 'cs-2', name: 'WhatsApp group', isActive: true },
+    { uuid: 'cs-3', name: 'Pamphlet', isActive: true },
+  ]),
+}));
+
+vi.mock('../../components/BarcodeScanner.jsx', () => ({
+  default: ({ onDetected }) => (
+    <div data-testid="pos-barcode-scanner">
+      <button type="button" onClick={() => onDetected('SCANNED-1')}>
+        Simulate scan
+      </button>
+    </div>
+  ),
 }));
 
 import { POSScreen } from '../pos/POSScreen.jsx';
@@ -47,9 +66,34 @@ describe('POSScreen (T-09)', () => {
     renderWithToast(<POSScreen />);
     expect(screen.getByRole('heading', { name: /point of sale/i })).toBeInTheDocument();
     expect(screen.getByText(/cart is empty/i)).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
-  it('adds a sellable unit by barcode and updates the total', async () => {
+  it('adds a sellable unit by barcode showing product name + details and updates the total', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+      stockName: 'Sari Paithani',
+      colourName: 'Red',
+      sizeName: 'XL',
+    });
+    renderWithToast(<POSScreen />);
+    fireEvent.change(screen.getByLabelText(/barcode/), { target: { value: 'B-100' } });
+    fireEvent.keyDown(screen.getByLabelText(/barcode/), { key: 'Enter' });
+    await waitFor(() => {
+      expect(screen.getByText('Sari Paithani')).toBeInTheDocument();
+    });
+    const row = screen.getByText('Sari Paithani').closest('li');
+    expect(row).toHaveTextContent('B-100');
+    expect(row).toHaveTextContent('Red');
+    expect(row).toHaveTextContent('XL');
+    expect(screen.getByTestId('pos-total').textContent).toBe('₹250.00');
+  });
+
+  it('falls back to the barcode when the unit has no stock name', async () => {
     unitsService.getUnitByBarcode.mockResolvedValue({
       uuid: 'u1',
       barcode: 'B-100',
@@ -61,9 +105,9 @@ describe('POSScreen (T-09)', () => {
     fireEvent.change(screen.getByLabelText(/barcode/), { target: { value: 'B-100' } });
     fireEvent.keyDown(screen.getByLabelText(/barcode/), { key: 'Enter' });
     await waitFor(() => {
-      expect(screen.getByText('B-100')).toBeInTheDocument();
+      expect(screen.getByText('Item B-100')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('pos-total').textContent).toBe('₹250.00');
+    expect(screen.getByText('B-100')).toBeInTheDocument();
   });
 
   it('rejects rental and out-of-stock units', async () => {
@@ -112,6 +156,7 @@ describe('POSScreen (T-09)', () => {
       expect(salesService.createSale).toHaveBeenCalledWith({
         customerName: undefined,
         customerUuid: undefined,
+        paymentMethod: 'Cash',
         items: [{ unitUuid: 'u1' }],
       });
       expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
@@ -123,7 +168,7 @@ describe('POSScreen (T-09)', () => {
       { uuid: 'cust-1', name: 'Priya Sharma', phone: '9876543210' },
     ]);
     renderWithToast(<POSScreen />);
-    const input = screen.getByLabelText(/customer/i);
+    const input = screen.getByLabelText(/^customer$/i);
     fireEvent.change(input, { target: { value: 'Priya' } });
     await waitFor(() => {
       expect(screen.getByText('Priya Sharma')).toBeInTheDocument();
@@ -159,7 +204,7 @@ describe('POSScreen (T-09)', () => {
     fireEvent.keyDown(barcodeInput, { key: 'Enter' });
     await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
 
-    const pickerInput = screen.getByLabelText(/customer/i);
+    const pickerInput = screen.getByLabelText(/^customer$/i);
     fireEvent.change(pickerInput, { target: { value: 'Priya' } });
     fireEvent.click(await screen.findByRole('button', { name: /priya sharma/i }));
 
@@ -168,9 +213,81 @@ describe('POSScreen (T-09)', () => {
       expect(salesService.createSale).toHaveBeenCalledWith({
         customerName: 'Priya Sharma',
         customerUuid: 'cust-1',
+        paymentMethod: 'Cash',
         items: [{ unitUuid: 'u1' }],
       });
       expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
+    });
+  });
+});
+
+describe('POS scanner feature', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authModule.useAuth.mockReturnValue({ permissions: [FULL.SALES.CREATE, FULL.SALES.VIEW] });
+  });
+
+  it('opens the camera scanner and adds a scanned unit to the cart', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'SCANNED-1',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '10000',
+      stockName: 'Sari Kanchi',
+      colourName: 'Blue',
+      sizeName: 'M',
+    });
+    renderWithToast(<POSScreen />);
+    fireEvent.click(screen.getByTestId('pos-scan-open'));
+    await waitFor(() => {
+      expect(screen.getByTestId('pos-barcode-scanner')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Simulate scan'));
+    await waitFor(() => {
+      expect(screen.getByText('Sari Kanchi')).toBeInTheDocument();
+      expect(screen.queryByTestId('pos-barcode-scanner')).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('pos-total').textContent).toBe('₹100.00');
+  });
+
+  it('sends the picked customer source to checkout', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+      stockName: 'Sari Paithani',
+    });
+    salesService.createSale.mockResolvedValue({
+      uuid: 's1',
+      saleNumber: 'SALE-001',
+      customerName: null,
+      soldAt: '2026-01-01T00:00:00.000Z',
+      totalPaise: '25000',
+      status: 'completed',
+      lines: [{ uuid: 'l1', barcode: 'B-100', sellingPricePaise: '25000', unitStatus: 'sold' }],
+      reversals: [],
+    });
+    renderWithToast(<POSScreen />);
+    const input = screen.getByLabelText(/barcode/);
+    fireEvent.change(input, { target: { value: 'B-100' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('pos-customer-source'));
+    fireEvent.click(await screen.findByRole('option', { name: /instagram/i }));
+
+    fireEvent.click(screen.getByTestId('pos-checkout'));
+    await waitFor(() => {
+      expect(salesService.createSale).toHaveBeenCalledWith({
+        customerName: undefined,
+        customerUuid: undefined,
+        paymentMethod: 'Cash',
+        customerSource: 'Instagram',
+        items: [{ unitUuid: 'u1' }],
+      });
     });
   });
 });

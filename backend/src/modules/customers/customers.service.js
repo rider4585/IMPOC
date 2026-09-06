@@ -74,7 +74,7 @@ export const createCustomer = async (payload) => {
 };
 
 /**
- * List customers, newest first. Partial match on name or phone.
+ * List customers, newest first. Partial match on name, phone, or email.
  * Empty search returns the most recent 20.
  */
 export const listCustomers = async ({ search } = {}) => {
@@ -85,6 +85,7 @@ export const listCustomers = async ({ search } = {}) => {
         where[Sequelize.Op.or] = [
             { name: { [Sequelize.Op.iLike]: `%${term}%` } },
             { phone: { [Sequelize.Op.iLike]: `%${term}%` } },
+            { email: { [Sequelize.Op.iLike]: `%${term}%` } },
         ];
     }
 

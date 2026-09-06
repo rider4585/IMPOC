@@ -11,6 +11,8 @@ import productTypesRoutes from './src/modules/product-types/product-type.routes.
 import coloursRoutes from './src/modules/colours/colour.routes.js';
 import sizesRoutes from './src/modules/sizes/size.routes.js';
 import damageGradesRoutes from './src/modules/damage-grades/damage-grade.routes.js';
+import paymentMethodRoutes from './src/modules/payment-methods/payment-method.routes.js';
+import customerSourceRoutes from './src/modules/customer-sources/customer-source.routes.js';
 import vendorsRoutes from './src/modules/vendors/vendor.routes.js';
 import tripRoutes from './src/modules/intake/trip.routes.js';
 import stockRoutes, { stockListRouter } from './src/modules/intake/stock.routes.js';
@@ -64,6 +66,8 @@ app.use('/api/picklists/product-types', productTypesRoutes);
 app.use('/api/picklists/colours', coloursRoutes);
 app.use('/api/picklists/sizes', sizesRoutes);
 app.use('/api/picklists/damage-grades', damageGradesRoutes);
+app.use('/api/picklists/payment-methods', paymentMethodRoutes);
+app.use('/api/picklists/customer-sources', customerSourceRoutes);
 app.use('/api/vendors', vendorsRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/trips/:tripUuid/stocks', stockRoutes);

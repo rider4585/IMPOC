@@ -5,7 +5,7 @@ import { ProductTypesManager } from './ProductTypesManager.jsx';
 import {
   FlatPicklistManager,
 } from './FlatPicklistManager.jsx';
-import { getColours, getSizes, getDamageGrades } from '../../services/picklistsApi.js';
+import { getColours, getSizes, getDamageGrades, getPaymentMethods, getCustomerSources } from '../../services/picklistsApi.js';
 import { DAMAGE_GRADE_OUTCOMES } from '../../constants/damageGrades.js';
 
 const TABS = [
@@ -13,6 +13,8 @@ const TABS = [
   { key: 'colours', label: 'Colours' },
   { key: 'sizes', label: 'Sizes' },
   { key: 'damage-grades', label: 'Damage grades' },
+  { key: 'payment-methods', label: 'Payment methods' },
+  { key: 'customer-sources', label: 'Customer sources' },
 ];
 
 const COLOUR_COLUMNS = [{ key: 'name', label: 'Name' }];
@@ -34,6 +36,12 @@ const DAMAGE_FIELDS = [
     options: Object.values(DAMAGE_GRADE_OUTCOMES),
   },
 ];
+
+const PAYMENT_COLUMNS = [{ key: 'name', label: 'Name' }];
+const PAYMENT_FIELDS = [{ key: 'name', label: 'Name', required: true }];
+
+const CUSTOMER_SOURCE_COLUMNS = [{ key: 'name', label: 'Name' }];
+const CUSTOMER_SOURCE_FIELDS = [{ key: 'name', label: 'Name', required: true }];
 
 export function PicklistManagementScreen() {
   const { permissions } = useAuth();
@@ -103,6 +111,24 @@ export function PicklistManagementScreen() {
           source={getDamageGrades}
           columns={DAMAGE_COLUMNS}
           fields={DAMAGE_FIELDS}
+        />
+      )}
+      {active === 'payment-methods' && (
+        <FlatPicklistManager
+          resource="paymentMethods"
+          singular="Payment method"
+          source={getPaymentMethods}
+          columns={PAYMENT_COLUMNS}
+          fields={PAYMENT_FIELDS}
+        />
+      )}
+      {active === 'customer-sources' && (
+        <FlatPicklistManager
+          resource="customerSources"
+          singular="Customer source"
+          source={getCustomerSources}
+          columns={CUSTOMER_SOURCE_COLUMNS}
+          fields={CUSTOMER_SOURCE_FIELDS}
         />
       )}
     </div>

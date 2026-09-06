@@ -22,7 +22,7 @@ function buildError(error, fallback) {
 /**
  * GET /customers?search=...
  * Empty search returns the recent customer list.
- * @param {string} [search] - partial phone or name to filter by
+ * @param {string} [search] - partial phone, email, or name to filter by
  * @returns {Promise<Array<{uuid, name, phone, email, dob, address, notes, consentWhatsapp, consentEmail, consentSms, consentWhatsappGroup, customerCount, createdAt, updatedAt}>>}
  */
 export async function searchCustomers(search) {
@@ -30,7 +30,7 @@ export async function searchCustomers(search) {
   try {
     const response = await apiClient.get(`${CUSTOMER_ROUTES.LIST}${query}`);
     if (response.data?.success) {
-      return response.data.data;
+      return response.data.data?.customers ?? [];
     }
     throw new Error(response.data?.message || 'Failed to load customers');
   } catch (error) {
@@ -55,7 +55,11 @@ export async function createCustomer(payload) {
   try {
     const response = await apiClient.post(CUSTOMER_ROUTES.CREATE, payload);
     if (response.data?.success && response.data?.data) {
-      return response.data.data;
+      const customer = response.data.data.customer ?? response.data.data;
+      if (!customer) {
+        throw new Error('Failed to create customer');
+      }
+      return customer;
     }
     throw new Error(response.data?.message || 'Failed to create customer');
   } catch (error) {
@@ -72,7 +76,7 @@ export async function getCustomer(uuid) {
   try {
     const response = await apiClient.get(CUSTOMER_ROUTES.GET(uuid));
     if (response.data?.success && response.data?.data) {
-      return response.data.data;
+      return response.data.data.customer ?? response.data.data;
     }
     throw new Error(response.data?.message || 'Failed to load customer');
   } catch (error) {
@@ -90,7 +94,7 @@ export async function updateCustomer(uuid, payload) {
   try {
     const response = await apiClient.patch(CUSTOMER_ROUTES.UPDATE(uuid), payload);
     if (response.data?.success && response.data?.data) {
-      return response.data.data;
+      return response.data.data.customer ?? response.data.data;
     }
     throw new Error(response.data?.message || 'Failed to update customer');
   } catch (error) {
@@ -114,7 +118,7 @@ export async function updateCustomerConsent(uuid, channel, consented) {
       consented: Boolean(consented),
     });
     if (response.data?.success && response.data?.data) {
-      return response.data.data;
+      return response.data.data.customer ?? response.data.data;
     }
     throw new Error(response.data?.message || 'Failed to update consent');
   } catch (error) {

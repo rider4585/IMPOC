@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useMemo } from 'react';
+﻿import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Card,
   CardHeader,
@@ -7,6 +7,8 @@ import {
   CardFooter,
   Button,
   Input,
+  Select,
+  Dialog,
   useToast,
 } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
@@ -14,6 +16,8 @@ import { PERMISSIONS } from '../../constants/permissions.js';
 import { getUnitByBarcode } from '../../services/unitsApi.js';
 import { createSale } from '../../services/salesApi.js';
 import { createRental } from '../../services/rentalsApi.js';
+import { getPaymentMethods, getCustomerSources } from '../../services/picklistsApi.js';
+import BarcodeScanner from '../../components/BarcodeScanner.jsx';
 import { formatPaise } from '../../platform/money.js';
 import { CustomerPicker } from '../../components/customers/CustomerPicker.jsx';
 import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
@@ -26,6 +30,15 @@ function todayISO() {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
+function itemTitle(item) {
+  return item.stockName || `Item ${item.barcode}`;
+}
+
+function itemDetail(item) {
+  const bits = [item.colourName, item.sizeName].filter(Boolean);
+  return bits.length > 0 ? bits.join(' · ') : null;
+}
+
 export function POSScreen() {
   const { permissions } = useAuth();
   const toast = useToast();
@@ -36,12 +49,43 @@ export function POSScreen() {
 
   const [mode, setMode] = useState('sale');
 
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+
+  const [customerSources, setCustomerSources] = useState([]);
+  const [customerSource, setCustomerSource] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    getPaymentMethods()
+      .then((methods) => {
+        if (cancelled) return;
+        setPaymentMethods(methods);
+        if (methods.length > 0 && !methods.some((m) => m.name === paymentMethod)) {
+          setPaymentMethod(methods[0].name);
+        }
+      })
+      .catch(() => {});
+    getCustomerSources()
+      .then((sources) => {
+        if (cancelled) return;
+        setCustomerSources(sources);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [barcode, setBarcode] = useState('');
   const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState(null);
   const [checkingOut, setCheckingOut] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [lookupError, setLookupError] = useState('');
+
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const [startDate, setStartDate] = useState(todayISO);
   const [rentalDays, setRentalDays] = useState('3');
@@ -85,6 +129,9 @@ export function POSScreen() {
             {
               uuid: unit.uuid,
               barcode: unit.barcode,
+              stockName: unit.stockName || null,
+              colourName: unit.colourName || null,
+              sizeName: unit.sizeName || null,
               sellingPricePaise: Number(unit.sellingPricePaise),
             },
           ]);
@@ -106,18 +153,29 @@ export function POSScreen() {
             {
               uuid: unit.uuid,
               barcode: unit.barcode,
+              stockName: unit.stockName || null,
+              colourName: unit.colourName || null,
+              sizeName: unit.sizeName || null,
               rentPerDayPaise: Number(unit.rentPerDayPaise),
               depositPaise: Number(unit.depositPaise),
             },
           ]);
         }
-        toast.success({ title: `Added ${unit.barcode}` });
+        toast.success({ title: `Added ${unit.stockName || `Item ${unit.barcode}`}` });
       } catch (err) {
         setLookupError(err.message || 'Lookup failed');
         toast.error({ title: 'Lookup failed', description: err.message });
       }
     },
     [cart, mode, toast]
+  );
+
+  const handleScannerDetected = useCallback(
+    (value) => {
+      setScannerOpen(false);
+      addByBarcode(value);
+    },
+    [addByBarcode]
   );
 
   const removeItem = (uuid) => {
@@ -133,6 +191,12 @@ export function POSScreen() {
     setStartDate(todayISO());
     setRentalDays('3');
     setRentalNotes('');
+    setCustomerSource('');
+    if (paymentMethods.length > 0 && !paymentMethods.some((m) => m.name === 'Cash')) {
+      setPaymentMethod(paymentMethods[0].name);
+    } else {
+      setPaymentMethod('Cash');
+    }
   };
 
   const handleCheckout = async () => {
@@ -142,6 +206,8 @@ export function POSScreen() {
       const customerPayload = {
         customerName: customer?.name || undefined,
         customerUuid: customer?.uuid,
+        paymentMethod: paymentMethod || undefined,
+        customerSource: customerSource || undefined,
       };
       if (mode === 'sale') {
         const sale = await createSale({
@@ -171,6 +237,12 @@ export function POSScreen() {
       setStartDate(todayISO());
       setRentalDays('3');
       setRentalNotes('');
+      setCustomerSource('');
+      if (paymentMethods.length > 0 && !paymentMethods.some((m) => m.name === 'Cash')) {
+        setPaymentMethod(paymentMethods[0].name);
+      } else {
+        setPaymentMethod('Cash');
+      }
       toast.success({ title: 'Checkout complete' });
     } catch (err) {
       toast.error({ title: 'Checkout failed', description: err.message });
@@ -202,13 +274,18 @@ export function POSScreen() {
                   {receipt.customerName ? `${receipt.customerName} · ` : ''}
                   {receipt.startDate} → due {receipt.dueDate} · {receipt.status}
                 </p>
-                {receipt.customer && (receipt.customer.phone || receipt.customer.email) && (
+                {(receipt.customerMobile || (receipt.customer && (receipt.customer.phone || receipt.customer.email))) && (
                   <p className="mt-1 text-xs">
-                    {receipt.customer.phone}
-                    {receipt.customer.phone && receipt.customer.email ? ' · ' : ''}
-                    {receipt.customer.email}
+                    {receipt.customerMobile || receipt.customer?.phone || ''}
+                    {[(receipt.customerMobile || receipt.customer?.phone), receipt.customer?.email]
+                      .filter(Boolean)
+                      .length > 1
+                      ? ' · '
+                      : ''}
+                    {receipt.customer?.email}
                   </p>
                 )}
+                {receipt.paymentMethod && <p className="mt-1 text-xs">Payment · {receipt.paymentMethod}</p>}
               </div>
               <ul className="flex flex-col gap-2">
                 {receipt.lines.map((line) => (
@@ -297,8 +374,37 @@ export function POSScreen() {
                 autoFocus
                 maxLength={12}
               />
+              <Button
+                variant="outline"
+                className="mt-3 w-full"
+                onClick={() => setScannerOpen(true)}
+                data-testid="pos-scan-open"
+              >
+                Scan barcode with camera
+              </Button>
             </CardContent>
           </Card>
+
+          <Dialog
+            open={scannerOpen}
+            onClose={() => setScannerOpen(false)}
+            title="Scan barcode"
+            footer={
+              <Button variant="outline" onClick={() => setScannerOpen(false)}>
+                Close
+              </Button>
+            }
+          >
+            <div
+              className="relative mx-auto w-full max-w-sm overflow-hidden rounded-lg"
+              style={{ aspectRatio: '3/4', maxHeight: '60vh' }}
+            >
+              <BarcodeScanner onDetected={handleScannerDetected} />
+            </div>
+            <p className="mt-3 text-center text-xs text-[var(--ink-muted)]">
+              Point the camera at a product barcode. A detected item is added to the cart automatically.
+            </p>
+          </Dialog>
 
           <Card>
             <CardHeader>
@@ -314,11 +420,17 @@ export function POSScreen() {
                       key={item.uuid}
                       className="flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
                     >
-                      <span className="font-semibold">{item.barcode}</span>
-                      <span className="ml-auto text-[var(--ink-muted)]">
+                      <div className="min-w-0">
+                        <span className="block truncate font-semibold">{itemTitle(item)}</span>
+                        <span className="block text-xs text-[var(--ink-muted)]">
+                          {item.barcode}
+                          {itemDetail(item) && <span> · {itemDetail(item)}</span>}
+                        </span>
+                      </div>
+                      <span className="ml-auto whitespace-nowrap text-[var(--ink-muted)]">
                         {mode === 'sale'
                           ? formatPaise(item.sellingPricePaise)
-                          : `${formatPaise(item.rentPerDayPaise)}/day Â· deposit ${formatPaise(item.depositPaise)}`}
+                          : `${formatPaise(item.rentPerDayPaise)}/day · deposit ${formatPaise(item.depositPaise)}`}
                       </span>
                       <Button variant="ghost" size="sm" onClick={() => removeItem(item.uuid)} aria-label={`Remove ${item.barcode}`}>
                         Remove
@@ -337,7 +449,26 @@ export function POSScreen() {
               <CardTitle>{mode === 'sale' ? 'Checkout' : 'Rental checkout'}</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              <CustomerPicker value={customer} onChange={setCustomer} /> 
+              <CustomerPicker value={customer} onChange={setCustomer} />
+              <Select
+                label="Payment method"
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+                options={paymentMethods.map((method) => ({ value: method.name, label: method.name }))}
+                dataTestid="pos-payment-method"
+                className="mt-3"
+              />
+              <Select
+                label="How did the customer hear about us?"
+                value={customerSource}
+                onChange={setCustomerSource}
+                options={[
+                  { value: '', label: 'Not selected / Walk-in' },
+                  ...customerSources.map((source) => ({ value: source.name, label: source.name })),
+                ]}
+                dataTestid="pos-customer-source"
+                className="mt-3"
+              />
               {mode === 'rental' && (
                 <>
                   <Input

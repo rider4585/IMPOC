@@ -38,7 +38,7 @@ class ErrorBoundary extends React.Component {
  *
  * Status states:
  * - signed-out: render SignIn
- * - restoring: render SignIn with loading state
+ * - restoring: render SignIn (restore is fast, no separate loading hint)
  * - signed-in: render children (the routed page)
  * - session-expired: render SignIn with expiry message
  */
@@ -66,8 +66,8 @@ export function RouteGuard({ children }) {
     return <ErrorBoundary>{children}</ErrorBoundary>;
   }
 
-  // For signed-out, restoring, or session-expired: show the SignIn screen
-  // SignIn.jsx already handles the restoring loading state internally
+  // For signed-out, restoring, or session-expired: show the SignIn screen.
+  // Session restore is instant; SignIn renders directly during it.
   return (
     <ErrorBoundary>
       <div>
@@ -76,10 +76,10 @@ export function RouteGuard({ children }) {
             className="session-expired-banner"
             style={{
               padding: '16px',
-              backgroundColor: '#f8d7da',
-              color: '#721c24',
-              border: '1px solid #f5c6cb',
-              borderRadius: '4px',
+              backgroundColor: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+              color: 'var(--danger)',
+              border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)',
+              borderRadius: 'var(--rounded-md)',
               marginBottom: '16px',
             }}
           >

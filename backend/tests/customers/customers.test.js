@@ -132,6 +132,21 @@ describe('Customers module - /api/customers', () => {
             const names = res.body.data.customers.map((c) => c.name);
             expect(names).toContain('TEST_Customer_Alpha');
         });
+
+        it('should search customers by email', async () => {
+            const created = await request(testApp)
+                .post('/api/customers')
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send(generateTestCustomer({ email: 'TEST_alpha@example.com' }));
+
+            const res = await request(testApp)
+                .get('/api/customers?search=alpha@example')
+                .set('Authorization', `Bearer ${adminToken}`);
+
+            expect(res.statusCode).toBe(200);
+            const emails = res.body.data.customers.map((c) => c.email);
+            expect(emails).toContain('TEST_alpha@example.com');
+        });
     });
 
     describe('GET /customers/:uuid', () => {

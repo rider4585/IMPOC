@@ -4,7 +4,7 @@ import { Card, CardContent, Input, Button } from '../components/ui';
 import { ShopLogo } from '../components/ShopLogo';
 
 export function SignIn() {
-  const { signIn, status } = useAuth();
+  const { signIn } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -76,12 +76,6 @@ export function SignIn() {
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
-
-          {status === 'restoring' && (
-            <p className="mt-4 text-center text-sm text-[var(--ink-muted)]">
-              Restoring your session...
-            </p>
-          )}
         </CardContent>
       </Card>
     </div>

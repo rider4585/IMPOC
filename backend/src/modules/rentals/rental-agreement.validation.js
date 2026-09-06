@@ -15,6 +15,8 @@ export const createRentalBodySchema = z.object({
     customerUuid: uuidSchema.nullable().optional().default(undefined),
     startDate: z.string().date('Invalid date').optional().default(undefined),
     rentalDays: z.number().int().positive('Rental days must be a positive integer').optional().default(undefined),
+    paymentMethod: z.string().trim().max(50).optional().default(undefined),
+    customerSource: z.string().trim().max(50).optional().default(undefined),
     notes: z.string().trim().max(2000).optional().default(undefined),
     items: z.array(itemSchema).min(1, 'At least one item is required'),
 });

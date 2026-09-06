@@ -13,7 +13,7 @@ function SectionTitle({ icon: Icon, children }) {
 }
 
 export function SettingsDrawer({ open, onClose }) {
-  const { settings, setColorScheme, setPrimaryColor, setFontFamily } = useTheme();
+  const { settings, resolvedColorScheme, setColorScheme, setPrimaryColor, setFontFamily } = useTheme();
 
   return (
     <>
@@ -45,8 +45,8 @@ export function SettingsDrawer({ open, onClose }) {
 
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
           <section>
-            <SectionTitle icon={settings.colorScheme === 'dark' ? Moon : Sun}>Mode</SectionTitle>
-            <div className="grid grid-cols-2 gap-2">
+            <SectionTitle icon={resolvedColorScheme === 'dark' ? Moon : Sun}>Mode</SectionTitle>
+            <div className="grid grid-cols-3 gap-2">
               {COLOR_SCHEMES.map((scheme) => {
                 const active = settings.colorScheme === scheme.value;
                 return (
@@ -54,7 +54,7 @@ export function SettingsDrawer({ open, onClose }) {
                     key={scheme.value}
                     type="button"
                     onClick={() => setColorScheme(scheme.value)}
-                    className={`flex flex-col items-start gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                    className={`flex flex-col items-start gap-2 rounded-lg border px-2 py-2.5 text-left transition-colors ${
                       active
                         ? 'border-[var(--primary)] bg-[var(--primary)]/10'
                         : 'border-[var(--border)] hover:border-[var(--border-strong)]'
@@ -62,7 +62,7 @@ export function SettingsDrawer({ open, onClose }) {
                   >
                     <span
                       className="h-5 w-5 rounded-full border border-[var(--border)]"
-                      style={{ backgroundColor: scheme.swatch }}
+                      style={{ background: scheme.swatch }}
                     />
                     <span className="text-sm font-medium text-[var(--ink)]">{scheme.label}</span>
                   </button>
@@ -88,7 +88,7 @@ export function SettingsDrawer({ open, onClose }) {
                     }`}
                     style={{ backgroundColor: preset.color }}
                   >
-                    {active && <Check className="h-5 w-5 text-white" />}
+                    {active && <Check className="h-5 w-5 text-[var(--primary-foreground)]" />}
                   </button>
                 );
               })}

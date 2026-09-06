@@ -14,11 +14,12 @@ import { ConsentCheckboxes } from './ConsentCheckboxes.jsx';
  *  - onChange: (customer | null) => void
  *  - label, placeholder, id
  */
-export function CustomerPicker({ value, onChange, label = 'Customer', placeholder = 'Search by name or phone…', id }) {
+export function CustomerPicker({ value, onChange, label = 'Customer', placeholder = 'Search by name, phone, or email…', id }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
+  const [touched, setTouched] = useState(false);
   const [error, setError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -44,7 +45,6 @@ export function CustomerPicker({ value, onChange, label = 'Customer', placeholde
     try {
       const customers = await searchCustomers(term);
       setResults(Array.isArray(customers) ? customers : []);
-      setOpen(true);
     } catch (err) {
       setError(err.message || 'Search failed');
       setResults([]);
@@ -56,13 +56,14 @@ export function CustomerPicker({ value, onChange, label = 'Customer', placeholde
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (value) return undefined;
+    if (!touched) return undefined;
     debounceRef.current = setTimeout(() => {
       runSearch(query);
     }, 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, value, runSearch]);
+  }, [query, value, touched, runSearch]);
 
   // Close the dropdown when clicking outside the picker.
   useEffect(() => {
@@ -138,9 +139,13 @@ export function CustomerPicker({ value, onChange, label = 'Customer', placeholde
 
       {value ? (
         <div className="flex w-full items-center gap-2 rounded-md border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 py-2 text-sm shadow-sm">
-          <span className="flex-1 truncate">
-            <span className="font-semibold">{value.name}</span>
-            {value.phone ? <span className="ml-2 text-[var(--ink-muted)]">{value.phone}</span> : null}
+          <span className="min-w-0 flex-1">
+            <span className="mr-2 font-semibold">{value.name}</span>
+            <span className="text-xs text-[var(--ink-muted)]">
+              {value.phone || value.email
+                ? [value.phone, value.email].filter(Boolean).join(' · ')
+                : null}
+            </span>
           </span>
           <button
             type="button"
@@ -158,9 +163,13 @@ export function CustomerPicker({ value, onChange, label = 'Customer', placeholde
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
+              setTouched(true);
               setOpen(true);
             }}
-            onFocus={() => setOpen(true)}
+            onFocus={() => {
+              setTouched(true);
+              setOpen(true);
+            }}
             placeholder={placeholder}
             autoComplete="off"
             aria-label={label}
@@ -184,9 +193,14 @@ export function CustomerPicker({ value, onChange, label = 'Customer', placeholde
                   onClick={() => select(customer)}
                   className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-sunken)]"
                 >
-                  <span className="truncate">
-                    <span className="font-medium">{customer.name}</span>
-                    {customer.phone ? <span className="ml-2 text-[var(--ink-muted)]">{customer.phone}</span> : null}
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">
+                      {customer.name}
+                      {customer.phone && <span className="ml-2 text-[var(--ink-muted)]">{customer.phone}</span>}
+                    </span>
+                    {customer.email && (
+                      <span className="block truncate text-xs text-[var(--ink-faint)]">{customer.email}</span>
+                    )}
                   </span>
                   {typeof customer.customerCount === 'number' && (
                     <span className="shrink-0 text-xs text-[var(--ink-faint)]">

@@ -51,7 +51,7 @@ describe('Auth Module - /api/auth', () => {
       expect(setCookieHeader).toBeDefined();
       expect(setCookieHeader[0]).toMatch(/refreshToken=/);
       expect(setCookieHeader[0]).toContain('HttpOnly');
-      expect(setCookieHeader[0]).toContain('Path=/api/auth');
+      expect(setCookieHeader[0]).toContain('Path=/');
       // In production, Secure and SameSite=None; in test/dev, it's non-secure with SameSite=Lax
       if (process.env.NODE_ENV === 'production') {
         expect(setCookieHeader[0]).toContain('Secure');

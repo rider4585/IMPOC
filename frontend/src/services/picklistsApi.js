@@ -23,6 +23,8 @@ const RESOURCE_BASE = {
   colours: '/picklists/colours',
   sizes: '/picklists/sizes',
   damageGrades: '/picklists/damage-grades',
+  paymentMethods: '/picklists/payment-methods',
+  customerSources: '/picklists/customer-sources',
 };
 
 /**
@@ -130,9 +132,33 @@ export async function getDamageGrades() {
   }
 }
 
+export async function getPaymentMethods() {
+  try {
+    const response = await apiClient.get(RESOURCE_BASE.paymentMethods);
+    if (response.data?.success && response.data?.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to fetch payment methods');
+  } catch (error) {
+    throw buildError(error, 'Failed to fetch payment methods');
+  }
+}
+
+export async function getCustomerSources() {
+  try {
+    const response = await apiClient.get(RESOURCE_BASE.customerSources);
+    if (response.data?.success && response.data?.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to fetch customer sources');
+  } catch (error) {
+    throw buildError(error, 'Failed to fetch customer sources');
+  }
+}
+
 /**
  * Generic create for flat picklists.
- * @param {'colours'|'sizes'|'damageGrades'} resource
+ * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'} resource
  * @param {Object} payload
  */
 export async function createPicklistItem(resource, payload) {
@@ -149,7 +175,7 @@ export async function createPicklistItem(resource, payload) {
 
 /**
  * Generic update for flat picklists.
- * @param {'colours'|'sizes'|'damageGrades'} resource
+ * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'} resource
  * @param {string} uuid
  * @param {Object} payload - {name?, isActive?, ...}
  */

@@ -10,6 +10,8 @@ export const createSaleBodySchema = z.object({
     customerName: z.string().trim().max(255).optional().default(undefined),
     customerUuid: uuidSchema.nullable().optional().default(undefined),
     soldAt: z.string().date('Invalid date').optional().default(undefined),
+    paymentMethod: z.string().trim().max(50).optional().default(undefined),
+    customerSource: z.string().trim().max(50).optional().default(undefined),
     notes: z.string().trim().max(2000).optional().default(undefined),
     items: z.array(
         z.object({

@@ -1,5 +1,5 @@
 ﻿/* =============================================================================
-   IMPOC Design System â€” Tailwind v4 + minimals.cc language (LIGHT + DARK)
+   IMPOC Design System - Tailwind v4 + minimals.cc language (DARK-PRIMARY)
 
    Single source of truth for the design system.
    - Tailwind v4 entry: @import "tailwindcss"
@@ -7,14 +7,18 @@
      carries data-theme (light|dark), data-primary (color preset) and data-font
      (font family preset) attributes set by <ThemeProvider>. All token values
      resolve from those attributes, so changing a setting re-skins the app.
+   - The design is HIGH-CONTRAST DARK PRIMARY: the default (root) palette is the
+     deep canvas #141a21 with gold #faaf00 CTAs. A light-mode adaptation is
+     provided via html[data-theme='light'] for the Light/System toggle.
    - SEMANTIC colours (unit status + money in/out/held) keep their meaning; only
      tones shift per mode.
    - Legacy CSS custom properties are kept so screens referencing var(--...)
      resolve against the active theme.
    ========================================================================== */
 
-/* Self-hosted fonts â€” minimals families (Public Sans body, Barlow display) */
+/* Self-hosted fonts - minimals families (Public Sans body, Inter display) */
 @import '@fontsource-variable/public-sans';
+@import '@fontsource-variable/inter';
 @import '@fontsource/barlow/400.css';
 @import '@fontsource/barlow/500.css';
 @import '@fontsource/barlow/600.css';
@@ -25,36 +29,36 @@
 @import '@fontsource-variable/bricolage-grotesque';
 @import '@fontsource-variable/instrument-sans';
 
-/* Tailwind v4 entry â€” generates utilities + theme from @theme below */
+/* Tailwind v4 entry - generates utilities + theme from @theme below */
 @import 'tailwindcss';
 
 /* =============================================================================
-   Tailwind theme tokens (theme-aware â€” colors resolve from CSS vars below)
+   Tailwind theme tokens (theme-aware - colors resolve from CSS vars below)
    ========================================================================== */
 @theme {
-  /* Brand â€” minimals primary (resolves from data-primary preset) */
+  /* Brand - minimals primary (resolves from data-primary preset) */
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
 
-  /* Neutral surfaces (minimals grey base, raised cards) */
+  /* Neutral surfaces (dark canvas #141a21, raised blocks #1c252e) */
   --color-surface-base: var(--surface-base);
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
   --color-surface-scan: var(--surface-scan);
 
-  /* Text / ink (minimals grey scale) */
+  /* Text / ink (high contrast white on dark) */
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-ink-faint: var(--ink-faint);
 
-  /* Borders (minimals outline) */
+  /* Borders (dark outline) */
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
 
-  /* Unit status (semantic â€” meaning unchanged) */
+  /* Unit status (semantic - meaning unchanged) */
   --color-status-in-stock: var(--status-in-stock);
   --color-status-rented: var(--status-rented);
   --color-status-overdue: var(--status-overdue);
@@ -78,66 +82,67 @@
   --font-sans: var(--font-body);
   --font-display: var(--font-heading);
 
-  /* Radii â€” minimals-style curvature (cards subtly rounded, controls tighter) */
+  /* Radii - minimals-style curvature (cards subtly rounded, controls tighter) */
   --radius-sm: 0.375rem;
   --radius: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 0.875rem;
-  --radius-xl: 1.25rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
   --radius-full: 9999px;
 }
 
 /* =============================================================================
-   Legacy CSS Custom Properties â€” Light Palette (root defaults, LIGHT ONLY)
-   Kept so existing screens resolve tokens; no dark-mode overrides exist.
+   Legacy CSS Custom Properties - DEFAULT = HIGH-CONTRAST DARK PRIMARY
+   Deep canvas #141a21, raised blocks #1c252e, gold #faaf00 CTAs, white text.
+   Kept so existing screens resolve tokens; no media-query dark detect.
    ========================================================================== */
 
 :root {
-  /* Neutral surfaces (light) */
-  --surface-base: #F4F6F8;
-  --surface-raised: #FFFFFF;
-  --surface-sunken: #F1F3F5;
-  --surface-scan: #1C1512;
+  /* Neutral surfaces (dark canvas) */
+  --surface-base: #141A21;
+  --surface-raised: #1C252E;
+  --surface-sunken: #10151B;
+  --surface-scan: #0B0F14;
 
-  /* Text / ink (light) */
-  --ink: #212B36;
-  --ink-muted: #637381;
-  --ink-faint: #919EAB;
+  /* Text / ink (high contrast white) */
+  --ink: #FFFFFF;
+  --ink-muted: #919EAB;
+  --ink-faint: #637381;
 
-  /* Borders (light) */
-  --border: #E4E8EC;
-  --border-strong: #C4CDD5;
+  /* Borders (dark outline) */
+  --border: #1C252E;
+  --border-strong: #28323D;
 
-  /* Brand */
-  --primary: #2065D1;
-  --primary-hover: #1849A9;
-  --primary-foreground: #FFFFFF;
-  --accent: #B8791F;
-  --accent-foreground: #201404;
+  /* Brand - gold primary, orange-red secondary accent */
+  --primary: #FAAF00;
+  --primary-hover: #D99A00;
+  --primary-foreground: #201604;
+  --accent: #FAAF00;
+  --accent-foreground: #201604;
 
-  /* Unit status (semantic, preserved) */
-  --status-in-stock: #118D57;
-  --status-rented: #2B5C8A;
-  --status-overdue: #B71D36;
-  --status-sold: #637381;
-  --status-maintenance: #8A5A1F;
-  --status-terminal: #454F5B;
+  /* Unit status (semantic, preserved - tinted for dark) */
+  --status-in-stock: #22C55E;
+  --status-rented: #61F3F3;
+  --status-overdue: #FF5630;
+  --status-sold: #919EAB;
+  --status-maintenance: #FAAF00;
+  --status-terminal: #637381;
 
   /* Money semantics (three kinds) */
-  --money-in: #118D57;
-  --money-out: #B71D36;
-  --money-held: #6D5BD0;
-  --money-reversed: #919EAB;
+  --money-in: #22C55E;
+  --money-out: #FF5630;
+  --money-held: #61F3F3;
+  --money-reversed: #637381;
 
   /* System feedback */
-  --waking: #8A5A1F;
-  --success: #118D57;
-  --danger: #B71D36;
-  --focus-ring: #2065D1;
+  --waking: #FAAF00;
+  --success: #22C55E;
+  --danger: #FF5630;
+  --focus-ring: #FAAF00;
 
   /* Font stack (resolve from data-font preset) */
   --font-body: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-heading: 'Barlow', 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: 'Inter', 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
   /* Spacing token scale (4px base) */
@@ -158,55 +163,94 @@
   --spacing-thumb-safe-bottom: 88px;
 
   /* Rounded corner scale */
-  --rounded-sm: 6px;
-  --rounded-md: 10px;
-  --rounded-lg: 14px;
-  --rounded-xl: 20px;
+  --rounded-sm: 8px;
+  --rounded-md: 12px;
+  --rounded-lg: 16px;
+  --rounded-xl: 24px;
   --rounded-full: 9999px;
 
   /* Surface fallback */
-  --surface-glass-fallback: #FFFFFF;
+  --surface-glass-fallback: #1C252E;
 }
 
 /* =============================================================================
-   Theme presets (applied to <html>) â€” set by <ThemeProvider>
+   Theme presets (applied to <html>) - set by <ThemeProvider>
 
-   data-theme="dark"  â†’ dark palette overrides
-   data-primary="..."  â†’ primary color presets (minimals set)
-   data-font="..."    â†’ font family presets
+   data-theme="light"  -> light-mode adaptation (for the Light/System toggle)
+   data-theme="dark"   -> explicit dark palette (same values as the defaults)
+   data-primary="..."  -> primary color presets (minimals set)
+   data-font="..."     -> font family presets
    ========================================================================== */
 
-/* ---- Dark mode palette (minimals dark: ink surfaces, soft borders) ---- */
-html[data-theme='dark'] {
-  --surface-base: #161C24;
-  --surface-raised: #212B36;
-  --surface-sunken: #1C242E;
-  --surface-glass-fallback: #212B36;
+/* ---- Light mode adaptation (grey canvas, dark ink, gold brand) ---- */
+html[data-theme='light'] {
+  --surface-base: #F4F6F8;
+  --surface-raised: #FFFFFF;
+  --surface-sunken: #F1F3F5;
+  --surface-glass-fallback: #FFFFFF;
 
-  --ink: #F9FAFB;
+  --ink: #212B36;
+  --ink-muted: #637381;
+  --ink-faint: #919EAB;
+
+  --border: #E4E8EC;
+  --border-strong: #C4CDD5;
+
+  --primary-hover: #D99A00;
+  --accent: #FAAF00;
+  --accent-foreground: #201604;
+
+  --status-in-stock: #118D57;
+  --status-rented: #2B5C8A;
+  --status-overdue: #B71D36;
+  --status-sold: #637381;
+  --status-maintenance: #8A5A1F;
+  --status-terminal: #454F5B;
+
+  --money-in: #118D57;
+  --money-out: #B71D36;
+  --money-held: #6D5BD0;
+  --money-reversed: #919EAB;
+
+  --waking: #8A5A1F;
+  --success: #118D57;
+  --danger: #B71D36;
+}
+
+/* ---- Comments below are intentionally media-query free ---- */
+html[data-theme='dark'] {
+  --surface-base: #141A21;
+  --surface-raised: #1C252E;
+  --surface-sunken: #10151B;
+  --surface-glass-fallback: #1C252E;
+
+  --ink: #FFFFFF;
   --ink-muted: #919EAB;
   --ink-faint: #637381;
 
-  --border: #333D49;
-  --border-strong: #454F5B;
+  --border: #1C252E;
+  --border-strong: #28323D;
 
-  --accent: #E8A33D;
-  --accent-foreground: #201404;
+  --primary: #FAAF00;
+  --primary-hover: #D99A00;
+  --primary-foreground: #201604;
+  --accent: #FAAF00;
+  --accent-foreground: #201604;
 
-  --waking: #E8A33D;
-  --status-rented: #7AA9CB;
+  --waking: #FAAF00;
+  --status-rented: #61F3F3;
   --status-sold: #919EAB;
-  --status-maintenance: #D9A455;
-  --status-terminal: #8A949E;
+  --status-maintenance: #FAAF00;
+  --status-terminal: #637381;
   --money-reversed: #637381;
 }
 
-/* ---- Primary color presets (minimals set) ---- */
+/* ---- Primary color presets (minimals set, gold default) ---- */
 html[data-primary='default'] {
-  --primary: #2065D1;
-  --primary-hover: #1849A9;
-  --primary-foreground: #FFFFFF;
-  --focus-ring: #2065D1;
+  --primary: #FAAF00;
+  --primary-hover: #D99A00;
+  --primary-foreground: #201604;
+  --focus-ring: #FAAF00;
 }
 html[data-primary='green'] {
   --primary: #22C55E;
@@ -236,7 +280,7 @@ html[data-primary='violet'] {
 /* ---- Font family presets ---- */
 html[data-font='minimals'] {
   --font-body: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-heading: 'Barlow', 'Public Sans', sans-serif;
+  --font-heading: 'Inter', 'Public Sans', sans-serif;
 }
 html[data-font='classic'] {
   --font-body: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -363,7 +407,7 @@ body,
 }
 
 /* =============================================================================
-   Surface Treatment Classes (LIGHT ONLY â€” no dark overrides)
+   Surface Treatment Classes (theme-aware)
    ========================================================================== */
 
 .surface-flat {
@@ -376,14 +420,14 @@ body,
   background-color: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--rounded-lg);
-  box-shadow: 0 2px 8px rgba(42, 33, 28, 0.1), 0 1px 2px rgba(42, 33, 28, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .surface-glass {
-  background-color: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  background-color: color-mix(in srgb, var(--surface-raised) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 50%, transparent);
   border-radius: var(--rounded-lg);
-  box-shadow: 0 8px 28px rgba(42, 33, 28, 0.2);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(20px) saturate(160%);
 }
 

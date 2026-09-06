@@ -26,6 +26,8 @@ export const createRental = async (req, res, next) => {
             customerUuid: body.customerUuid,
             startDate: body.startDate,
             rentalDays: body.rentalDays,
+            paymentMethod: body.paymentMethod,
+            customerSource: body.customerSource,
             notes: body.notes,
             items: body.items,
             actorUserId: req.user?.id,

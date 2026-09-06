@@ -38,6 +38,8 @@ import ProductTypeModel from './ProductType.js';
 import ColourModel from './Colour.js';
 import SizeModel from './Size.js';
 import DamageGradeModel from './DamageGrade.js';
+import PaymentMethodModel from './PaymentMethod.js';
+import CustomerSourceModel from './CustomerSource.js';
 import VendorModel from './Vendor.js';
 import TripModel from './Trip.js';
 import TripVendorModel from './TripVendor.js';
@@ -69,6 +71,8 @@ const ProductType = ProductTypeModel(sequelize);
 const Colour = ColourModel(sequelize);
 const Size = SizeModel(sequelize);
 const DamageGrade = DamageGradeModel(sequelize);
+const PaymentMethod = PaymentMethodModel(sequelize);
+const CustomerSource = CustomerSourceModel(sequelize);
 const Vendor = VendorModel(sequelize);
 const Trip = TripModel(sequelize);
 const TripVendor = TripVendorModel(sequelize);
@@ -526,6 +530,8 @@ export {
     Colour,
     Size,
     DamageGrade,
+    PaymentMethod,
+    CustomerSource,
     Vendor,
     Trip,
     TripVendor,

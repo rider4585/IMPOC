@@ -155,7 +155,13 @@ export const getVendorHistory = async (vendorUuid) => {
                                 {
                                     model: ProductType,
                                     as: 'productType',
-                                    attributes: ['uuid'],
+                                    attributes: ['uuid', 'name'],
+                                    required: false,
+                                },
+                                {
+                                    model: ProductType,
+                                    as: 'subType',
+                                    attributes: ['uuid', 'name'],
                                     required: false,
                                 },
                                 {
@@ -168,13 +174,13 @@ export const getVendorHistory = async (vendorUuid) => {
                                         {
                                             model: Colour,
                                             as: 'colour',
-                                            attributes: ['uuid'],
+                                            attributes: ['uuid', 'name'],
                                             required: false,
                                         },
                                         {
                                             model: Size,
                                             as: 'size',
-                                            attributes: ['uuid'],
+                                            attributes: ['uuid', 'name'],
                                             required: false,
                                         },
                                     ],
@@ -221,6 +227,13 @@ export function computeVarianceForTrip(totalPaidPaise, stocks) {
     return totalPaidPaise - stockSum;
 }
 
+function deriveStockName(stock) {
+    const parts = [];
+    if (stock.productType?.name) parts.push(stock.productType.name);
+    if (stock.subType?.name) parts.push(stock.subType.name);
+    return parts.length > 0 ? parts.join(' ') : null;
+}
+
 /**
  * Map vendor and nested data to history DTO
  * Money fields returned as strings, UUIDs only, variance computed per trip_vendor
@@ -263,7 +276,9 @@ function mapVendorHistoryDTO(vendor) {
 
                 return {
                     uuid: stock.uuid,
+                    stockName: deriveStockName(stock),
                     productTypeUuid: stock.productType?.uuid || null,
+                    subTypeUuid: stock.subType?.uuid || null,
                     quantity: stock.quantity,
                     buyingPricePaise: String(stock.buyingPricePaise),
                     sellingPricePaise: String(stock.sellingPricePaise),
@@ -278,7 +293,9 @@ function mapVendorHistoryDTO(vendor) {
                         status: unit.status,
                         channel: unit.channel,
                         colour: unit.colour?.uuid || null,
+                        colourName: unit.colour?.name || null,
                         size: unit.size?.uuid || null,
+                        sizeName: unit.size?.name || null,
                         buyingPricePaise: String(unit.buyingPricePaise),
                         sellingPricePaise: String(unit.sellingPricePaise),
                         floorPricePaise: String(unit.floorPricePaise),

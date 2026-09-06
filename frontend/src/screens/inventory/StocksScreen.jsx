@@ -11,11 +11,16 @@ import { formatPaise } from '../../platform/money.js';
 const SEARCH_DEBOUNCE_MS = 300;
 
 function fallbackName(uuid) {
-  if (!uuid) return '?';
+  if (!uuid) return '—';
   const id = String(uuid);
-  if (id.startsWith('type-')) return `Type ${id.slice(5)}`;
-  if (id.startsWith('subtype-')) return `Subtype ${id.slice(8)}`;
-  return id.slice(0, 8);
+  if (id.startsWith('type-')) return 'Type';
+  if (id.startsWith('subtype-')) return 'Subtype';
+  return '—';
+}
+
+function tripLabel(t) {
+  if (t.name) return t.name;
+  return `Trip${t.purchasedOn ? ` ${new Date(t.purchasedOn).toLocaleDateString()}` : ''}`;
 }
 
 export function StocksScreen() {
@@ -111,6 +116,7 @@ export function StocksScreen() {
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Input
               type="search"
+              label="Search"
               placeholder="Search type, subtype, vendor…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -126,7 +132,7 @@ export function StocksScreen() {
                 { value: '', label: 'All trips' },
                 ...trips.map((t) => ({
                   value: t.uuid,
-                  label: t.name || `Trip ${t.uuid.slice(0, 8)}`,
+                  label: tripLabel(t),
                 })),
               ]}
             />
@@ -172,8 +178,7 @@ export function StocksScreen() {
                       </div>
                       <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
                         {vendor}
-                        {trip?.name && <span> &middot; {trip.name}</span>}
-                        {trip && !trip.name && <span> &middot; Trip {trip.uuid.slice(0, 8)}</span>}
+                        {trip && <span> &middot; {tripLabel(trip)}</span>}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 text-[13px]">

@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 const cssPath = path.join(__dirname, '../index.css');
 const cssContent = fs.readFileSync(cssPath, 'utf-8');
 
-describe('Revamp Design System — Tailwind v4, LIGHT MODE ONLY (index.css)', () => {
+describe('Revamp Design System — Tailwind v4, DARK-PRIMARY (index.css)', () => {
   describe('Tailwind + font entry', () => {
     it('should import Tailwind v4 at the entry point', () => {
       expect(cssContent).toContain("@import 'tailwindcss'");
@@ -21,6 +21,7 @@ describe('Revamp Design System — Tailwind v4, LIGHT MODE ONLY (index.css)', ()
       expect(cssContent).toContain("@import '@fontsource-variable/bricolage-grotesque'");
       expect(cssContent).toContain("@import '@fontsource-variable/instrument-sans'");
       expect(cssContent).toContain("@import '@fontsource-variable/public-sans'");
+      expect(cssContent).toContain("@import '@fontsource-variable/inter'");
       expect(cssContent).toContain("@import '@fontsource/barlow");
     });
 
@@ -29,21 +30,21 @@ describe('Revamp Design System — Tailwind v4, LIGHT MODE ONLY (index.css)', ()
     });
   });
 
-  describe('Light-mode brand + surface tokens', () => {
-    it('should define brand token values on :root', () => {
+  describe('Dark-primary brand + surface tokens', () => {
+    it('should define gold-brand token values on :root', () => {
       expect(cssContent).toContain(':root {');
-      expect(cssContent).toContain('--primary: #2065D1');
-      expect(cssContent).toContain('--primary-foreground: #FFFFFF');
-      expect(cssContent).toContain('--accent: #B8791F');
+      expect(cssContent).toContain('--primary: #FAAF00');
+      expect(cssContent).toContain('--primary-foreground: #201604');
+      expect(cssContent).toContain('--accent: #FAAF00');
     });
 
-    it('should define light surface and ink tokens', () => {
-      expect(cssContent).toContain('--surface-base: #F4F6F8');
-      expect(cssContent).toContain('--surface-raised: #FFFFFF');
-      expect(cssContent).toContain('--ink: #212B36');
-      expect(cssContent).toContain('--ink-muted: #637381');
-      expect(cssContent).toContain('--border: #E4E8EC');
-      expect(cssContent).toContain('--border-strong: #C4CDD5');
+    it('should define dark surfaces and high-contrast ink tokens', () => {
+      expect(cssContent).toContain('--surface-base: #141A21');
+      expect(cssContent).toContain('--surface-raised: #1C252E');
+      expect(cssContent).toContain('--ink: #FFFFFF');
+      expect(cssContent).toContain('--ink-muted: #919EAB');
+      expect(cssContent).toContain('--border: #1C252E');
+      expect(cssContent).toContain('--border-strong: #28323D');
     });
 
     it('should map tokens into the Tailwind @theme', () => {
@@ -59,34 +60,34 @@ describe('Revamp Design System — Tailwind v4, LIGHT MODE ONLY (index.css)', ()
 
   describe('Semantic unit-status tokens', () => {
     it('should define all unit status colors', () => {
-      expect(cssContent).toContain('--status-in-stock: #118D57');
-      expect(cssContent).toContain('--status-rented: #2B5C8A');
-      expect(cssContent).toContain('--status-overdue: #B71D36');
-      expect(cssContent).toContain('--status-sold: #637381');
-      expect(cssContent).toContain('--status-maintenance: #8A5A1F');
-      expect(cssContent).toContain('--status-terminal: #454F5B');
+      expect(cssContent).toContain('--status-in-stock: #22C55E');
+      expect(cssContent).toContain('--status-rented: #61F3F3');
+      expect(cssContent).toContain('--status-overdue: #FF5630');
+      expect(cssContent).toContain('--status-sold: #919EAB');
+      expect(cssContent).toContain('--status-maintenance: #FAAF00');
+      expect(cssContent).toContain('--status-terminal: #637381');
     });
   });
 
   describe('Semantic money tokens', () => {
     it('should define all money color tokens (three kinds)', () => {
-      expect(cssContent).toContain('--money-in: #118D57');
-      expect(cssContent).toContain('--money-out: #B71D36');
-      expect(cssContent).toContain('--money-held: #6D5BD0');
-      expect(cssContent).toContain('--money-reversed: #919EAB');
+      expect(cssContent).toContain('--money-in: #22C55E');
+      expect(cssContent).toContain('--money-out: #FF5630');
+      expect(cssContent).toContain('--money-held: #61F3F3');
+      expect(cssContent).toContain('--money-reversed: #637381');
     });
   });
 
   describe('System feedback tokens', () => {
     it('should define feedback + focus colors', () => {
-      expect(cssContent).toContain('--success: #118D57');
-      expect(cssContent).toContain('--danger: #B71D36');
-      expect(cssContent).toContain('--waking: #8A5A1F');
-      expect(cssContent).toContain('--focus-ring: #2065D1');
+      expect(cssContent).toContain('--success: #22C55E');
+      expect(cssContent).toContain('--danger: #FF5630');
+      expect(cssContent).toContain('--waking: #FAAF00');
+      expect(cssContent).toContain('--focus-ring: #FAAF00');
     });
   });
 
-  describe('Theme-aware constraint (light + dark via data-theme)', () => {
+  describe('Theme-aware constraint (dark-primary + light override via data-theme)', () => {
     it('should NOT rely on prefers-color-scheme media queries', () => {
       expect(cssContent).not.toMatch(/prefers-color-scheme:\s*dark/);
     });
@@ -94,6 +95,12 @@ describe('Revamp Design System — Tailwind v4, LIGHT MODE ONLY (index.css)', ()
     it('should define a dark palette via html[data-theme="dark"]', () => {
       expect(cssContent).toContain("html[data-theme='dark']");
       expect(cssContent).toMatch(/data-theme/);
+    });
+
+    it('should define a light adaptation via html[data-theme="light"] keeping gold brand', () => {
+      expect(cssContent).toContain("html[data-theme='light']");
+      expect(cssContent).toContain('--surface-base: #F4F6F8');
+      expect(cssContent).toContain('--ink: #212B36');
     });
 
     it('should drive tailwind colors from CSS vars for live theme switching', () => {
@@ -144,7 +151,7 @@ describe('Revamp Design System — Tailwind v4, LIGHT MODE ONLY (index.css)', ()
     });
   });
 
-  describe('Surface treatment classes (preserved, light-only)', () => {
+  describe('Surface treatment classes (preserved, theme-aware)', () => {
     it('should define all three surface classes', () => {
       expect(cssContent).toContain('.surface-flat {');
       expect(cssContent).toContain('.surface-soft {');

@@ -58,14 +58,21 @@ function rentalDaysBetween(fromStr, toStr) {
 }
 
 function customerBlock(entity) {
-    if (!entity.customer) {
-        return null;
+    if (entity.customer) {
+        return {
+            name: entity.customer.name,
+            phone: entity.customer.phone,
+            email: entity.customer.email,
+        };
     }
-    return {
-        name: entity.customer.name,
-        phone: entity.customer.phone,
-        email: entity.customer.email,
-    };
+    if (entity.customerName || entity.customerMobile) {
+        return {
+            name: entity.customerName || null,
+            phone: entity.customerMobile || null,
+            email: null,
+        };
+    }
+    return null;
 }
 
 /**
@@ -105,6 +112,7 @@ async function buildSaleReceipt(uuid) {
             type: 'SALE',
             number: sale.saleNumber,
             date: sale.soldAt,
+            paymentMethod: sale.paymentMethod || null,
             totalPaise: String(totalPaise),
             paidPaise: String(amountPaidPaise),
             changePaise: '0',
@@ -168,6 +176,7 @@ async function buildRentalReceipt(uuid) {
             type: 'RENTAL',
             number: agreement.agreementNumber,
             date: agreement.startDate,
+            paymentMethod: agreement.paymentMethod || null,
             totalPaise: String(rentTotalPaise),
             paidPaise: String(amountPaidPaise),
             changePaise: '0',
@@ -254,6 +263,9 @@ function renderTextReceipt(receipt) {
     out.push(padRight('TOTAL', W - 10) + padLeft(paiseToRupees(receipt.totals.totalPaise), 10));
     out.push(padRight('Paid', W - 10) + padLeft(paiseToRupees(receipt.totals.amountPaidPaise), 10));
     out.push(padRight('Balance', W - 10) + padLeft(paiseToRupees(receipt.totals.balancePaise), 10));
+    if (receipt.transaction.paymentMethod) {
+        out.push(padRight('Payment', W - 10) + receipt.transaction.paymentMethod);
+    }
     out.push(thin);
 
     if (receipt.customer) {

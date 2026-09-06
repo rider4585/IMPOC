@@ -31,18 +31,19 @@ describe('money', () => {
       expect(formatPaise(1234567)).toBe('₹12,345.67');
     });
 
-    it('throws TypeError on negative paise', () => {
-      expect(() => formatPaise(-100)).toThrow(TypeError);
-    });
-
-    it('throws TypeError on negative zero', () => {
-      expect(() => formatPaise(-0)).not.toThrow();
-      expect(formatPaise(-0)).toBe('₹0.00');
-    });
-
     it('throws TypeError on non-integer values', () => {
       expect(() => formatPaise(100.5)).toThrow(TypeError);
       expect(() => formatPaise(100.1)).toThrow(TypeError);
+    });
+
+    it('formats negative paise with a leading minus sign', () => {
+      expect(formatPaise(-100)).toBe('-₹1.00');
+      expect(formatPaise(-180000)).toBe('-₹1,800.00');
+      expect(formatPaise(-129950)).toBe('-₹1,299.50');
+    });
+
+    it('formats negative zero as ₹0.00', () => {
+      expect(formatPaise(-0)).toBe('₹0.00');
     });
 
     it('throws TypeError on string input', () => {

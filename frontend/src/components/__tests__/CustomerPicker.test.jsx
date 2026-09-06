@@ -46,6 +46,24 @@ describe('CustomerPicker (T-20)', () => {
     expect(customersApi.searchCustomers).toHaveBeenCalledWith('Priya');
   });
 
+  it('does not open the dropdown on mount — only after the input is focused', async () => {
+    customersApi.searchCustomers.mockResolvedValue([
+      { uuid: 'c1', name: 'Priya Sharma', phone: '9876543210' },
+    ]);
+    const onChange = vi.fn();
+    render(<Controlled onPick={onChange} />);
+
+    expect(screen.queryByRole('button', { name: /priya sharma/i })).not.toBeInTheDocument();
+    expect(customersApi.searchCustomers).not.toHaveBeenCalled();
+
+    const input = screen.getByLabelText(/customer/i);
+    fireEvent.focus(input);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /priya sharma/i })).toBeInTheDocument();
+    });
+    expect(customersApi.searchCustomers).toHaveBeenCalledWith('');
+  });
+
   it('inline-creates a customer with consent and hands it back', async () => {
     customersApi.searchCustomers.mockResolvedValue([]);
     customersApi.createCustomer.mockResolvedValue({

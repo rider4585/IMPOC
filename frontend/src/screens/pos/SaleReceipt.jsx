@@ -11,6 +11,7 @@ import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
 export function SaleReceipt({ sale }) {
   const customer = sale.customer || null;
   const customerName = customer?.name || sale.customerName;
+  const customerPhone = customer?.phone || sale.customerMobile;
 
   return (
     <>
@@ -24,12 +25,15 @@ export function SaleReceipt({ sale }) {
             {new Date(sale.soldAt || sale.createdAt).toLocaleDateString()}
             {sale.status ? ` · ${sale.status}` : ''}
           </p>
-          {customer && (customer.phone || customer.email) && (
+          {(customerPhone || (customer && customer.email)) && (
             <p className="mb-2 text-xs text-[var(--ink-muted)]">
-              {customer.phone}
-              {customer.phone && customer.email ? ' · ' : ''}
-              {customer.email}
+              {customerPhone}
+              {customerPhone && customer?.email ? ' · ' : ''}
+              {customer?.email}
             </p>
+          )}
+          {sale.paymentMethod && (
+            <p className="mb-2 text-xs text-[var(--ink-muted)]">Payment · {sale.paymentMethod}</p>
           )}
           <Table>
             <TableHead>

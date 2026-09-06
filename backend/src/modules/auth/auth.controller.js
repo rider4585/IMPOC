@@ -14,6 +14,41 @@ import { revokeAuthSession, revokeAllAuthSessions } from './auth-session.service
 
 import { getUserPermissions } from './permission.service.js';
 
+// Refresh-token cookie options. The domain is intentionally NOT hardcoded to
+// 'localhost': a host-only cookie (no Domain attribute) works on localhost AND
+// on a LAN IP (e.g. 192.168.x.x:5173) when the app is reached from another
+// device. Set COOKIE_DOMAIN only when you need a shared/cross-host cookie.
+function cookieOptions(refreshToken, expiresAt) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const opts = {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'strict' : 'lax',
+        path: '/',
+        expires: expiresAt,
+    };
+    if (process.env.COOKIE_DOMAIN) {
+        opts.domain = process.env.COOKIE_DOMAIN;
+    }
+    return opts;
+}
+
+// Options for clearing the refresh-token cookie. Must mirror cookieOptions
+// (path + optional domain + sameSite/secure) so the expiry directive matches
+// the cookie as it was set — otherwise a stale cookie survives logout.
+function cookieClearOptions() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const opts = {
+        path: '/',
+        sameSite: isProduction ? 'strict' : 'lax',
+        secure: isProduction,
+    };
+    if (process.env.COOKIE_DOMAIN) {
+        opts.domain = process.env.COOKIE_DOMAIN;
+    }
+    return opts;
+}
+
 export const login = async (req, res, next) => {
     try {
         const data = loginSchema.parse(req.body);
@@ -27,16 +62,8 @@ export const login = async (req, res, next) => {
         const permissions = Array.from(permissionsSet).sort();
 
         // Set refresh token as an httpOnly cookie
-        const isProduction = process.env.NODE_ENV === 'production';
         try {
-            res.cookie('refreshToken', tokens.refreshToken, {
-                httpOnly: true,
-                secure: isProduction,
-                sameSite: isProduction ? 'strict' : 'lax',
-                path: '/',
-                domain: isProduction ? undefined : 'localhost',
-                expires: tokens.expiresAt,
-            });
+            res.cookie('refreshToken', tokens.refreshToken, cookieOptions(tokens.refreshToken, tokens.expiresAt));
         } catch (cookieError) {
             const error = new Error('Failed to set refresh token cookie');
             error.statusCode = 500;
@@ -78,16 +105,8 @@ export const refresh = async (req, res, next) => {
         const tokens = await refreshAuthTokens(refreshToken);
 
         // Set new refresh token as an httpOnly cookie
-        const isProduction = process.env.NODE_ENV === 'production';
         try {
-            res.cookie('refreshToken', tokens.refreshToken, {
-                httpOnly: true,
-                secure: isProduction,
-                sameSite: isProduction ? 'strict' : 'lax',
-                path: '/',
-                domain: isProduction ? undefined : 'localhost',
-                expires: tokens.expiresAt,
-            });
+            res.cookie('refreshToken', tokens.refreshToken, cookieOptions(tokens.refreshToken, tokens.expiresAt));
         } catch (cookieError) {
             const error = new Error('Failed to set refresh token cookie');
             error.statusCode = 500;
@@ -110,7 +129,7 @@ export const logout = async (req, res, next) => {
     try {
         await revokeAuthSession(req.auth.sessionUuid);
 
-        res.clearCookie('refreshToken', { path: '/' });
+        res.clearCookie('refreshToken', cookieClearOptions());
 
         return res.status(200).json({
             success: true,
@@ -125,7 +144,7 @@ export const logoutAll = async (req, res, next) => {
     try {
         await revokeAllAuthSessions(req.auth.userUuid);
 
-        res.clearCookie('refreshToken', { path: '/' });
+        res.clearCookie('refreshToken', cookieClearOptions());
 
         return res.status(200).json({
             success: true,

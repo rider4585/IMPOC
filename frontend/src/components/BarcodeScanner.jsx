@@ -16,7 +16,7 @@ import '../BarcodeScanner.css';
 const SCAN_PAUSE_DURATION = 5;
 
 /*
- * Default zoom shown on the start screen.
+ * Default zoom level.
  */
 const DEFAULT_ZOOM = 1;
 
@@ -61,6 +61,14 @@ function BarcodeScanner({ onDetected }) {
     const detectingRef = useRef(false);
 
     /*
+     * Guards against starting the camera twice.
+     *
+     * React StrictMode invokes mount effects twice
+     * in development; getUserMedia must only run once.
+     */
+    const startRequestedRef = useRef(false);
+
+    /*
      * Shared pause state.
      *
      * Refs are used here because both the native
@@ -91,9 +99,6 @@ function BarcodeScanner({ onDetected }) {
     const [zoom, setZoom] =
         useState(DEFAULT_ZOOM);
 
-    const [zoomError, setZoomError] =
-        useState('');
-
     /*
      * Actual camera zoom range.
      *
@@ -102,6 +107,12 @@ function BarcodeScanner({ onDetected }) {
      */
     const [zoomRange, setZoomRange] =
         useState(null);
+
+    /*
+     * Zoom delta applied by the floating
+     * stepper controls.
+     */
+    const ZOOM_STEP = 0.5;
 
     /*
      * Torch state.
@@ -311,50 +322,57 @@ function BarcodeScanner({ onDetected }) {
 
     /*
      * ---------------------------------------------------------
-     * Zoom input
+     * Floating zoom stepper
      * ---------------------------------------------------------
      */
 
-    const handleZoomChange = (event) => {
-        const value = event.target.value;
-
-        /*
-         * Allow the input to be temporarily empty
-         * while the user is editing it.
-         */
-        if (value === '') {
-            setZoom('');
-            setZoomError('');
-
-            return;
-        }
-
-        const numericValue =
-            Number(value);
+    const changeZoom = async (delta) => {
+        const stream =
+            streamRef.current;
 
         if (
-            !Number.isFinite(
-                numericValue
-            )
+            !stream ||
+            !zoomRange
         ) {
             return;
         }
 
-        /*
-         * Keep zoom positive.
-         */
-        if (numericValue <= 0) {
-            setZoomError(
-                'Zoom must be greater than 0.'
-            );
+        const track =
+            stream.getVideoTracks()[0];
 
-            setZoom(value);
-
+        if (!track) {
             return;
         }
 
-        setZoomError('');
-        setZoom(numericValue);
+        const current =
+            typeof zoom === 'number'
+                ? zoom
+                : DEFAULT_ZOOM;
+
+        const nextZoom = Math.min(
+            Math.max(
+                current + delta,
+                zoomRange.min
+            ),
+            zoomRange.max
+        );
+
+        if (nextZoom === current) {
+            return;
+        }
+
+        try {
+            await track.applyConstraints({
+                advanced: [{ zoom: nextZoom }],
+            });
+
+            setZoom(nextZoom);
+        } catch (zoomError) {
+            console.error(
+                'Unable to change zoom:',
+                zoomError
+            );
+        }
     };
 
     /*
@@ -411,28 +429,14 @@ function BarcodeScanner({ onDetected }) {
      */
 
     const startCamera = async () => {
-        /*
-         * Validate zoom before requesting camera.
-         */
-        const requestedZoom =
-            Number(zoom);
-
-        if (
-            !Number.isFinite(
-                requestedZoom
-            ) ||
-            requestedZoom <= 0
-        ) {
-            setZoomError(
-                'Please enter a valid zoom value greater than 0.'
-            );
-
+        if (startRequestedRef.current) {
             return;
         }
 
+        startRequestedRef.current = true;
+
         try {
             setError('');
-            setZoomError('');
             setBarcode('');
             setScanPaused(false);
             setRemainingSeconds(0);
@@ -516,10 +520,15 @@ function BarcodeScanner({ onDetected }) {
                      * Clamp requested zoom to the
                      * actual camera-supported range.
                      */
+                    const currentZoom =
+                        typeof zoom === 'number'
+                            ? zoom
+                            : DEFAULT_ZOOM;
+
                     const appliedZoom =
                         Math.min(
                             Math.max(
-                                requestedZoom,
+                                currentZoom,
                                 min
                             ),
                             max
@@ -531,7 +540,7 @@ function BarcodeScanner({ onDetected }) {
                      */
                     if (
                         appliedZoom !==
-                        requestedZoom
+                        currentZoom
                     ) {
                         setZoom(
                             appliedZoom
@@ -634,6 +643,11 @@ function BarcodeScanner({ onDetected }) {
                 'Unable to access camera:',
                 cameraError
             );
+
+            /*
+             * Allow the user to retry.
+             */
+            startRequestedRef.current = false;
 
             /*
              * Clean up partially opened camera.
@@ -940,101 +954,31 @@ function BarcodeScanner({ onDetected }) {
 
     /*
      * ---------------------------------------------------------
-     * Stop camera
+     * Start camera on mount
      * ---------------------------------------------------------
+     *
+     * The camera is opened as soon as the scanner
+     * is mounted; there is no start screen.
+     *
+     * The guard inside startCamera prevents the
+     * camera from being opened twice (e.g. under
+     * React StrictMode in development).
      */
-
-    const stopCamera = () => {
+    useEffect(() => {
         /*
-         * Stop native BarcodeDetector loop.
+         * Defer the initial start out of the effect's
+         * synchronous body; startCamera resets state
+         * (setError) which is not allowed synchronously.
          */
-        if (
-            animationFrameRef.current
-        ) {
-            cancelAnimationFrame(
-                animationFrameRef.current
-            );
+        const timer = setTimeout(() => {
+            startCamera();
+        }, 0);
 
-            animationFrameRef.current =
-                null;
-        }
-
-        /*
-         * Stop ZXing.
-         */
-        if (
-            zxingControlsRef.current
-        ) {
-            try {
-                zxingControlsRef.current.stop();
-            } catch {
-                /*
-                 * Scanner may already be stopped.
-                 */
-            }
-
-            zxingControlsRef.current =
-                null;
-        }
-
-        /*
-         * Stop pause timer.
-         */
-        if (pauseTimerRef.current) {
-            clearInterval(
-                pauseTimerRef.current
-            );
-
-            pauseTimerRef.current =
-                null;
-        }
-
-        /*
-         * Stop camera tracks.
-         *
-         * This also releases the torch.
-         */
-        if (streamRef.current) {
-            streamRef.current
-                .getTracks()
-                .forEach((track) => {
-                    try {
-                        track.stop();
-                    } catch {
-                        /*
-                         * Track already stopped.
-                         */
-                    }
-                });
-
-            streamRef.current = null;
-        }
-
-        /*
-         * Reset scanner state.
-         */
-        detectorRef.current = null;
-        codeReaderRef.current = null;
-
-        detectingRef.current = false;
-        pausedRef.current = false;
-
-        setStarted(false);
-        setScanPaused(false);
-        setRemainingSeconds(0);
-        setBarcode('');
-        setError('');
-
-        setTorchSupported(false);
-        setTorchEnabled(false);
-
-        /*
-         * Keep the user's selected zoom.
-         *
-         * This means when they reopen the scanner,
-         * the same zoom value will be used.
-         */
-    };
+        return () => {
+            clearTimeout(timer);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     /*
      * ---------------------------------------------------------
@@ -1100,58 +1044,21 @@ function BarcodeScanner({ onDetected }) {
 
     return (
         <div className="barcode-scanner">
-            {!started && (
+            {!started && !error && (
+                <div className="scanner-starting">
+                    Starting camera…
+                </div>
+            )}
+
+            {error && (
                 <div className="scanner-start">
                     <div className="scanner-start-content">
                         <div className="scanner-start-title">
                             Barcode Scanner
                         </div>
 
-                        <div className="scanner-zoom-input">
-                            <label htmlFor="scanner-zoom">
-                                Camera Zoom
-                            </label>
-
-                            <div className="scanner-zoom-input-wrapper">
-                                <input
-                                    id="scanner-zoom"
-                                    type="number"
-                                    inputMode="decimal"
-                                    min="0.1"
-                                    step="0.1"
-                                    value={zoom}
-                                    onChange={
-                                        handleZoomChange
-                                    }
-                                    aria-describedby={
-                                        zoomError
-                                            ? 'scanner-zoom-error'
-                                            : undefined
-                                    }
-                                />
-
-                                <span>
-                                    ×
-                                </span>
-                            </div>
-
-                            {zoomError && (
-                                <div
-                                    id="scanner-zoom-error"
-                                    className="scanner-zoom-error"
-                                >
-                                    {zoomError}
-                                </div>
-                            )}
-
-                            {zoomRange && (
-                                <div className="scanner-zoom-range">
-                                    Camera supports{' '}
-                                    {zoomRange.min}×
-                                    {' – '}
-                                    {zoomRange.max}×
-                                </div>
-                            )}
+                        <div className="scanner-error">
+                            {error}
                         </div>
 
                         <button
@@ -1159,14 +1066,8 @@ function BarcodeScanner({ onDetected }) {
                             className="scanner-start-button"
                             onClick={startCamera}
                         >
-                            Start Scanner
+                            Try again
                         </button>
-
-                        {error && (
-                            <div className="scanner-error">
-                                {error}
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
@@ -1211,6 +1112,40 @@ function BarcodeScanner({ onDetected }) {
                             autoPlay
                         />
 
+                        {zoomRange && (
+                            <div className="scanner-zoom">
+                                <button
+                                    type="button"
+                                    className="scanner-zoom-button"
+                                    onClick={() =>
+                                        changeZoom(
+                                            -ZOOM_STEP
+                                        )
+                                    }
+                                    aria-label="Zoom out"
+                                >
+                                    −
+                                </button>
+
+                                <span className="scanner-zoom-value">
+                                    {zoom}×
+                                </span>
+
+                                <button
+                                    type="button"
+                                    className="scanner-zoom-button"
+                                    onClick={() =>
+                                        changeZoom(
+                                            ZOOM_STEP
+                                        )
+                                    }
+                                    aria-label="Zoom in"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        )}
+
                         {scanPaused && (
                             <div className="scanner-pause-message">
                                 <span>
@@ -1247,14 +1182,6 @@ function BarcodeScanner({ onDetected }) {
                             </div>
                         )}
                     </div>
-
-                    <button
-                        type="button"
-                        className="scanner-close"
-                        onClick={stopCamera}
-                    >
-                        Close
-                    </button>
                 </div>
             )}
         </div>

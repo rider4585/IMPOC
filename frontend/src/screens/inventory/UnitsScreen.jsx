@@ -4,6 +4,8 @@ import { Card, CardHeader, CardTitle, CardContent, Input, SearchableSelect } fro
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { listAllUnits } from '../../services/unitsApi.js';
+import { listAllStocks } from '../../services/tripsApi.js';
+import { getProductTypes } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -51,11 +53,28 @@ export function UnitsScreen() {
   const [status, setStatus] = useState('');
   const [stockUuid, setStockUuid] = useState(() => readStockUuid(location.search));
 
+  const [stocks, setStocks] = useState([]);
+  const [productTypes, setProductTypes] = useState([]);
+
   const [prevSearch, setPrevSearch] = useState(location.search);
   if (location.search !== prevSearch) {
     setPrevSearch(location.search);
     setStockUuid(readStockUuid(location.search));
   }
+
+  const typeName = useCallback(
+    (uuid) => productTypes.find((p) => p.uuid === uuid)?.name || '—',
+    [productTypes]
+  );
+
+  const stockLabel = useCallback(
+    (s) => {
+      const t = typeName(s.productTypeUuid);
+      const sub = s.subTypeUuid ? typeName(s.subTypeUuid) : null;
+      return sub ? `${t} (${sub})` : t;
+    },
+    [typeName]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,6 +99,13 @@ export function UnitsScreen() {
       clearTimeout(id);
     };
   }, [load]);
+
+  useEffect(() => {
+    listAllStocks({})
+      .then((data) => setStocks(Array.isArray(data) ? data : data?.items || []))
+      .catch(() => {});
+    getProductTypes().then(setProductTypes).catch(() => {});
+  }, []);
 
   const legend = useMemo(() => Object.values(STATUS_META), []);
 
@@ -123,6 +149,7 @@ export function UnitsScreen() {
           <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Input
               type="search"
+              label="Search"
               placeholder="Search barcode, stock, vendor…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -140,7 +167,17 @@ export function UnitsScreen() {
               ]}
             />
             {stockUuid && (
-              <Input label="Stock" value={stockUuid} readOnly aria-label="Stock filter" />
+              <SearchableSelect
+                label="Stock"
+                value={stockUuid}
+                onChange={setStockUuid}
+                searchPlaceholder="Search stocks…"
+                emptyMessage="No stocks."
+                options={[
+                  { value: '', label: 'All stocks' },
+                  ...stocks.map((s) => ({ value: s.uuid, label: stockLabel(s) })),
+                ]}
+              />
             )}
           </div>
 

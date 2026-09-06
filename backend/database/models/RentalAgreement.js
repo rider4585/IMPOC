@@ -72,6 +72,18 @@ export default (sequelize) => {
                 allowNull: true,
             },
 
+            paymentMethod: {
+                type: DataTypes.STRING(50),
+                field: 'payment_method',
+                allowNull: true,
+            },
+
+            customerSource: {
+                type: DataTypes.STRING(50),
+                field: 'customer_source',
+                allowNull: true,
+            },
+
             createdBy: {
                 type: DataTypes.INTEGER,
                 field: 'created_by',

@@ -19,6 +19,8 @@ export const createSale = async (req, res, next) => {
             customerName: body.customerName,
             customerUuid: body.customerUuid,
             soldAt: body.soldAt,
+            paymentMethod: body.paymentMethod,
+            customerSource: body.customerSource,
             notes: body.notes,
             items: body.items,
             actorUserId: req.user?.id,

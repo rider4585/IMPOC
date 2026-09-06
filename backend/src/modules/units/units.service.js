@@ -308,6 +308,9 @@ function mapUnitDTO(unit) {
         channel: unit.channel,
         colourUuid: unit.colour?.uuid || null,
         sizeUuid: unit.size?.uuid || null,
+        colourName: unit.colour?.name || null,
+        sizeName: unit.size?.name || null,
+        stockName: unit.stock ? deriveStockName(unit.stock) : null,
         buyingPricePaise: String(unit.buyingPricePaise),
         sellingPricePaise: String(unit.sellingPricePaise),
         floorPricePaise: String(unit.floorPricePaise),
@@ -545,8 +548,16 @@ export const getUnitByBarcode = async (barcode) => {
             'updatedAt',
         ],
         include: [
-            { association: 'colour', attributes: ['uuid'] },
-            { association: 'size', attributes: ['uuid'] },
+            { association: 'colour', attributes: ['uuid', 'name'] },
+            { association: 'size', attributes: ['uuid', 'name'] },
+            {
+                association: 'stock',
+                attributes: ['uuid'],
+                include: [
+                    { association: 'productType', attributes: ['uuid', 'name'] },
+                    { association: 'subType', attributes: ['uuid', 'name'] },
+                ],
+            },
         ],
     });
 

@@ -12,8 +12,15 @@
       (function () {
         try {
           var s = JSON.parse(localStorage.getItem('impoc-theme-settings') || '{}');
+          // Bug-free pre-hydration theme: default to DARK, resolve 'system' via OS.
+          var scheme = s.colorScheme || 'dark';
+          if (scheme === 'system') {
+            try {
+              scheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            } catch (e) { scheme = 'dark'; }
+          }
           var r = document.documentElement;
-          r.setAttribute('data-theme', s.colorScheme || 'light');
+          r.setAttribute('data-theme', scheme);
           r.setAttribute('data-primary', s.primaryColor || 'default');
           r.setAttribute('data-font', s.fontFamily || 'minimals');
         } catch (e) {}

@@ -9,7 +9,7 @@ import { formatPaise } from '../../platform/money.js';
  * receipt shape:
  * {
  *   store: {name, address, phone},
- *   transaction: {type, number, date, totalPaise, paidPaise, changePaise, status},
+ *   transaction: {type, number, date, paymentMethod, totalPaise, paidPaise, changePaise, status},
  *   customer: {name, phone, email},
  *   lines: [{productName, productType, colour, size, quantity, unitPricePaise, lineTotalPaise}],
  *   totals: {subtotalPaise, discountPaise, totalPaise, amountPaidPaise, balancePaise, itemsCount}
@@ -51,6 +51,12 @@ export function ReceiptPreview({ receipt }) {
                   <span className="text-[var(--ink-muted)]">Status</span>
                   <Badge variant="neutral">{transaction.status}</Badge>
                 </p>
+                {transaction.paymentMethod && (
+                  <p className="flex justify-between">
+                    <span className="text-[var(--ink-muted)]">Payment</span>
+                    <span className="font-medium">{transaction.paymentMethod}</span>
+                  </p>
+                )}
               </>
             )}
           </CardContent>

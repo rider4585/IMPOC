@@ -284,7 +284,7 @@ export function VendorsScreen() {
                     <TableBody>
                       {tripStocks(trip).map((stock) => (
                         <TableRow key={stock.uuid}>
-                          <TableCell>{stock.productTypeUuid || '—'}</TableCell>
+                          <TableCell>{stock.stockName || '—'}</TableCell>
                           <TableCell>{stock.quantity}</TableCell>
                           <TableCell>{formatPaise(Number(stock.buyingPricePaise))}</TableCell>
                           <TableCell>{formatPaise(Number(stock.sellingPricePaise))}</TableCell>

@@ -11,7 +11,7 @@ function StockBlock({ stock }) {
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3">
       <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="font-semibold">{stock.name || stock.productTypeUuid || 'Stock'}</span>
+        <span className="font-semibold">{stock.stockName || stock.name || 'Stock'}</span>
         <span className="text-[var(--ink-muted)]">qty {stock.quantity} · {stock.channel}</span>
       </div>
       <div className="mt-1 text-xs text-[var(--ink-muted)]">
@@ -24,7 +24,7 @@ function StockBlock({ stock }) {
           {units.map((unit) => (
             <li key={unit.uuid} className="flex items-center gap-2 text-xs">
               <span className="font-mono text-[var(--ink)]">{unit.barcode}</span>
-              <span className="text-[var(--ink-muted)]">{unit.colour || ''} {unit.size || ''}</span>
+              <span className="text-[var(--ink-muted)]">{unit.colourName || ''} {unit.sizeName || ''}</span>
               <span className="ml-auto text-[var(--ink-muted)]">{unit.status}</span>
             </li>
           ))}

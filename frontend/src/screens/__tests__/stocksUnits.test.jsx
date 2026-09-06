@@ -263,10 +263,23 @@ describe('StocksScreen (R-12)', () => {
 });
 
 describe('UnitsScreen (R-12)', () => {
+  const UNIT_STOCKS = [
+    { uuid: 'su1', productTypeUuid: 'pt-sari', subTypeUuid: 'st-paithani', quantity: 2 },
+    { uuid: 'su2', productTypeUuid: 'pt-saree', subTypeUuid: 'st-banarasi', quantity: 1 },
+  ];
+  const UNIT_PRODUCT_TYPES = [
+    { uuid: 'pt-sari', name: 'Sari', parentUuid: null, isActive: true },
+    { uuid: 'st-paithani', name: 'Paithani', parentUuid: 'pt-sari', isActive: true },
+    { uuid: 'pt-saree', name: 'Saree', parentUuid: null, isActive: true },
+    { uuid: 'st-banarasi', name: 'Banarasi', parentUuid: 'pt-saree', isActive: true },
+  ];
+
   beforeEach(() => {
     vi.clearAllMocks();
     authModule.useAuth.mockReturnValue({ permissions: VIEWER });
     unitsService.listAllUnits.mockResolvedValue(UNITS);
+    tripsService.listAllStocks.mockResolvedValue(UNIT_STOCKS);
+    picklistsService.getProductTypes.mockResolvedValue(UNIT_PRODUCT_TYPES);
   });
 
   it('renders barcode chip, status badge, stock, vendor, colour+size and buying price', async () => {
@@ -316,7 +329,13 @@ describe('UnitsScreen (R-12)', () => {
     await waitFor(() => {
       expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: 'Banarasi', status: 'sold', stockUuid: 'su1' });
     });
-    expect(screen.getByLabelText(/stock filter/i)).toHaveValue('su1');
+
+    expect(screen.getByLabelText(/^Stock$/)).toHaveTextContent('Sari (Paithani)');
+
+    await selectCombo('Stock', /Saree \(Banarasi\)/, 'Saree');
+    await waitFor(() => {
+      expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: 'Banarasi', status: 'sold', stockUuid: 'su2' });
+    });
   });
 
   it('shows an error state with a working retry', async () => {

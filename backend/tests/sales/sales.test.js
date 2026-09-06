@@ -126,12 +126,14 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ customerName: 'Walk-in', items: [{ unitUuid: unit1.uuid }, { unitUuid: unit2.uuid }] })
+                .send({ customerName: 'Walk-in', paymentMethod: 'Cash', customerSource: 'Instagram', items: [{ unitUuid: unit1.uuid }, { unitUuid: unit2.uuid }] })
                 .expect(201);
 
             expect(res.body.success).toBe(true);
             const sale = res.body.data;
             expect(sale.saleNumber).toBeDefined();
+            expect(sale.paymentMethod).toBe('Cash');
+            expect(sale.customerSource).toBe('Instagram');
             expect(sale.totalPaise).toBe('400000'); // 2 * 200000 snapshot
             expect(sale.lines).toHaveLength(2);
             expect(sale.lines[0].sellingPricePaise).toBe('200000');

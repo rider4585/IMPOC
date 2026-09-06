@@ -172,8 +172,8 @@ export function StockIntake() {
       setWaking(false);
 
       // Check if stock is now full
-      const newCount = (updated?.unitsScannedCount ?? scannedCount) + 1;
-      if (newCount >= quantity) {
+      const newCount = updated?.unitsScannedCount ?? (scannedCount + 1);
+      if (quantity > 0 && newCount >= quantity) {
         setState(STATES.STOCK_FULL);
       } else {
         setState(STATES.IDLE);
@@ -277,9 +277,11 @@ export function StockIntake() {
       <div className="flex flex-1 flex-col items-center justify-center px-4">
         {state === STATES.IDLE && !isFull && (
           <>
-            <p className="mb-6 text-center text-sm text-white/50">Tap to arm the camera</p>
+            <p className="mb-6 text-center text-sm text-white/50">
+              {scannedCount > 0 ? 'Unit saved — scan the next one.' : 'Tap to arm the camera'}
+            </p>
             <Button onClick={armCamera} className="w-full max-w-xs" data-testid="scan-barcode">
-              Scan barcode
+              {scannedCount > 0 ? 'Scan next unit' : 'Scan barcode'}
             </Button>
             {decodeFailHint && (
               <div className="mt-4 text-center">
@@ -327,7 +329,7 @@ export function StockIntake() {
         )}
 
         {state === STATES.DECODED && (
-          <div className="w-full max-w-md rounded-lg border border-[var(--border)] bg-white p-5 shadow-lg">
+          <div className="w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-5 shadow-lg">
             {refusalInfo ? (
               /* Refusal state */
               <div className="text-center">
@@ -390,7 +392,7 @@ export function StockIntake() {
                 </div>
 
                 {waking && (
-                  <div className="mt-3 rounded-md bg-[var(--waking)] p-2 text-center text-xs text-white">
+                  <div className="mt-3 rounded-md bg-[var(--accent)] p-2 text-center text-xs text-[var(--accent-foreground)]">
                     Waking the system up. This takes up to a minute. Nothing is lost.
                   </div>
                 )}
@@ -411,7 +413,7 @@ export function StockIntake() {
 
         {state === STATES.STOCK_FULL && (
           <div className="w-full max-w-md text-center">
-            <div className="rounded-lg border border-[var(--border)] bg-white p-6 shadow-lg">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg">
               <p className="text-lg font-semibold text-[var(--success)]">{quantity} of {quantity} — stock complete</p>
               <Button onClick={closeStock} className="mt-4 w-full" data-testid="close-stock">
                 Close stock
@@ -422,7 +424,7 @@ export function StockIntake() {
 
         {isFull && state === STATES.IDLE && (
           <div className="w-full max-w-md text-center">
-            <div className="rounded-lg border border-[var(--border)] bg-white p-6 shadow-lg">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg">
               <p className="text-lg font-semibold text-[var(--success)]">{quantity} of {quantity} — stock complete</p>
               <Button onClick={closeStock} className="mt-4 w-full" data-testid="close-stock">
                 Close stock
@@ -435,7 +437,7 @@ export function StockIntake() {
       {/* Manual barcode entry overlay */}
       {showManual && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowManual(false)}>
-          <div className="w-full max-w-md rounded-t-xl bg-white p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-t-xl bg-[var(--surface-raised)] p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-3 text-sm font-semibold">Enter barcode manually</h3>
             <div className="flex gap-2">
               <input
