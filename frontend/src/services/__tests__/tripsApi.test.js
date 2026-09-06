@@ -6,7 +6,7 @@ import { STOCK_ROUTES } from '../../platform/routes.js';
 vi.mock('../../platform/apiClient.js');
 
 // Import after mocking
-import { createStock } from '../tripsApi.js';
+import { getStock, scanBarcodeIntoStock, createStock } from '../tripsApi.js';
 
 describe('tripsApi.createStock', () => {
   beforeEach(() => {
@@ -63,5 +63,49 @@ describe('tripsApi.createStock', () => {
       `/trips/${tripUuid}/stocks`,
       expect.objectContaining({ tripUuid })
     );
+  });
+});
+
+describe('tripsApi.getStock', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('GETs the trip-scoped single-stock route and returns the stock DTO', async () => {
+    const tripUuid = '6082e02e-e0ec-4e8c-8821-70c8a35cc7f8';
+    const stockUuid = 'e1d2c3b4-a5b6-47a8-8b7c-6d5e4f3a2b1c';
+    apiClient.get.mockResolvedValueOnce({
+      data: { success: true, data: { uuid: stockUuid, name: 'Kurti A' } },
+    });
+
+    const result = await getStock(tripUuid, stockUuid);
+
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    expect(apiClient.get).toHaveBeenCalledWith(`/trips/${tripUuid}/stocks/${stockUuid}`);
+    expect(result.uuid).toBe(stockUuid);
+  });
+});
+
+describe('tripsApi.scanBarcodeIntoStock', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('POSTs the payload to the trip-scoped scan route and returns the created unit', async () => {
+    const tripUuid = '6082e02e-e0ec-4e8c-8821-70c8a35cc7f8';
+    const stockUuid = 'e1d2c3b4-a5b6-47a8-8b7c-6d5e4f3a2b1c';
+    const payload = { barcode: '100001', colourUuid: 'c1', sizeUuid: 's1' };
+    apiClient.post.mockResolvedValueOnce({
+      data: { success: true, data: { uuid: 'u1', barcode: payload.barcode } },
+    });
+
+    const result = await scanBarcodeIntoStock(tripUuid, stockUuid, payload);
+
+    expect(apiClient.post).toHaveBeenCalledTimes(1);
+    expect(apiClient.post).toHaveBeenCalledWith(
+      `/trips/${tripUuid}/stocks/${stockUuid}/scan`,
+      payload
+    );
+    expect(result.barcode).toBe(payload.barcode);
   });
 });

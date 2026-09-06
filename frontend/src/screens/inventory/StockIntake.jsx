@@ -53,16 +53,16 @@ export function StockIntake() {
 
   const refreshStock = useCallback(async () => {
     if (!stockUuid) return null;
-    const data = await getStock(stockUuid);
+    const data = await getStock(tripUuid, stockUuid);
     if (data) setStock(data);
     return data;
-  }, [stockUuid]);
+  }, [tripUuid, stockUuid]);
 
   // Load stock data
   useEffect(() => {
     if (!stockUuid) return;
     setLoading(true);
-    Promise.all([getStock(stockUuid), getColours(), getSizes(), getProductTypes()])
+    Promise.all([getStock(tripUuid, stockUuid), getColours(), getSizes(), getProductTypes()])
       .then(([stockData, colData, szData, typeData]) => {
         if (stockData) setStock(stockData);
         else setError('Stock not found');
@@ -72,7 +72,7 @@ export function StockIntake() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [stockUuid]);
+  }, [tripUuid, stockUuid]);
 
   // Decode timer — after 10s armed with no decode, show hint + manual entry
   useEffect(() => {
@@ -144,7 +144,7 @@ export function StockIntake() {
 
     const requestKey = createRequestKey();
     const doSave = () =>
-      scanBarcodeIntoStock(stockUuid, {
+      scanBarcodeIntoStock(tripUuid, stockUuid, {
         barcode: scannedBarcode,
         colourUuid,
         sizeUuid,

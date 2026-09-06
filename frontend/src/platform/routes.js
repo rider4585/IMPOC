@@ -34,13 +34,15 @@ export const STOCK_ROUTES = {
   LIST: (tripUuid) => `/trips/${encodeURIComponent(tripUuid)}/stocks`,
   /** POST /trips/{tripUuid}/stocks - Create a stock (for one of the trip's vendors) */
   CREATE: (tripUuid) => `/trips/${encodeURIComponent(tripUuid)}/stocks`,
-  /** GET /stocks/{uuid} - Get a single stock */
-  GET: (uuid) => `/stocks/${encodeURIComponent(uuid)}`,
+  /** GET /trips/{tripUuid}/stocks/{uuid} - Get a single stock */
+  GET: (tripUuid, uuid) =>
+    `/trips/${encodeURIComponent(tripUuid)}/stocks/${encodeURIComponent(uuid)}`,
   /** PATCH /trips/{tripUuid}/stocks/{uuid} - Update a stock */
   UPDATE: (tripUuid, uuid) =>
     `/trips/${encodeURIComponent(tripUuid)}/stocks/${encodeURIComponent(uuid)}`,
-  /** POST /stocks/{uuid}/scan - Scan a barcode into a stock (creates a unit) */
-  SCAN: (uuid) => `/stocks/${encodeURIComponent(uuid)}/scan`,
+  /** POST /trips/{tripUuid}/stocks/{uuid}/scan - Scan a barcode into a stock (creates a unit) */
+  SCAN: (tripUuid, uuid) =>
+    `/trips/${encodeURIComponent(tripUuid)}/stocks/${encodeURIComponent(uuid)}/scan`,
 };
 
 // Per-vendor buying template endpoints

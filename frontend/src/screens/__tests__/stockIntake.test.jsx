@@ -49,7 +49,7 @@ function setup({ initialStock } = {}) {
   if (initialStock) stockState = { ...initialStock };
   stockState = stockState.uuid ? stockState : makeStock();
   tripsService.getStock.mockImplementation(async () => stockState);
-  tripsService.scanBarcodeIntoStock.mockImplementation(async (stockUuid, payload) => {
+  tripsService.scanBarcodeIntoStock.mockImplementation(async (tripUuid, stockUuid, payload) => {
     stockState = { ...stockState, unitsScannedCount: stockState.unitsScannedCount + 1 };
     return { ok: true };
   });
@@ -129,6 +129,7 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
     await waitFor(() => expect(screen.getByText(/1 of 3/)).toBeInTheDocument());
     expect(tripsService.scanBarcodeIntoStock).toHaveBeenCalledTimes(1);
     expect(tripsService.scanBarcodeIntoStock).toHaveBeenCalledWith(
+      't1',
       'S1',
       { barcode: '100001', colourUuid: 'c1', sizeUuid: 's1' }
     );

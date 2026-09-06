@@ -1,6 +1,6 @@
 /**
  * Trip + stock API service
- * Thin wrappers over apiClient for /trips and /trips/:tripUuid/stocks (and /stocks/:uuid).
+ * Thin wrappers over apiClient for /trips and /trips/:tripUuid/stocks (and /trips/:tripUuid/stocks/:uuid).
  * Schema V2: Trip (1) -> Vendors (N) -> Stocks (N per vendor) -> Units (N per stock).
  */
 
@@ -149,13 +149,14 @@ export async function getStocks(tripUuid) {
 }
 
 /**
- * GET /stocks/:uuid
+ * GET /trips/:tripUuid/stocks/:uuid
+ * @param {string} tripUuid
  * @param {string} uuid
  * @returns {Promise<Object>} stock DTO
  */
-export async function getStock(uuid) {
+export async function getStock(tripUuid, uuid) {
   try {
-    const response = await apiClient.get(STOCK_ROUTES.GET(uuid));
+    const response = await apiClient.get(STOCK_ROUTES.GET(tripUuid, uuid));
     if (response.data?.success) {
       return response.data.data;
     }
@@ -205,16 +206,17 @@ export async function updateStock(tripUuid, uuid, payload) {
 }
 
 /**
- * POST /stocks/:uuid/scan
+ * POST /trips/:tripUuid/stocks/:uuid/scan
  * Scans a barcode into a stock, creating a unit.
+ * @param {string} tripUuid
  * @param {string} stockUuid - the stock's uuid
  * @param {{barcode, colourUuid, sizeUuid}} payload
  * @returns {Promise<Object>} created unit DTO
  */
-export async function scanBarcodeIntoStock(stockUuid, { barcode, colourUuid, sizeUuid }) {
+export async function scanBarcodeIntoStock(tripUuid, stockUuid, { barcode, colourUuid, sizeUuid }) {
   try {
     const response = await apiClient.post(
-      STOCK_ROUTES.SCAN(stockUuid),
+      STOCK_ROUTES.SCAN(tripUuid, stockUuid),
       { barcode, colourUuid, sizeUuid }
     );
     if (response.data?.success) {

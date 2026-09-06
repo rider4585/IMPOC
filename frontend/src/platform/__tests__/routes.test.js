@@ -54,10 +54,11 @@ describe('TRIP_ROUTES', () => {
 
 describe('STOCK_ROUTES', () => {
   describe('SCAN', () => {
+    const trip = '11111111-1111-4111-8111-111111111111';
     const uuid = '550e8400-e29b-41d4-a716-446655440000';
 
-    it('returns the correct path under the stocks mount', () => {
-      expect(STOCK_ROUTES.SCAN(uuid)).toBe(`/stocks/${uuid}/scan`);
+    it('returns the correct path under the trip-scoped stocks mount', () => {
+      expect(STOCK_ROUTES.SCAN(trip, uuid)).toBe(`/trips/${trip}/stocks/${uuid}/scan`);
     });
 
     it('is a function', () => {
@@ -65,11 +66,12 @@ describe('STOCK_ROUTES', () => {
     });
 
     it('does not include /api prefix', () => {
-      expect(STOCK_ROUTES.SCAN(uuid)).not.toContain('/api/');
+      expect(STOCK_ROUTES.SCAN(trip, uuid)).not.toContain('/api/');
     });
 
-    it('encodes special characters in the param', () => {
-      const result = STOCK_ROUTES.SCAN('stock@y');
+    it('encodes special characters in the params', () => {
+      const result = STOCK_ROUTES.SCAN('t@1', 'stock@y');
+      expect(result).toContain('t%401');
       expect(result).toContain('stock%40y');
     });
   });
@@ -82,9 +84,11 @@ describe('STOCK_ROUTES', () => {
     expect(STOCK_ROUTES.UPDATE(trip, uuid)).toBe(`/trips/${trip}/stocks/${uuid}`);
   });
 
-  it('builds a GET path for a single stock', () => {
+  it('builds a trip-scoped GET path for a single stock', () => {
+    const trip = '11111111-1111-4111-8111-111111111111';
     const uuid = '550e8400-e29b-41d4-a716-446655440000';
-    expect(STOCK_ROUTES.GET(uuid)).toBe(`/stocks/${uuid}`);
+    expect(STOCK_ROUTES.GET(trip, uuid)).toBe(`/trips/${trip}/stocks/${uuid}`);
+    expect(STOCK_ROUTES.GET(trip, uuid)).not.toContain('/api/');
   });
 });
 
