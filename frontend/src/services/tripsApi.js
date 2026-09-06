@@ -167,13 +167,15 @@ export async function getStock(uuid) {
 
 /**
  * POST /trips/:tripUuid/stocks
- * @param {string} tripUuid
+ * tripUuid is sent BOTH in the URL path and in the request BODY (the backend
+ * createStockSchema requires tripUuid in the body).
+ * @param {string} tripUuid - the trip's UUID, also included in the request body
  * @param {Object} payload - {vendorUuid, productTypeUuid, quantity, buyingPricePaise, sellingPricePaise, floorPricePaise, channel, rentPerDayPaise?, depositPaise?, overduePerDayPaise?}
  * @returns {Promise<Object>} created stock DTO
  */
 export async function createStock(tripUuid, payload) {
   try {
-    const response = await apiClient.post(STOCK_ROUTES.CREATE(tripUuid), payload);
+    const response = await apiClient.post(STOCK_ROUTES.CREATE(tripUuid), { ...payload, tripUuid });
     if (response.data?.success) {
       return response.data.data;
     }
