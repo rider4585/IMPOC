@@ -5,7 +5,7 @@ import {
   CardTitle,
   CardContent,
   Button,
-  Select,
+  SearchableSelect,
   Input,
   Dialog,
   Badge,
@@ -196,12 +196,19 @@ export function RentalsScreen() {
             </CardHeader>
             <CardContent className="p-4">
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                <Select label="Filter" value={filter} onChange={(e) => setFilter(e.target.value)}>
-                  <option value="all">All statuses</option>
-                  <option value="active">Active</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </Select>
+                <SearchableSelect
+                  label="Filter"
+                  value={filter}
+                  onChange={setFilter}
+                  searchPlaceholder="Search statuses…"
+                  emptyMessage="No matching statuses."
+                  options={[
+                    { value: 'all', label: 'All statuses' },
+                    { value: 'active', label: 'Active' },
+                    { value: 'completed', label: 'Completed' },
+                    { value: 'cancelled', label: 'Cancelled' },
+                  ]}
+                />
               </div>
 
               {loading ? (

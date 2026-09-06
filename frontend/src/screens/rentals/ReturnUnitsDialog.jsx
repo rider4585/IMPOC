@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, Button, Input, Select, Card, CardContent } from '../../components/ui';
+import { Dialog, Button, Input, SearchableSelect, Card, CardContent } from '../../components/ui';
 import { formatPaise } from '../../platform/money.js';
 import { parseRupeesToPaise } from '../../platform/moneyInput.js';
 
@@ -129,18 +129,18 @@ export function ReturnUnitsDialog({ open, onClose, onSave, saving, agreement, da
                       </div>
                       {selected && (
                         <div className="mt-3 flex flex-col gap-2">
-                          <Select
+                          <SearchableSelect
                             label="Damage grade (optional)"
                             value={selections[line.uuid]?.gradeUuid || ''}
-                            onChange={(ev) => setGrade(line.uuid, ev.target.value)}
-                          >
-                            <option value="">No damage grade</option>
-                            {(damageGrades || []).map((g) => (
-                              <option key={g.uuid} value={g.uuid}>
-                                {g.name}
-                              </option>
-                            ))}
-                          </Select>
+                            onChange={(gradeUuid) => setGrade(line.uuid, gradeUuid)}
+                            placeholder="No damage grade"
+                            searchPlaceholder="Search damage grades…"
+                            emptyMessage="No damage grades."
+                            options={[
+                              { value: '', label: 'No damage grade' },
+                              ...(damageGrades || []).map((g) => ({ value: g.uuid, label: g.name })),
+                            ]}
+                          />
                           <Input
                             label="Damage charge (₹) — optional, defaults to 0"
                             value={charges[line.uuid] || ''}

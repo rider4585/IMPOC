@@ -6,7 +6,7 @@ import {
   CardContent,
   Button,
   Input,
-  Select,
+  SearchableSelect,
   Dialog,
   Badge,
   useToast,
@@ -150,23 +150,28 @@ export function ExpensesScreen() {
         </CardHeader>
         <CardContent className="p-4">
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <Select label="Status" className="min-w-[160px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="all">All</option>
-              {STATUS_FILTERS.filter((s) => s !== 'all').map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </Select>
-            <Select
+            <SearchableSelect
+              label="Status"
+              className="min-w-[160px]"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: 'all', label: 'All' },
+                ...STATUS_FILTERS.filter((s) => s !== 'all').map((s) => ({ value: s, label: s })),
+              ]}
+            />
+            <SearchableSelect
               label="Category"
               className="min-w-[160px]"
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-            >
-              <option value="">All categories</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </Select>
+              onChange={setCategoryFilter}
+              searchPlaceholder="Search categories…"
+              emptyMessage="No categories yet."
+              options={[
+                { value: '', label: 'All categories' },
+                ...categories.map((c) => ({ value: c, label: c })),
+              ]}
+            />
             <Input
               label="Date"
               type="date"

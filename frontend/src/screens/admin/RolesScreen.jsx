@@ -5,7 +5,7 @@ import {
   CardTitle,
   CardContent,
   Button,
-  Select,
+  SearchableSelect,
   Dialog,
   Table,
   TableHead,
@@ -49,6 +49,7 @@ export function RolesScreen() {
   const [allPermissions, setAllPermissions] = useState([]);
   const [assignedPerms, setAssignedPerms] = useState([]);
   const [permsLoading, setPermsLoading] = useState(false);
+  const [permissionUuid, setPermissionUuid] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,10 +131,11 @@ export function RolesScreen() {
 
   const handleAssign = async (e) => {
     e.preventDefault();
-    const permissionUuid = e.target.elements.permission.value;
+    const assignedUuid = permissionUuid;
     try {
-      const added = await assignPermissionToRole(permsTarget.uuid, permissionUuid);
+      const added = await assignPermissionToRole(permsTarget.uuid, assignedUuid);
       setAssignedPerms((prev) => [...prev, added]);
+      setPermissionUuid('');
       toast.success({ title: 'Permission assigned' });
     } catch (err) {
       toast.error({ title: 'Assign failed', description: err.message });
@@ -285,16 +287,15 @@ export function RolesScreen() {
                   {canManage && availablePerms.length > 0 && (
                     <form onSubmit={handleAssign} className="mt-4 flex flex-wrap items-end gap-3">
                       <div className="flex-1">
-                        <Select name="permission" label="Add permission" defaultValue="">
-                          <option value="" disabled>
-                            Select a permission…
-                          </option>
-                          {availablePerms.map((p) => (
-                            <option key={p.uuid} value={p.uuid}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </Select>
+                        <SearchableSelect
+                          label="Add permission"
+                          value={permissionUuid}
+                          onChange={setPermissionUuid}
+                          placeholder="Select a permission…"
+                          searchPlaceholder="Search permissions…"
+                          emptyMessage="No matching permissions."
+                          options={availablePerms.map((p) => ({ value: p.uuid, label: p.name, description: p.description || undefined }))}
+                        />
                       </div>
                       <Button type="submit" size="sm">
                         Assign

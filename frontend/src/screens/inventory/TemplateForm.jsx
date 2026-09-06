@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Card, CardContent, Button, Input, Select, Dialog, useToast } from '../../components/ui';
+import { Card, CardContent, Button, Input, SearchableSelect, Dialog, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../../services/templatesApi.js';
@@ -112,8 +112,7 @@ export function TemplateForm() {
     return () => { cancelled = true; };
   }, [vendorUuid]);
 
-  const changeVendor = (e) => {
-    const vuuid = e.target.value;
+  const changeVendor = (vuuid) => {
     setVendorUuid(vuuid);
     setEditing(null);
     setError('');
@@ -140,10 +139,10 @@ export function TemplateForm() {
     setEditing(tpl);
   };
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const set = (key) => (e) =>
+    setForm((f) => ({ ...f, [key]: e && e.target ? e.target.value : e }));
 
-  const handleTypeChange = (e) => {
-    const typeUuid = e.target.value;
+  const handleTypeChange = (typeUuid) => {
     setForm((f) => ({ ...f, productTypeUuid: typeUuid, subTypeUuid: '' }));
   };
 
@@ -257,12 +256,15 @@ export function TemplateForm() {
       </div>
 
       {!navVendorUuid && (
-        <Select label="Vendor" value={vendorUuid} onChange={changeVendor} required>
-          <option value="">Select a vendor…</option>
-          {vendors.map((v) => (
-            <option key={v.uuid} value={v.uuid}>{v.name}</option>
-          ))}
-        </Select>
+        <SearchableSelect
+          label="Vendor"
+          value={vendorUuid}
+          onChange={changeVendor}
+          placeholder="Select a vendor…"
+          searchPlaceholder="Search vendors…"
+          emptyMessage="No vendors."
+          options={vendors.map((v) => ({ value: v.uuid, label: v.name }))}
+        />
       )}
 
       {editing !== null ? (
@@ -272,25 +274,31 @@ export function TemplateForm() {
               {editing?.uuid ? 'Edit template' : 'New template'}
             </h2>
             <form id="template-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <Select label="Type" value={form.productTypeUuid} onChange={handleTypeChange} required>
-                <option value="">Select a type…</option>
-                {parentTypes.map((t) => (
-                  <option key={t.uuid} value={t.uuid}>{t.name}</option>
-                ))}
-              </Select>
+              <SearchableSelect
+                label="Type"
+                value={form.productTypeUuid}
+                onChange={handleTypeChange}
+                placeholder="Select a type…"
+                searchPlaceholder="Search types…"
+                emptyMessage="No types available."
+                options={parentTypes.map((t) => ({ value: t.uuid, label: t.name }))}
+              />
 
-              <Select
+              <SearchableSelect
                 label="Subtype (optional)"
                 value={form.subTypeUuid}
                 onChange={set('subTypeUuid')}
                 disabled={!form.productTypeUuid}
-                hint={!form.productTypeUuid ? 'Choose a type first.' : undefined}
-              >
-                <option value="">No subtype</option>
-                {subtypeRows.map((t) => (
-                  <option key={t.uuid} value={t.uuid}>{t.name}</option>
-                ))}
-              </Select>
+                searchPlaceholder="Search subtypes…"
+                emptyMessage="No subtypes for this type."
+                options={[
+                  { value: '', label: 'No subtype' },
+                  ...subtypeRows.map((t) => ({ value: t.uuid, label: t.name })),
+                ]}
+              />
+              {!form.productTypeUuid && (
+                <p className="text-xs text-[var(--ink-faint)]">Choose a type first.</p>
+              )}
 
               <Input label="Template name (optional)" value={form.name} onChange={set('name')} placeholder="e.g. Paithani weekly" maxLength={200} />
 

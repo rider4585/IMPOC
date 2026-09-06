@@ -78,8 +78,22 @@ function renderTemplateForm() {
   );
 }
 
-function fillStockBasics({ typeUuid = 'pt1', quantity = '1', buying = '500', selling = '800', floor = '600' } = {}) {
-  fireEvent.change(screen.getByLabelText('Type'), { target: { value: typeUuid } });
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Drive a SearchableSelect combobox: click the trigger, type into the search
+// input, then click the matching option row. (Modeled on tripsFlow.test.jsx.)
+async function selectCombo(label, optionName, queryText) {
+  fireEvent.click(screen.getByLabelText(label));
+  const search = await screen.findByRole('combobox', { name: new RegExp(`^${escapeRegExp(label)}$`, 'i') });
+  if (queryText != null) fireEvent.change(search, { target: { value: queryText } });
+  fireEvent.click(await screen.findByRole('option', { name: optionName }));
+}
+
+async function fillStockBasics({ typeUuid = 'pt1', quantity = '1', buying = '500', selling = '800', floor = '600' } = {}) {
+  const typeName = { pt1: 'Sari', pt4: 'Kurti' }[typeUuid] || typeUuid;
+  await selectCombo('Type', typeName, typeName);
   fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: quantity } });
   fireEvent.change(screen.getByLabelText('Buying price (₹)'), { target: { value: buying } });
   fireEvent.change(screen.getByLabelText('Selling price (₹)'), { target: { value: selling } });
@@ -108,29 +122,37 @@ describe('StockForm — two-level type/subtype + whole/per-unit buying price (R-
     const typeSelect = await screen.findByLabelText('Type');
     const subSelect = screen.getByLabelText('Subtype (optional)');
 
-    // Type select: only parent nodes with no parentUuid.
-    const typeOptions = within(typeSelect).getAllByRole('option').map((o) => o.textContent.trim());
-    expect(typeOptions).toEqual(['Select a type…', 'Sari', 'Kurti']);
+    // Type combobox lists only parent nodes (no parentUuid).
+    fireEvent.click(typeSelect);
+    expect(await screen.findByRole('option', { name: /Sari/ })).toBeInTheDocument();
+    const typeOptions = screen.getAllByRole('option').map((o) => o.textContent.trim());
+    expect(typeOptions).toEqual(['Sari', 'Kurti']);
 
-    // Empty until a Type is chosen; then the "No subtype" null option is exposed.
+    // Subtype is disabled until a Type is chosen.
     expect(subSelect).toBeDisabled();
-    expect(within(subSelect).getAllByRole('option').map((o) => o.textContent.trim())).toEqual(['No subtype']);
 
-    fireEvent.change(typeSelect, { target: { value: 'pt1' } });
-    expect(within(subSelect).getAllByRole('option').map((o) => o.textContent.trim()))
+    // Select "Sari" (pt1): subtypes now expose its children plus the null option.
+    fireEvent.click(screen.getByRole('option', { name: /Sari/ }));
+    fireEvent.click(subSelect);
+    expect(screen.getAllByRole('option').map((o) => o.textContent.trim()))
       .toEqual(['No subtype', 'Paithani', 'Banarasi']);
 
-    fireEvent.change(typeSelect, { target: { value: 'pt4' } });
-    expect(within(subSelect).getAllByRole('option').map((o) => o.textContent.trim()))
+    fireEvent.click(screen.getByRole('option', { name: /Paithani/ }));
+    expect(subSelect).toHaveTextContent('Paithani');
+
+    // Switch to "Kurti" (pt4): subtype resets and lists only Round Neck.
+    fireEvent.click(typeSelect);
+    fireEvent.click(screen.getByRole('option', { name: /Kurti/ }));
+    fireEvent.click(subSelect);
+    expect(screen.getAllByRole('option').map((o) => o.textContent.trim()))
       .toEqual(['No subtype', 'Round Neck']);
-    // Changing the type clears any chosen subtype.
-    expect(subSelect).toHaveValue('');
+    expect(subSelect).toHaveTextContent('No subtype');
   });
 
   it('sends wholeBuyingPricePaise as null when the whole input is blank', async () => {
     renderStockForm();
     await screen.findByLabelText('Type');
-    fillStockBasics();
+    await fillStockBasics();
     // Whole input untouched (blank).
     fireEvent.click(screen.getByRole('button', { name: 'Save stock' }));
 
@@ -151,7 +173,7 @@ describe('StockForm — two-level type/subtype + whole/per-unit buying price (R-
   it('sends integer paise for a filled whole buying price', async () => {
     renderStockForm();
     await screen.findByLabelText('Type');
-    fillStockBasics();
+    await fillStockBasics();
     fireEvent.change(screen.getByLabelText('Whole stock buying price (₹)'), { target: { value: '1500.50' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save stock' }));
 
@@ -172,9 +194,8 @@ describe('StockForm — two-level type/subtype + whole/per-unit buying price (R-
   it('sends the selected subtype with the stock', async () => {
     renderStockForm();
     await screen.findByLabelText('Type');
-    fillStockBasics();
-    const subtypeSelect = screen.getByLabelText('Subtype (optional)');
-    fireEvent.change(subtypeSelect, { target: { value: 'pt2' } });
+    await fillStockBasics();
+    await selectCombo('Subtype (optional)', /Paithani/, 'Paithani');
     fireEvent.click(screen.getByRole('button', { name: 'Save stock' }));
 
     await expectCreateStockPayload({
@@ -196,13 +217,13 @@ describe('StockForm — two-level type/subtype + whole/per-unit buying price (R-
     renderStockForm();
 
     await screen.findByLabelText('Type');
-    fireEvent.change(screen.getByLabelText('Vendor (on this trip)'), { target: { value: 'v1' } });
+    await selectCombo('Vendor (on this trip)', /Sharma Fabrics/, 'Sharma');
 
-    const templateSelect = await screen.findByLabelText('Template');
-    fireEvent.change(templateSelect, { target: { value: 'tmp1' } });
+    await screen.findByLabelText('Template');
+    await selectCombo('Template', /Paithani lot/, 'Paithani');
 
-    expect(screen.getByLabelText('Type')).toHaveValue('pt1');
-    expect(screen.getByLabelText('Subtype (optional)')).toHaveValue('pt2');
+    expect(screen.getByLabelText('Type')).toHaveTextContent('Sari');
+    expect(screen.getByLabelText('Subtype (optional)')).toHaveTextContent('Paithani');
     expect(screen.getByLabelText('Buying price (₹)').value).toBe('300.00');
     expect(screen.getByLabelText('Whole stock buying price (₹)').value).toBe('60000.00');
     expect(screen.getByLabelText('Selling price (₹)').value).toBe('500.00');
@@ -241,8 +262,8 @@ describe('StockForm — two-level type/subtype + whole/per-unit buying price (R-
     renderStockForm([{ pathname: '/trips/t1/stocks/new', state: { prefill } }]);
 
     expect(await screen.findByRole('heading', { name: 'Add stock (cloned)' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Type')).toHaveValue('pt1');
-    expect(screen.getByLabelText('Subtype (optional)')).toHaveValue('pt2');
+    await waitFor(() => expect(screen.getByLabelText('Type')).toHaveTextContent('Sari'));
+    await waitFor(() => expect(screen.getByLabelText('Subtype (optional)')).toHaveTextContent('Paithani'));
     expect(screen.getByLabelText('Whole stock buying price (₹)').value).toBe('50000.00');
     expect(screen.getByLabelText('Quantity').value).toBe('4');
 
@@ -292,8 +313,8 @@ describe('TemplateForm — buying template list + create/edit (R-11)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New template' }));
 
-    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'pt1' } });
-    fireEvent.change(screen.getByLabelText('Subtype (optional)'), { target: { value: 'pt2' } });
+    await selectCombo('Type', /Sari/, 'Sari');
+    await selectCombo('Subtype (optional)', /Paithani/, 'Paithani');
     fireEvent.change(screen.getByLabelText('Template name (optional)'), { target: { value: 'Paithani weekly' } });
     fireEvent.change(screen.getByLabelText('Buying price per unit (₹)'), { target: { value: '300' } });
     fireEvent.change(screen.getByLabelText('Whole stock buying price (₹)'), { target: { value: '60000' } });

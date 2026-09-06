@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Button, Select, useToast } from '../../components/ui';
+import { Button, SearchableSelect, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getStock, scanBarcodeIntoStock } from '../../services/tripsApi.js';
@@ -364,19 +364,29 @@ export function StockIntake() {
 
                 {/* Colour + Size fields */}
                 <div className="flex flex-col gap-3">
-                  <Select label="Colour" value={colourUuid} onChange={(e) => setColourUuid(e.target.value)} required>
-                    <option value="">Select colour…</option>
-                    {colours.filter((c) => c.isActive !== false).map((c) => (
-                      <option key={c.uuid} value={c.uuid}>{c.name}</option>
-                    ))}
-                  </Select>
+                  <SearchableSelect
+                    label="Colour"
+                    value={colourUuid}
+                    onChange={setColourUuid}
+                    placeholder="Select colour…"
+                    searchPlaceholder="Search colours…"
+                    emptyMessage="No colours."
+                    options={colours
+                      .filter((c) => c.isActive !== false)
+                      .map((c) => ({ value: c.uuid, label: c.name }))}
+                  />
 
-                  <Select label="Size" value={sizeUuid} onChange={(e) => setSizeUuid(e.target.value)} required>
-                    <option value="">Select size…</option>
-                    {sizes.filter((s) => s.isActive !== false).map((s) => (
-                      <option key={s.uuid} value={s.uuid}>{s.name}</option>
-                    ))}
-                  </Select>
+                  <SearchableSelect
+                    label="Size"
+                    value={sizeUuid}
+                    onChange={setSizeUuid}
+                    placeholder="Select size…"
+                    searchPlaceholder="Search sizes…"
+                    emptyMessage="No sizes."
+                    options={sizes
+                      .filter((s) => s.isActive !== false)
+                      .map((s) => ({ value: s.uuid, label: s.name }))}
+                  />
                 </div>
 
                 {waking && (

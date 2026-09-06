@@ -6,7 +6,7 @@ import {
   CardContent,
   Button,
   Input,
-  Select,
+  SearchableSelect,
   Dialog,
   Table,
   TableHead,
@@ -196,7 +196,8 @@ function FlatPicklistFormDialog({ open, onClose, onSave, saving, item, singular,
   });
   const [error, setError] = useState('');
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const set = (key) => (e) =>
+    setForm((f) => ({ ...f, [key]: e && e.target ? e.target.value : e }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -249,16 +250,14 @@ function FlatPicklistFormDialog({ open, onClose, onSave, saving, item, singular,
     }
     if (f.options) {
       return (
-        <Select key={f.key} label={f.label} value={form[f.key]} onChange={set(f.key)}>
-          <option value="" disabled>
-            Select {f.label.toLowerCase()}…
-          </option>
-          {f.options.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </Select>
+        <SearchableSelect
+          key={f.key}
+          label={f.label}
+          value={form[f.key]}
+          onChange={set(f.key)}
+          placeholder={`Select ${f.label.toLowerCase()}…`}
+          options={f.options.map((o) => ({ value: o, label: o }))}
+        />
       );
     }
     return (

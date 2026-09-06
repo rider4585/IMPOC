@@ -3,7 +3,7 @@ import {
   Dialog,
   Button,
   Input,
-  Select,
+  SearchableSelect,
   Card,
   CardContent,
 } from '../../components/ui';
@@ -33,7 +33,8 @@ export function UserFormDialog({ open, onClose, onSave, saving, user, roles }) {
   );
   const [error, setError] = useState('');
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const set = (key) => (e) =>
+    setForm((f) => ({ ...f, [key]: e && e.target ? e.target.value : e }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -105,20 +106,15 @@ export function UserFormDialog({ open, onClose, onSave, saving, user, roles }) {
                   onChange={set('password')}
                   hint="At least 8 characters."
                 />
-                <Select
+                <SearchableSelect
                   label="Initial role"
                   value={form.roleUuid}
                   onChange={set('roleUuid')}
-                >
-                  <option value="" disabled>
-                    Select a role…
-                  </option>
-                  {roles.map((role) => (
-                    <option key={role.uuid} value={role.uuid}>
-                      {role.name}
-                    </option>
-                  ))}
-                </Select>
+                  placeholder="Select a role…"
+                  searchPlaceholder="Search roles…"
+                  emptyMessage="No roles available."
+                  options={roles.map((role) => ({ value: role.uuid, label: role.name }))}
+                />
               </>
             )}
 

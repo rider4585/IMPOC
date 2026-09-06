@@ -6,7 +6,7 @@ import {
   CardContent,
   Button,
   Input,
-  Select,
+  SearchableSelect,
   Dialog,
   Badge,
   useToast,
@@ -209,19 +209,18 @@ function ProductTypeFormDialog({ open, onClose, onSave, saving, type, allTypes }
         <CardContent>
           <form id="pt-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-            <Select
+            <SearchableSelect
               label="Parent"
               value={parentUuid}
-              onChange={(e) => setParentUuid(e.target.value)}
-              hint="Leave empty for a top-level type."
-            >
-              <option value="">— Top level —</option>
-              {parentOptions.map((t) => (
-                <option key={t.uuid} value={t.uuid}>
-                  {t.name}
-                </option>
-              ))}
-            </Select>
+              onChange={setParentUuid}
+              options={[
+                { value: '', label: '— Top level —' },
+                ...parentOptions.map((t) => ({ value: t.uuid, label: t.name })),
+              ]}
+              searchPlaceholder="Search types…"
+              emptyMessage="No parent types available."
+            />
+            <p className="text-xs text-[var(--ink-faint)]">Leave empty for a top-level type.</p>
             {error && (
               <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
             )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Input, Select } from '../../components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Input, SearchableSelect } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { listAllUnits } from '../../services/unitsApi.js';
@@ -128,12 +128,17 @@ export function UnitsScreen() {
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search units"
             />
-            <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="">All statuses</option>
-              {UNIT_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </Select>
+            <SearchableSelect
+              label="Status"
+              value={status}
+              onChange={setStatus}
+              searchPlaceholder="Search statuses…"
+              emptyMessage="No matching statuses."
+              options={[
+                { value: '', label: 'All statuses' },
+                ...UNIT_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+              ]}
+            />
             {stockUuid && (
               <Input label="Stock" value={stockUuid} readOnly aria-label="Stock filter" />
             )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select } from '../../components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, SearchableSelect } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrips, listAllStocks } from '../../services/tripsApi.js';
@@ -116,18 +116,31 @@ export function StocksScreen() {
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search stocks"
             />
-            <Select label="Trip" value={tripUuid} onChange={(e) => setTripUuid(e.target.value)}>
-              <option value="">All trips</option>
-              {trips.map((t) => (
-                <option key={t.uuid} value={t.uuid}>{t.name || `Trip ${t.uuid.slice(0, 8)}`}</option>
-              ))}
-            </Select>
-            <Select label="Vendor" value={vendorUuid} onChange={(e) => setVendorUuid(e.target.value)}>
-              <option value="">All vendors</option>
-              {vendors.map((v) => (
-                <option key={v.uuid} value={v.uuid}>{v.name}</option>
-              ))}
-            </Select>
+            <SearchableSelect
+              label="Trip"
+              value={tripUuid}
+              onChange={setTripUuid}
+              searchPlaceholder="Search trips…"
+              emptyMessage="No trips."
+              options={[
+                { value: '', label: 'All trips' },
+                ...trips.map((t) => ({
+                  value: t.uuid,
+                  label: t.name || `Trip ${t.uuid.slice(0, 8)}`,
+                })),
+              ]}
+            />
+            <SearchableSelect
+              label="Vendor"
+              value={vendorUuid}
+              onChange={setVendorUuid}
+              searchPlaceholder="Search vendors…"
+              emptyMessage="No vendors."
+              options={[
+                { value: '', label: 'All vendors' },
+                ...vendors.map((v) => ({ value: v.uuid, label: v.name })),
+              ]}
+            />
           </div>
 
           {loading ? (

@@ -92,6 +92,19 @@ function PathProbe() {
   return <div data-testid="probe-path">{pathname}{search}</div>;
 }
 
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Drive a SearchableSelect combobox: click the trigger, type into the search
+// input, then click the matching option row. (Modeled on tripsFlow.test.jsx.)
+async function selectCombo(label, optionName, queryText) {
+  fireEvent.click(screen.getByLabelText(label));
+  const search = await screen.findByRole('combobox', { name: new RegExp(`^${escapeRegExp(label)}$`, 'i') });
+  if (queryText != null) fireEvent.change(search, { target: { value: queryText } });
+  fireEvent.click(await screen.findByRole('option', { name: optionName }));
+}
+
 describe('navigationSections — inventory tab order (R-12)', () => {
   it('orders inventory items Trips, Vendors, Stocks, Units, Print labels with correct gates', () => {
     const inventory = navigationSections.find((s) => s.key === 'inventory');
@@ -174,12 +187,12 @@ describe('StocksScreen (R-12)', () => {
       expect(tripsService.listAllStocks).toHaveBeenLastCalledWith({ search: 'Paithani', tripUuid: '', vendorUuid: '' });
     });
 
-    fireEvent.change(screen.getByLabelText(/^trip$/i), { target: { value: 't1' } });
+    await selectCombo('Trip', /Delhi run/, 'Delhi');
     await waitFor(() => {
       expect(tripsService.listAllStocks).toHaveBeenLastCalledWith({ search: 'Paithani', tripUuid: 't1', vendorUuid: '' });
     });
 
-    fireEvent.change(screen.getByLabelText(/^vendor$/i), { target: { value: 'v1' } });
+    await selectCombo('Vendor', /Sharma Fabrics/, 'Sharma');
     await waitFor(() => {
       expect(tripsService.listAllStocks).toHaveBeenLastCalledWith({ search: 'Paithani', tripUuid: 't1', vendorUuid: 'v1' });
     });
@@ -294,7 +307,7 @@ describe('UnitsScreen (R-12)', () => {
       expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: '', status: '', stockUuid: 'su1' });
     });
 
-    fireEvent.change(screen.getByLabelText(/^status$/i), { target: { value: 'sold' } });
+    await selectCombo('Status', /Sold/, 'Sold');
     await waitFor(() => {
       expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: '', status: 'sold', stockUuid: 'su1' });
     });

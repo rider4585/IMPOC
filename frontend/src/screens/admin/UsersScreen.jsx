@@ -6,7 +6,7 @@ import {
   CardContent,
   Button,
   Input,
-  Select,
+  SearchableSelect,
   Dialog,
   Table,
   TableHead,
@@ -64,6 +64,7 @@ export function UsersScreen() {
   const [rolesTarget, setRolesTarget] = useState(null);
   const [assignedRoles, setAssignedRoles] = useState([]);
   const [roleSaveLoading, setRoleSaveLoading] = useState(false);
+  const [roleUuid, setRoleUuid] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -164,10 +165,11 @@ export function UsersScreen() {
   const handleAssignRole = async (e) => {
     e.preventDefault();
     setRoleSaveLoading(true);
-    const roleUuid = e.target.elements.role.value;
+    const assignedUuid = roleUuid;
     try {
-      const assigned = await assignRoleToUser(rolesTarget.uuid, roleUuid);
+      const assigned = await assignRoleToUser(rolesTarget.uuid, assignedUuid);
       setAssignedRoles((prev) => [...prev, assigned]);
+      setRoleUuid('');
       toast.success({ title: 'Role assigned' });
     } catch (err) {
       toast.error({ title: 'Assign failed', description: err.message });
@@ -353,16 +355,15 @@ export function UsersScreen() {
               {canUpdate && availableRoles.length > 0 && (
                 <form onSubmit={handleAssignRole} className="mt-4 flex flex-wrap items-end gap-3">
                   <div className="flex-1">
-                    <Select name="role" label="Add role" defaultValue="">
-                      <option value="" disabled>
-                        Select a role…
-                      </option>
-                      {availableRoles.map((role) => (
-                        <option key={role.uuid} value={role.uuid}>
-                          {role.name}
-                        </option>
-                      ))}
-                    </Select>
+                    <SearchableSelect
+                      label="Add role"
+                      value={roleUuid}
+                      onChange={setRoleUuid}
+                      placeholder="Select a role…"
+                      searchPlaceholder="Search roles…"
+                      emptyMessage="No matching roles."
+                      options={availableRoles.map((role) => ({ value: role.uuid, label: role.name }))}
+                    />
                   </div>
                   <Button type="submit" size="sm" loading={roleSaveLoading}>
                     Assign

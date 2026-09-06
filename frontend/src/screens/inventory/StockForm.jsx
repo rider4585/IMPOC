@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Card, CardContent, Button, Input, Select, useToast } from '../../components/ui';
+import { Card, CardContent, Button, Input, SearchableSelect, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrip, createStock } from '../../services/tripsApi.js';
@@ -67,8 +67,7 @@ export function StockForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripUuid]);
 
-  const handleVendorChange = async (e) => {
-    const vendorUuid = e.target.value;
+  const handleVendorChange = async (vendorUuid) => {
     setForm((f) => ({ ...f, vendorUuid }));
     setVendorTemplates([]);
     if (!vendorUuid) return;
@@ -83,8 +82,7 @@ export function StockForm() {
     }
   };
 
-  const applyTemplate = (e) => {
-    const uuid = e.target.value;
+  const applyTemplate = (uuid) => {
     const tpl = vendorTemplates.find((t) => t.uuid === uuid);
     if (!tpl) return;
     setForm((f) => {
@@ -107,10 +105,10 @@ export function StockForm() {
     });
   };
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const set = (key) => (e) =>
+    setForm((f) => ({ ...f, [key]: e && e.target ? e.target.value : e }));
 
-  const handleTypeChange = (e) => {
-    const typeUuid = e.target.value;
+  const handleTypeChange = (typeUuid) => {
     setForm((f) => ({ ...f, productTypeUuid: typeUuid, subTypeUuid: '' }));
   };
 
@@ -214,20 +212,19 @@ export function StockForm() {
       </div>
 
       <form id="stock-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Select
+        <SearchableSelect
           label="Vendor (on this trip)"
           value={form.vendorUuid}
           onChange={handleVendorChange}
-          required
-          hint="The stock's vendor must be one of the trip's vendors."
-        >
-          <option value="">Select a vendor…</option>
-          {tripVendors.map((tv) => (
-            <option key={tv.vendor?.uuid || tv.uuid} value={tv.vendor?.uuid || tv.uuid}>
-              {tv.vendor?.name || 'Vendor'}
-            </option>
-          ))}
-        </Select>
+          placeholder="Select a vendor…"
+          searchPlaceholder="Search vendors…"
+          emptyMessage="No vendors on this trip."
+          options={tripVendors.map((tv) => ({
+            value: tv.vendor?.uuid || tv.uuid,
+            label: tv.vendor?.name || 'Vendor',
+          }))}
+        />
+        <p className="text-xs text-[var(--ink-faint)]">The stock's vendor must be one of the trip's vendors.</p>
 
         {form.vendorUuid && vendorTemplates.length > 0 && (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-4">
@@ -235,19 +232,19 @@ export function StockForm() {
               Pre-fill from a buying template
             </p>
             <div className="flex flex-col gap-3">
-              <Select
+              <SearchableSelect
                 label="Template"
                 value=""
                 onChange={applyTemplate}
-                hint="Applying a template pre-fills type and prices below (still editable)."
-              >
-                <option value="">-- Select template --</option>
-                {vendorTemplates.map((t) => (
-                  <option key={t.uuid} value={t.uuid}>
-                    {t.name || 'Untitled template'}
-                  </option>
-                ))}
-              </Select>
+                placeholder="-- Select template --"
+                searchPlaceholder="Search templates…"
+                emptyMessage="No templates."
+                options={vendorTemplates.map((t) => ({
+                  value: t.uuid,
+                  label: t.name || 'Untitled template',
+                }))}
+              />
+              <p className="text-xs text-[var(--ink-faint)]">Applying a template pre-fills type and prices below (still editable).</p>
               {loadingTemplates && (
                 <p className="text-xs text-[var(--ink-muted)]">Loading templates…</p>
               )}
@@ -272,25 +269,31 @@ export function StockForm() {
           </button>
         )}
 
-        <Select label="Type" value={form.productTypeUuid} onChange={handleTypeChange} required>
-          <option value="">Select a type…</option>
-          {parentTypes.map((t) => (
-            <option key={t.uuid} value={t.uuid}>{t.name}</option>
-          ))}
-        </Select>
+        <SearchableSelect
+          label="Type"
+          value={form.productTypeUuid}
+          onChange={handleTypeChange}
+          placeholder="Select a type…"
+          searchPlaceholder="Search types…"
+          emptyMessage="No types available."
+          options={parentTypes.map((t) => ({ value: t.uuid, label: t.name }))}
+        />
 
-        <Select
+        <SearchableSelect
           label="Subtype (optional)"
           value={form.subTypeUuid}
           onChange={set('subTypeUuid')}
           disabled={!form.productTypeUuid}
-          hint={!form.productTypeUuid ? 'Choose a type first.' : undefined}
-        >
-          <option value="">No subtype</option>
-          {subtypeRows.map((t) => (
-            <option key={t.uuid} value={t.uuid}>{t.name}</option>
-          ))}
-        </Select>
+          searchPlaceholder="Search subtypes…"
+          emptyMessage="No subtypes for this type."
+          options={[
+            { value: '', label: 'No subtype' },
+            ...subtypeRows.map((t) => ({ value: t.uuid, label: t.name })),
+          ]}
+        />
+        {!form.productTypeUuid && (
+          <p className="text-xs text-[var(--ink-faint)]">Choose a type first.</p>
+        )}
 
         <Input label="Stock name (optional)" value={form.name} onChange={set('name')} placeholder="e.g. Round-neck kurti" maxLength={200} />
 
@@ -301,10 +304,15 @@ export function StockForm() {
         <Input label="Selling price (₹)" value={form.sellingPricePaise} onChange={set('sellingPricePaise')} inputMode="decimal" required />
         <Input label="Floor price (₹)" value={form.floorPricePaise} onChange={set('floorPricePaise')} inputMode="decimal" required hint="Cannot exceed selling price." />
 
-        <Select label="Channel" value={form.channel} onChange={set('channel')} required>
-          <option value={CHANNEL.RETAIL}>Retail</option>
-          <option value={CHANNEL.RENTAL}>Rental</option>
-        </Select>
+        <SearchableSelect
+          label="Channel"
+          value={form.channel}
+          onChange={set('channel')}
+          options={[
+            { value: CHANNEL.RETAIL, label: 'Retail' },
+            { value: CHANNEL.RENTAL, label: 'Rental' },
+          ]}
+        />
 
         {form.channel === CHANNEL.RENTAL && (
           <>

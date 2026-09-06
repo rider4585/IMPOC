@@ -78,6 +78,24 @@ async function enterDecodedState(barcode = '100001') {
   await waitFor(() => expect(screen.getByTestId('save-unit')).toBeInTheDocument());
 }
 
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Drive a SearchableSelect combobox: click the trigger, type into the search
+// input, then click the matching option row. (Modeled on tripsFlow.test.jsx.)
+async function selectCombo(label, optionName, queryText) {
+  fireEvent.click(screen.getByLabelText(label));
+  const search = await screen.findByRole('combobox', { name: new RegExp(`^${escapeRegExp(label)}$`, 'i') });
+  if (queryText != null) fireEvent.change(search, { target: { value: queryText } });
+  fireEvent.click(await screen.findByRole('option', { name: optionName }));
+}
+
+async function pickColourSize(colourName, sizeName) {
+  await selectCombo('Colour', colourName, colourName);
+  await selectCombo('Size', sizeName, sizeName);
+}
+
 describe('StockIntake — Scan Primitive (Schema V2)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,8 +123,7 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
     expect(screen.getByText(/0 of 3/)).toBeInTheDocument();
     expect(tripsService.scanBarcodeIntoStock).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText(/colour/i), { target: { value: 'c1' } });
-    fireEvent.change(screen.getByLabelText(/size/i), { target: { value: 's1' } });
+    await pickColourSize('Red', 'M');
     fireEvent.click(screen.getByTestId('save-unit'));
 
     await waitFor(() => expect(screen.getByText(/1 of 3/)).toBeInTheDocument());
@@ -124,8 +141,7 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
     await waitFor(() => expect(screen.getByText(/0 of 3/)).toBeInTheDocument());
 
     await enterDecodedState('100001');
-    fireEvent.change(screen.getByLabelText(/colour/i), { target: { value: 'c1' } });
-    fireEvent.change(screen.getByLabelText(/size/i), { target: { value: 's1' } });
+    await pickColourSize('Red', 'M');
     fireEvent.click(screen.getByTestId('save-unit'));
 
     await waitFor(() => expect(screen.getByText(/already used/i)).toBeInTheDocument());
@@ -154,14 +170,13 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
 
     // Save a first unit with Red/M.
     await enterDecodedState('100001');
-    fireEvent.change(screen.getByLabelText(/colour/i), { target: { value: 'c1' } });
-    fireEvent.change(screen.getByLabelText(/size/i), { target: { value: 's1' } });
+    await pickColourSize('Red', 'M');
     fireEvent.click(screen.getByTestId('save-unit'));
     await waitFor(() => expect(screen.getByText(/1 of 3/)).toBeInTheDocument());
 
     // Second unit: colour+size should pre-fill from the last saved unit.
     await enterDecodedState('100002');
-    expect(screen.getByLabelText(/colour/i).value).toBe('c1');
-    expect(screen.getByLabelText(/size/i).value).toBe('s1');
+    expect(screen.getByLabelText(/colour/i)).toHaveTextContent('Red');
+    expect(screen.getByLabelText(/size/i)).toHaveTextContent('M');
   });
 });
