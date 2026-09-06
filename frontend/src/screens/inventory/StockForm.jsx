@@ -57,10 +57,12 @@ export function StockForm() {
     if (!tripUuid) return;
     getTrip(tripUuid)
       .then((trip) => {
-        const vendors = Array.isArray(trip?.trip_vendors) ? trip.trip_vendors : [];
+        const vendors = Array.isArray(trip?.vendors)
+          ? trip.vendors
+          : Array.isArray(trip?.trip_vendors) ? trip.trip_vendors : [];
         setTripVendors(vendors);
         if (vendors.length === 1 && !form.vendorUuid) {
-          setForm((f) => ({ ...f, vendorUuid: vendors[0].vendor?.uuid || '' }));
+          setForm((f) => ({ ...f, vendorUuid: mapTripVendor(vendors[0]).value }));
         }
       })
       .catch(() => setTripVendors([]));
@@ -219,10 +221,7 @@ export function StockForm() {
           placeholder="Select a vendor…"
           searchPlaceholder="Search vendors…"
           emptyMessage="No vendors on this trip."
-          options={tripVendors.map((tv) => ({
-            value: tv.vendor?.uuid || tv.uuid,
-            label: tv.vendor?.name || 'Vendor',
-          }))}
+          options={tripVendors.map(mapTripVendor)}
         />
         <p className="text-xs text-[var(--ink-faint)]">The stock's vendor must be one of the trip's vendors.</p>
 
@@ -377,6 +376,13 @@ export function StockForm() {
 function rupeeOrEmpty(paise) {
   if (paise == null || Number.isNaN(Number(paise))) return '';
   return formatPaiseForInput(Number(paise));
+}
+
+function mapTripVendor(tv) {
+  return {
+    value: tv.vendorUuid || tv.vendor?.uuid || tv.uuid || '',
+    label: tv.vendorName || tv.vendor?.name || 'Vendor',
+  };
 }
 
 export default StockForm;

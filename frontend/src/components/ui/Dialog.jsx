@@ -48,14 +48,14 @@ export const Dialog = ({
             onClick={onClose}
           />
           <motion.div
-            className={`fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg ${className}`.trim()}
+            className={`fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg ${className}`.trim()}
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
           >
             {title && (
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex shrink-0 items-center justify-between">
                 <h2 className="text-lg font-semibold leading-none tracking-tight">
                   {title}
                 </h2>
@@ -81,8 +81,8 @@ export const Dialog = ({
                 )}
               </div>
             )}
-            <div className="text-sm text-[var(--ink)]">{children}</div>
-            {footer && <div className="mt-4 flex justify-end gap-2">{footer}</div>}
+            <div className="min-h-0 flex-1 overflow-y-auto text-sm text-[var(--ink)]">{children}</div>
+            {footer && <div className="mt-4 flex shrink-0 justify-end gap-2">{footer}</div>}
           </motion.div>
         </div>
       )}

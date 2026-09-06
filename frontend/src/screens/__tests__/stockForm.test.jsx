@@ -37,7 +37,8 @@ const TRIP = {
   name: 'Delhi run',
   purchasedOn: '2026-09-05',
   notes: null,
-  trip_vendors: [{ vendor: { uuid: 'v1', name: 'Sharma Fabrics' } }],
+  trip_vendors: undefined,
+  vendors: [{ uuid: 'tv1', vendorUuid: 'v1', vendorName: 'Sharma Fabrics' }],
   stocks: [],
 };
 

@@ -89,41 +89,42 @@ export const SearchableSelect = forwardRef(function SearchableSelect(
           {label}
         </label>
       )}
-      <button
-        ref={ref}
-        id={triggerId}
-        type="button"
-        disabled={disabled}
-        data-testid={dataTestid}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={triggerCls}
-        onClick={() => {
-          if (disabled) return;
-          if (open) close();
-          else setOpen(true);
-        }}
-      >
-        <span className={selected ? 'truncate font-medium' : 'truncate text-[var(--ink-faint)]'}>
-          {selected ? selected.label : placeholder || 'Select…'}
-        </span>
-        <svg
-          aria-hidden="true"
-          className={`pointer-events-none h-4 w-4 shrink-0 text-[var(--ink-muted)] transition-transform ${open ? 'rotate-180' : ''}`}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      <div className="relative">
+        <button
+          ref={ref}
+          id={triggerId}
+          type="button"
+          disabled={disabled}
+          data-testid={dataTestid}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className={triggerCls}
+          onClick={() => {
+            if (disabled) return;
+            if (open) close();
+            else setOpen(true);
+          }}
         >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
+          <span className={selected ? 'truncate font-medium' : 'truncate text-[var(--ink-faint)]'}>
+            {selected ? selected.label : placeholder || 'Select…'}
+          </span>
+          <svg
+            aria-hidden="true"
+            className={`pointer-events-none h-4 w-4 shrink-0 text-[var(--ink-muted)] transition-transform ${open ? 'rotate-180' : ''}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
 
-      {open && (
-        <div className="relative z-30">
-          <Command label={label} className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)] shadow-lg">
+        {open && (
+          <div className="absolute left-0 right-0 top-full z-50 mt-1">
+            <Command label={label} className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)] shadow-lg">
             <div className="flex items-center gap-2 border-b border-[var(--border)] px-2.5">
               <svg
                 aria-hidden="true"
@@ -191,6 +192,7 @@ export const SearchableSelect = forwardRef(function SearchableSelect(
           </Command>
         </div>
       )}
+      </div>
     </div>
   );
 });
