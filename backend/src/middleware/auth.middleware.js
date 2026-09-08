@@ -5,6 +5,8 @@ import {
     User,
 } from '../../database/models/index.js';
 
+import { JWT_ALGORITHM } from '../modules/auth/token.service.js';
+
 const getRequiredEnv = (key) => {
     const value = process.env[key];
 
@@ -56,6 +58,7 @@ export const authenticate = async (req, res, next) => {
             token,
             secret,
             {
+                algorithms: [JWT_ALGORITHM],
                 issuer,
                 audience,
             }
@@ -85,12 +88,24 @@ export const authenticate = async (req, res, next) => {
          * - refresh-token reuse revocation
          *
          * invalidate existing access tokens.
+         *
+         * The User is joined so the session can be bound
+         * to the token's subject: an access token minted
+         * for user A must never be accepted against a
+         * session that belongs to user B, and vice-versa.
          */
         const session = await AuthSession.findOne({
             where: {
                 uuid: payload.sessionId,
                 revokedAt: null,
             },
+            include: [
+                {
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'uuid'],
+                },
+            ],
         });
 
         if (!session) {
@@ -104,6 +119,22 @@ export const authenticate = async (req, res, next) => {
         if (session.expiresAt <= new Date()) {
             const error = new Error(
                 'Session has expired'
+            );
+            error.statusCode = 401;
+            throw error;
+        }
+
+        /*
+         * The token subject must be the session's owner.
+         *
+         * Without this, a token for user A (whose sub we
+         * trust) could be re-issued against a session row
+         * belonging to user B — the classic "session not
+         * bound to sub" impersonation hole.
+         */
+        if (!session.user || session.user.uuid !== payload.sub) {
+            const error = new Error(
+                'Invalid access token'
             );
             error.statusCode = 401;
             throw error;

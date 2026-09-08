@@ -3,6 +3,8 @@ import app from '../../app.js';
 import * as db from '../../database/models/index.js';
 import { initializeTestDatabase, cleanupTestDatabase, closeDatabase, generateTestUser } from '../utils/test-setup.js';
 import argon2 from 'argon2';
+import jwt from 'jsonwebtoken';
+import { validateJwtSecret, assertJwtSecrets } from '../../src/modules/auth/token.service.js';
 
 describe('Auth Module - /api/auth', () => {
   let testDb;
@@ -977,6 +979,222 @@ describe('Auth Module - /api/auth', () => {
 
       // Should return 401 or similar error indicating invalid token
       expect([400, 401, 403]).toContain(res.statusCode);
+    });
+  });
+
+  describe('JWT security - SEC-CR-3 (forgeable JWT)', () => {
+    const loginFor = async (userFixture) => {
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ username: userFixture.username, password: userFixture.password });
+      expect(loginRes.statusCode).toBe(200);
+      return loginRes;
+    };
+
+    const mintAccessToken = (payload, algorithm = 'HS256') => {
+      return jwt.sign(
+        payload,
+        process.env.JWT_ACCESS_SECRET,
+        {
+          algorithm,
+          expiresIn: '15m',
+          issuer: process.env.JWT_ISSUER,
+          audience: process.env.JWT_AUDIENCE,
+        }
+      );
+    };
+
+    it('should reject a token signed with a different algorithm (HS384) -> 401', async () => {
+      const testUser = generateTestUser();
+      const passwordHash = await argon2.hash(testUser.password);
+
+      await db.User.create({
+        username: testUser.username,
+        email: testUser.email,
+        firstName: testUser.firstName,
+        passwordHash,
+      });
+
+      // Login normally so a real session row exists to look up
+      const loginRes = await loginFor(testUser);
+
+      const sessionsRes = await request(app)
+        .get('/api/auth/sessions')
+        .set('Authorization', `Bearer ${loginRes.body.data.accessToken}`);
+      const sessionUuid = sessionsRes.body.data[0].uuid;
+
+      // Correct sub + correct sessionId, but signed with HS384 instead of the
+      // pinned HS256. jwt.verify with algorithms:['HS256'] must reject it.
+      const forgedToken = mintAccessToken(
+        { sub: loginRes.body.data.uuid, sessionId: sessionUuid, type: 'access' },
+        'HS384'
+      );
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${forgedToken}`);
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body).toHaveProperty('message');
+    });
+
+    it('should reject a valid token whose sub does not match the session owner -> 401', async () => {
+      const userA = generateTestUser();
+      const userB = generateTestUser();
+      const hashA = await argon2.hash(userA.password);
+      const hashB = await argon2.hash(userB.password);
+
+      await db.User.create({
+        username: userA.username,
+        email: userA.email,
+        firstName: userA.firstName,
+        passwordHash: hashA,
+      });
+      await db.User.create({
+        username: userB.username,
+        email: userB.email,
+        firstName: userB.firstName,
+        passwordHash: hashB,
+      });
+
+      // Session row belonging to user A
+      const loginA = await loginFor(userA);
+
+      const sessionsRes = await request(app)
+        .get('/api/auth/sessions')
+        .set('Authorization', `Bearer ${loginA.body.data.accessToken}`);
+      const sessionAUuid = sessionsRes.body.data[0].uuid;
+      const userAUuid = loginA.body.data.uuid;
+
+      // A correctly-signed HS256 token for user B, re-pointed at A's session.
+      const loginB = await loginFor(userB);
+      const userBUuid = loginB.body.data.uuid;
+
+      expect(userBUuid).not.toBe(userAUuid);
+
+      const crossUserToken = mintAccessToken(
+        { sub: userBUuid, sessionId: sessionAUuid, type: 'access' },
+        'HS256'
+      );
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${crossUserToken}`);
+
+      // Session exists and is active, but it belongs to user A while the token
+      // subject is user B -> the session/sub binding must reject with 401.
+      expect(res.statusCode).toBe(401);
+      expect(res.body).toHaveProperty('message');
+    });
+
+    it('should accept a correctly-signed token whose sub matches the session owner (positive control)', async () => {
+      const testUser = generateTestUser();
+      const passwordHash = await argon2.hash(testUser.password);
+
+      const user = await db.User.create({
+        username: testUser.username,
+        email: testUser.email,
+        firstName: testUser.firstName,
+        passwordHash,
+      });
+
+      const loginRes = await loginFor(testUser);
+
+      const userUuid = loginRes.body.data.uuid;
+      expect(userUuid).toBe(user.uuid);
+
+      // A freshly-minted token using the real session (same shape the backend
+      // signs) must be accepted.
+      const sessionsRes = await request(app)
+        .get('/api/auth/sessions')
+        .set('Authorization', `Bearer ${loginRes.body.data.accessToken}`);
+      const sessionUuid = sessionsRes.body.data[0].uuid;
+
+      const validToken = mintAccessToken(
+        { sub: userUuid, sessionId: sessionUuid, type: 'access' },
+        'HS256'
+      );
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${validToken}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data.username).toBe(testUser.username);
+    });
+
+    it('should reject a token for a revoked session even when sub matches -> 401', async () => {
+      const testUser = generateTestUser();
+      const passwordHash = await argon2.hash(testUser.password);
+
+      await db.User.create({
+        username: testUser.username,
+        email: testUser.email,
+        firstName: testUser.firstName,
+        passwordHash,
+      });
+
+      const loginRes = await loginFor(testUser);
+      const userUuid = loginRes.body.data.uuid;
+
+      const sessionsRes = await request(app)
+        .get('/api/auth/sessions')
+        .set('Authorization', `Bearer ${loginRes.body.data.accessToken}`);
+      const sessionUuid = sessionsRes.body.data[0].uuid;
+
+      const token = mintAccessToken(
+        { sub: userUuid, sessionId: sessionUuid, type: 'access' },
+        'HS256'
+      );
+
+      // Logout revokes the session; the still-cryptographically-valid token
+      // must stop working (SEC-H-9 lifecycle behaviour preserved).
+      await request(app)
+        .post('/api/auth/logout')
+        .set('Authorization', `Bearer ${loginRes.body.data.accessToken}`)
+        .set('X-Requested-With', 'IMPOC-SPA');
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(401);
+    });
+  });
+
+  describe('JWT secret strength validation (SEC-CR-3)', () => {
+    it('rejects missing/empty, placeholder, and too-short secrets', () => {
+      expect(() => validateJwtSecret(undefined, 'JWT_ACCESS_SECRET')).toThrow(/JWT_ACCESS_SECRET/);
+      expect(() => validateJwtSecret('', 'JWT_ACCESS_SECRET')).toThrow(/JWT_ACCESS_SECRET/);
+      expect(() => validateJwtSecret('  ', 'JWT_ACCESS_SECRET')).toThrow(/JWT_ACCESS_SECRET/);
+      expect(() => validateJwtSecret('your-long-random-access-secret', 'JWT_ACCESS_SECRET')).toThrow(/JWT_ACCESS_SECRET/);
+      expect(() => validateJwtSecret('short-secret', 'JWT_ACCESS_SECRET')).toThrow(/JWT_ACCESS_SECRET/);
+      expect(() => validateJwtSecret('secret', 'JWT_ACCESS_SECRET')).toThrow(/JWT_ACCESS_SECRET/);
+    });
+
+    it('accepts a strong random secret of sufficient length', () => {
+      const strong = 'Aa0!' + 'x'.repeat(40); // 44 chars
+      expect(() => validateJwtSecret(strong, 'JWT_ACCESS_SECRET')).not.toThrow();
+    });
+
+    it('assertJwtSecrets throws when JWT_ACCESS_SECRET is weak and passes when strong', () => {
+      const original = process.env.JWT_ACCESS_SECRET;
+      const originalRefresh = process.env.JWT_REFRESH_SECRET;
+      try {
+        process.env.JWT_ACCESS_SECRET = 'weak';
+        expect(() => assertJwtSecrets()).toThrow(/JWT_ACCESS_SECRET/);
+
+        process.env.JWT_ACCESS_SECRET = 'longenoughrandomsecretvalue12345678901234567890';
+        delete process.env.JWT_REFRESH_SECRET;
+        expect(() => assertJwtSecrets()).not.toThrow();
+      } finally {
+        process.env.JWT_ACCESS_SECRET = original;
+        if (originalRefresh === undefined) {
+          delete process.env.JWT_REFRESH_SECRET;
+        } else {
+          process.env.JWT_REFRESH_SECRET = originalRefresh;
+        }
+      }
     });
   });
 });

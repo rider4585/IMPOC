@@ -27,6 +27,16 @@ import deliveryRoutes from './src/modules/delivery/delivery.routes.js';
 import receiptRoutes from './src/modules/receipts/receipts.routes.js';
 import errorMiddleware from './src/middleware/error.middleware.js';
 
+import { assertJwtSecrets } from './src/modules/auth/token.service.js';
+
+/*
+ * Fail fast at boot: a missing, placeholder, or weak JWT access secret would
+ * leave every access token forgeable (SEC-CR-3). Running this at import time
+ * means the process refuses to start (tests included) instead of silently
+ * serving tokens anyone can mint.
+ */
+assertJwtSecrets();
+
 const app = express();
 
 app.use(express.json({ limit: '15mb' }));
