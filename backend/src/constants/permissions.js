@@ -4,6 +4,7 @@ export const PERMISSIONS = Object.freeze({
         CREATE: 'users.create',
         UPDATE: 'users.update',
         DELETE: 'users.delete',
+        ASSIGN_ROLE: 'users.assign_role',
     },
 
     INVENTORY: {

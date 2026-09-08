@@ -36,7 +36,7 @@ export const createUser = async (req, res, next) => {
     try {
         const data = createUserSchema.parse(req.body);
 
-        const user = await createUserAccount(data);
+        const user = await createUserAccount(data, req.auth.userUuid);
 
         return res.status(201).json({
             success: true,
@@ -88,7 +88,7 @@ export const updateUser = async (req, res, next) => {
 
         const data = updateUserSchema.parse(req.body);
 
-        const user = await updateUserAccount(uuid, data);
+        const user = await updateUserAccount(uuid, data, req.auth.userUuid);
 
         return res.status(200).json({
             success: true,
@@ -116,7 +116,7 @@ export const updateUserStatus = async (req, res, next) => {
 
         const { status } = updateUserStatusSchema.parse(req.body);
 
-        const user = await updateUserStatusAccount(uuid, status);
+        const user = await updateUserStatusAccount(uuid, status, req.auth.userUuid);
 
         return res.status(200).json({
             success: true,
@@ -142,7 +142,7 @@ export const deleteUser = async (req, res, next) => {
     try {
         const { uuid } = userUuidParamSchema.parse(req.params);
 
-        const user = await deleteUserAccount(uuid);
+        const user = await deleteUserAccount(uuid, req.auth.userUuid);
 
         return res.status(200).json({
             success: true,

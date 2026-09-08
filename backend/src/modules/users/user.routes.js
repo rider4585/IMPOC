@@ -29,8 +29,8 @@ router.delete('/:uuid', authenticate, authorize(PERMISSIONS.USERS.DELETE), delet
 
 router.get('/:userUuid/roles', authenticate, authorize(PERMISSIONS.USERS.VIEW), getUserRoles);
 
-router.post('/:userUuid/roles', authenticate, authorize(PERMISSIONS.USERS.UPDATE), assignRoleToUser);
+router.post('/:userUuid/roles', authenticate, authorize(PERMISSIONS.USERS.ASSIGN_ROLE), assignRoleToUser);
 
-router.delete('/:userUuid/roles/:roleUuid', authenticate, authorize(PERMISSIONS.USERS.UPDATE), removeRoleFromUser);
+router.delete('/:userUuid/roles/:roleUuid', authenticate, authorize(PERMISSIONS.USERS.ASSIGN_ROLE), removeRoleFromUser);
 
 export default router;
