@@ -6,6 +6,7 @@ import argon2 from 'argon2';
 import app from '../../app.js';
 import salesRoutes from '../../src/modules/sales/sales.routes.js';
 import errorMiddleware from '../../src/middleware/error.middleware.js';
+import { createSale, cancelSale, refundSale } from '../../src/modules/sales/sales.service.js';
 
 /*
  * T-08 sales routes are intentionally NOT mounted in app.js (another owner
@@ -19,6 +20,7 @@ testApp.use(errorMiddleware);
 
 describe('Sales / POS module (T-08)', () => {
     let managerToken;
+    let managerUserId;
     let cashierToken;
     let trip;
     let tripVendor;
@@ -57,6 +59,7 @@ describe('Sales / POS module (T-08)', () => {
         });
         const mgrRole = await db.Role.findOne({ where: { name: 'MANAGER' } });
         await mgr.addRole(mgrRole);
+        managerUserId = mgr.id;
 
         const mgrLogin = await request(app)
             .post('/api/auth/login')
@@ -254,6 +257,77 @@ describe('Sales / POS module (T-08)', () => {
 
             expect(res.body.data.status).toBe('refunded');
             expect(res.body.data.reversals.some((r) => r.reversalType === 'REFUND')).toBe(true);
+        });
+    });
+
+    describe('Money-out race fixes (R-29)', () => {
+        it('should double-cancel only once: concurrent cancels yield one success and one 409', async () => {
+            const u = await scanUnit('RACECANCEL01');
+            const sale = await createSale({
+                items: [{ unitUuid: u.uuid }],
+                actorUserId: managerUserId,
+            });
+            const saleRow = await db.Sale.findOne({ where: { uuid: sale.uuid } });
+
+            const attempt = async () => cancelSale({ uuid: sale.uuid, reason: 'race', actorUserId: managerUserId });
+
+            const results = await Promise.allSettled([attempt(), attempt()]);
+            const ok = results.filter((r) => r.status === 'fulfilled');
+            const rejected = results.filter((r) => r.status === 'rejected');
+
+            expect(ok).toHaveLength(1);
+            expect(rejected).toHaveLength(1);
+            expect(rejected[0].reason.statusCode).toBe(409);
+            expect(rejected[0].reason.message).toMatch(/already/);
+
+            const reversals = await db.SaleReversal.count({
+                where: { saleId: saleRow.id, reversalType: 'CANCEL', deletedAt: null },
+            });
+            expect(reversals).toBe(1);
+        });
+
+        it('should double-refund only once: concurrent refunds yield one success and one 409', async () => {
+            const u = await scanUnit('RACEREFUND1');
+            const sale = await createSale({
+                items: [{ unitUuid: u.uuid }],
+                actorUserId: managerUserId,
+            });
+            const saleRow = await db.Sale.findOne({ where: { uuid: sale.uuid } });
+
+            const attempt = async () => refundSale({ uuid: sale.uuid, reason: 'race', actorUserId: managerUserId });
+
+            const results = await Promise.allSettled([attempt(), attempt()]);
+            const ok = results.filter((r) => r.status === 'fulfilled');
+            const rejected = results.filter((r) => r.status === 'rejected');
+
+            expect(ok).toHaveLength(1);
+            expect(rejected).toHaveLength(1);
+            expect(rejected[0].reason.statusCode).toBe(409);
+            expect(rejected[0].reason.message).toMatch(/already/);
+
+            const reversals = await db.SaleReversal.count({
+                where: { saleId: saleRow.id, reversalType: 'REFUND', deletedAt: null },
+            });
+            expect(reversals).toBe(1);
+        });
+
+        it('should produce unique sale numbers under concurrent checkout', async () => {
+            const u1 = await scanUnit('RACENUM001');
+            const u2 = await scanUnit('RACENUM002');
+
+            const results = await Promise.allSettled([
+                createSale({ items: [{ unitUuid: u1.uuid }], actorUserId: managerUserId }),
+                createSale({ items: [{ unitUuid: u2.uuid }], actorUserId: managerUserId }),
+            ]);
+
+            const sales = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+            expect(sales[0]).not.toBeNull();
+            expect(sales[1]).not.toBeNull();
+            const numbers = sales.map((s) => s.saleNumber);
+            expect(numbers[0]).not.toBe(numbers[1]);
+
+            const allDistinct = new Set(numbers).size === numbers.length;
+            expect(allDistinct).toBe(true);
         });
     });
 });

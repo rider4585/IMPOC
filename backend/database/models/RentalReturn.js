@@ -113,6 +113,16 @@ export default (sequelize) => {
             timestamps: true,
             underscored: true,
             paranoid: true,
+            indexes: [
+                {
+                    fields: ['rental_line_id'],
+                    unique: true,
+                    name: 'uq_rental_returns_line',
+                    where: {
+                        deleted_at: null,
+                    },
+                },
+            ],
         }
     );
 

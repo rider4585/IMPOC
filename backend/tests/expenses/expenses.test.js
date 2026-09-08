@@ -6,6 +6,7 @@ import argon2 from 'argon2';
 import app from '../../app.js';
 import expenseRoutes from '../../src/modules/expenses/expenses.routes.js';
 import errorMiddleware from '../../src/middleware/error.middleware.js';
+import { createExpense, cancelExpense } from '../../src/modules/expenses/expenses.service.js';
 
 /*
  * T-12 expense routes are intentionally NOT mounted in app.js (another owner
@@ -20,6 +21,7 @@ testApp.use(errorMiddleware);
 
 describe('Expenses module (T-12)', () => {
     let managerToken;
+    let managerUserId;
     let cashierToken;
 
     beforeAll(async () => {
@@ -35,6 +37,7 @@ describe('Expenses module (T-12)', () => {
         });
         const managerRole = await db.Role.findOne({ where: { name: 'MANAGER' } });
         await manager.addRole(managerRole);
+        managerUserId = manager.id;
         const mgrLogin = await request(app)
             .post('/api/auth/login')
             .send({ username: mgrData.username, password: mgrData.password });
@@ -153,6 +156,34 @@ describe('Expenses module (T-12)', () => {
                 .set('Authorization', `Bearer ${managerToken}`)
                 .send({ reason: 'again' })
                 .expect(409);
+        });
+    });
+
+    describe('Money-out race fix: cancel expense (R-29)', () => {
+        it('should double-cancel only once: concurrent cancels yield one success and one 409', async () => {
+            const expense = await createExpense({
+                amountPaise: 12345,
+                category: 'RaceTest',
+                purpose: 'concurrency',
+                actorUserId: managerUserId,
+            });
+            const expenseRow = await db.Expense.findOne({ where: { uuid: expense.uuid } });
+
+            const attempt = async () => cancelExpense({ uuid: expense.uuid, reason: 'race', actorUserId: managerUserId });
+
+            const results = await Promise.allSettled([attempt(), attempt()]);
+            const ok = results.filter((r) => r.status === 'fulfilled');
+            const rejected = results.filter((r) => r.status === 'rejected');
+
+            expect(ok).toHaveLength(1);
+            expect(rejected).toHaveLength(1);
+            expect(rejected[0].reason.statusCode).toBe(409);
+            expect(rejected[0].reason.message).toMatch(/already/);
+
+            const reversals = await db.ExpenseReversal.count({
+                where: { expenseId: expenseRow.id, reversalType: 'CANCEL', deletedAt: null },
+            });
+            expect(reversals).toBe(1);
         });
     });
 });

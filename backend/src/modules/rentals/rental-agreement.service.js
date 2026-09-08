@@ -37,6 +37,10 @@ async function resolveCustomer(customerUuid, transaction) {
 // from this + start date; it is never stored as a mutable field.
 const DEFAULT_RENTAL_DAYS = 3;
 
+// How many times to retry creating an agreement when two concurrent checkouts
+// race on the next R-number (read MAX + 1) and hit the unique constraint.
+const MAX_NUMBER_RETRIES = 3;
+
 /**
  * Generate the next agreement number, e.g. R-0001
  * @returns {Promise<string>}
@@ -180,7 +184,7 @@ function mapAgreementDTO(agreement, lines = [], returns = [], reversals = []) {
  * @param {Object} params - { customerName, customerUuid, startDate, rentalDays, paymentMethod, customerSource, notes, items, actorUserId }
  * @returns {Object} agreement DTO
  */
-export const createRental = async ({ customerName, customerUuid, startDate, rentalDays, paymentMethod, customerSource, notes, items, actorUserId }) => {
+const createRentalOnce = async ({ customerName, customerUuid, startDate, rentalDays, paymentMethod, customerSource, notes, items, actorUserId }) => {
     const transaction = await sequelize.transaction();
     try {
         const units = [];
@@ -264,6 +268,30 @@ export const createRental = async ({ customerName, customerUuid, startDate, rent
         await transaction.rollback();
         throw error;
     }
+};
+
+/**
+ * Create/checkout a rental. Wrapped in a retry loop so two concurrent
+ * checkouts that race on the next R-number (read MAX + 1) do not collide: the
+ * loser hits the unique agreement_number constraint, rolls back, regenerates a
+ * fresh number and retries.
+ */
+export const createRental = async (params) => {
+    for (let attempt = 1; attempt <= MAX_NUMBER_RETRIES; attempt += 1) {
+        try {
+            return await createRentalOnce(params);
+        } catch (error) {
+            const isNumberCollision =
+                error &&
+                (error.parent && error.parent.code === '23505') &&
+                error.name === 'SequelizeUniqueConstraintError';
+            if (!isNumberCollision || attempt === MAX_NUMBER_RETRIES) {
+                throw error;
+            }
+        }
+    }
+    // Unreachable: the loop always returns or throws above.
+    throw new Error('createRental retry exhausted');
 };
 
 /**
@@ -425,23 +453,41 @@ export const processRentalReturn = async ({ uuid, actualReturnDate, items, actor
 
             // Rental return rows (history is rewritten only by adding rows)
             // eslint-disable-next-line no-await-in-loop
-            await RentalReturn.create(
-                {
-                    agreementId: agreement.id,
-                    rentalLineId: line.id,
-                    unitId: line.unitId,
-                    unitUuid: line.unitUuid,
-                    actualReturnDate: returnDate,
-                    damageGradeName: grade ? grade.name : null,
-                    damageGradeOutcome: outcome,
-                    lateDays,
-                    overdueChargePaise,
-                    damageChargePaise,
-                    depositRefundedPaise,
-                    notes: item.notes || null,
-                },
-                { transaction }
-            );
+            try {
+                await RentalReturn.create(
+                    {
+                        agreementId: agreement.id,
+                        rentalLineId: line.id,
+                        unitId: line.unitId,
+                        unitUuid: line.unitUuid,
+                        actualReturnDate: returnDate,
+                        damageGradeName: grade ? grade.name : null,
+                        damageGradeOutcome: outcome,
+                        lateDays,
+                        overdueChargePaise,
+                        damageChargePaise,
+                        depositRefundedPaise,
+                        notes: item.notes || null,
+                    },
+                    { transaction }
+                );
+            } catch (err) {
+                // DB partial-unique backstop (rental_returns.rental_line_id where
+                // deleted_at IS NULL). Two concurrent returns for the same line
+                // cannot both insert; the loser is surfaced as a clean 409.
+                const isDuplicate =
+                    err &&
+                    (err.parent && err.parent.code === '23505') &&
+                    err.name === 'SequelizeUniqueConstraintError';
+                if (isDuplicate) {
+                    const dupError = new Error(
+                        `Unit ${line.unit.barcode} has already been returned`
+                    );
+                    dupError.statusCode = 409;
+                    throw dupError;
+                }
+                throw err;
+            }
 
             // eslint-disable-next-line no-await-in-loop
             await transitionUnit(
@@ -458,12 +504,30 @@ export const processRentalReturn = async ({ uuid, actualReturnDate, items, actor
             returnedLineIds.add(line.id);
         }
 
-        // If every line has been returned, the agreement is complete
+        // If every line has been returned, the agreement is complete. Flip the
+        // status only via a conditional update so two concurrent returns cannot
+        // both blind-save the completion.
         const allReturned = agreement.lines.every((l) => returnedLineIds.has(l.id));
         if (allReturned) {
-            agreement.status = 'completed';
-            // eslint-disable-next-line no-await-in-loop
-            await agreement.save({ transaction });
+            const [, completedCount] = await sequelize.query(
+                `UPDATE rental_agreements
+                 SET status = :to, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = :id AND status = :expectedFrom AND deleted_at IS NULL`,
+                {
+                    replacements: {
+                        id: agreement.id,
+                        to: 'completed',
+                        expectedFrom: 'active',
+                    },
+                    type: sequelize.QueryTypes.UPDATE,
+                    transaction,
+                }
+            );
+            // Even if a concurrent transaction already flipped it, completion
+            // is the terminal state and there is no harm in this one observing 0.
+            if (completedCount > 0) {
+                agreement.status = 'completed';
+            }
         }
 
         await transaction.commit();
@@ -512,6 +576,43 @@ export const cancelRental = async ({ uuid, reason, actorUserId }) => {
             throw error;
         }
 
+        // CAS: atomically flip status active -> cancelled before writing the
+        // reversal, so two concurrent cancels cannot both double-issue.
+        const [, affectedCount] = await sequelize.query(
+            `UPDATE rental_agreements
+             SET status = :to, updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id AND status = :expectedFrom AND deleted_at IS NULL`,
+            {
+                replacements: {
+                    id: agreement.id,
+                    to: 'cancelled',
+                    expectedFrom: 'active',
+                },
+                type: sequelize.QueryTypes.UPDATE,
+                transaction,
+            }
+        );
+
+        if (affectedCount === 0) {
+            const realAgreement = await RentalAgreement.findByPk(agreement.id, {
+                attributes: ['agreementNumber', 'status', 'deletedAt'],
+                transaction,
+            });
+            if (!realAgreement || realAgreement.deletedAt) {
+                const error = new Error(`Agreement ${agreement.agreementNumber} was deleted`);
+                error.statusCode = 409;
+                throw error;
+            }
+            const realStatus = realAgreement.status || 'unknown';
+            const error = new Error(
+                `Agreement ${realAgreement.agreementNumber} is already ${realStatus}, cannot cancel`
+            );
+            error.statusCode = 409;
+            throw error;
+        }
+
+        // Record the reversal AFTER the conditional update wins, in the same
+        // transaction. History is never rewritten; reversals are append-only.
         await RentalReversal.create(
             {
                 agreementId: agreement.id,
@@ -540,8 +641,8 @@ export const cancelRental = async ({ uuid, reason, actorUserId }) => {
             }
         }
 
+        // Status already flipped to cancelled by the CAS above.
         agreement.status = 'cancelled';
-        await agreement.save({ transaction });
 
         await transaction.commit();
 

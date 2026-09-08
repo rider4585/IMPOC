@@ -61,6 +61,17 @@ export default (sequelize) => {
             timestamps: true,
             underscored: true,
             paranoid: true,
+            indexes: [
+                {
+                    fields: ['agreement_id'],
+                    unique: true,
+                    name: 'uq_rental_reversals_cancel_agreement',
+                    where: {
+                        reversal_type: 'CANCEL',
+                        deleted_at: null,
+                    },
+                },
+            ],
         }
     );
 

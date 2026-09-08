@@ -6,6 +6,7 @@ import argon2 from 'argon2';
 import app from '../../app.js';
 import rentalRoutes from '../../src/modules/rentals/rental-agreement.routes.js';
 import errorMiddleware from '../../src/middleware/error.middleware.js';
+import { createRental, processRentalReturn, cancelRental } from '../../src/modules/rentals/rental-agreement.service.js';
 
 /*
  * T-10 rental routes are intentionally NOT mounted in app.js (another owner
@@ -23,6 +24,7 @@ const RENTAL_PERMISSIONS = ['rentals.view', 'rentals.create', 'rentals.update', 
 
 describe('Rental agreements module (T-10)', () => {
     let managerToken;
+    let managerUserId;
     let cashierToken;
     let trip;
     let tripVendor;
@@ -69,6 +71,7 @@ describe('Rental agreements module (T-10)', () => {
             passwordHash: await argon2.hash(mgrData.password),
         });
         await manager.addRole(managerRole);
+        managerUserId = manager.id;
         const mgrLogin = await request(app)
             .post('/api/auth/login')
             .send({ username: mgrData.username, password: mgrData.password });
@@ -310,6 +313,82 @@ describe('Rental agreements module (T-10)', () => {
                 .set('Authorization', `Bearer ${managerToken}`)
                 .send({ reason: 'again' })
                 .expect(409);
+        });
+    });
+
+    describe('Money-out race fixes (R-29)', () => {
+        it('should double-cancel only once: concurrent cancels yield one success and one 409', async () => {
+            const u = await scanUnit('RACERCNL01');
+            const agreement = await createRental({
+                items: [{ unitUuid: u.uuid }],
+                actorUserId: managerUserId,
+            });
+
+            const attempt = async () => cancelRental({ uuid: agreement.uuid, reason: 'race', actorUserId: managerUserId });
+
+            const results = await Promise.allSettled([attempt(), attempt()]);
+            const ok = results.filter((r) => r.status === 'fulfilled');
+            const rejected = results.filter((r) => r.status === 'rejected');
+
+            expect(ok).toHaveLength(1);
+            expect(rejected).toHaveLength(1);
+            expect(rejected[0].reason.statusCode).toBe(409);
+            expect(rejected[0].reason.message).toMatch(/already/);
+
+            const agreementRow = await db.RentalAgreement.findOne({ where: { uuid: agreement.uuid } });
+            const reversals = await db.RentalReversal.count({
+                where: { agreementId: agreementRow.id, reversalType: 'CANCEL', deletedAt: null },
+            });
+            expect(reversals).toBe(1);
+        });
+
+        it('should not double-return the same line: concurrent returns yield one success and one 409', async () => {
+            const u = await scanUnit('RACERTN01');
+            const agreement = await createRental({
+                items: [{ unitUuid: u.uuid }],
+                actorUserId: managerUserId,
+            });
+            const line = agreement.lines[0];
+
+            const attempt = async () => processRentalReturn({
+                uuid: agreement.uuid,
+                actualReturnDate: '2026-09-10',
+                items: [{ unitUuid: u.uuid }],
+                actorUserId: managerUserId,
+            });
+
+            const results = await Promise.allSettled([attempt(), attempt()]);
+            const ok = results.filter((r) => r.status === 'fulfilled');
+            const rejected = results.filter((r) => r.status === 'rejected');
+
+            expect(ok).toHaveLength(1);
+            expect(rejected).toHaveLength(1);
+            expect(rejected[0].reason.statusCode).toBe(409);
+            expect(rejected[0].reason.message).toMatch(/already.*returned/);
+
+            // Exactly one rental_returns row per line (deposit refunded only once)
+            const lineRow = await db.RentalLine.findOne({ where: { unitUuid: line.unitUuid } });
+            const returnRows = await db.RentalReturn.findAll({
+                where: { rentalLineId: lineRow.id, deletedAt: null },
+            });
+            expect(returnRows).toHaveLength(1);
+        });
+
+        it('should produce unique agreement numbers under concurrent checkout', async () => {
+            const u1 = await scanUnit('RACENUMR01');
+            const u2 = await scanUnit('RACENUMR02');
+
+            const results = await Promise.allSettled([
+                createRental({ items: [{ unitUuid: u1.uuid }], actorUserId: managerUserId }),
+                createRental({ items: [{ unitUuid: u2.uuid }], actorUserId: managerUserId }),
+            ]);
+
+            const agreements = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+            expect(agreements[0]).not.toBeNull();
+            expect(agreements[1]).not.toBeNull();
+            const numbers = agreements.map((a) => a.agreementNumber);
+            expect(numbers[0]).not.toBe(numbers[1]);
+            expect(new Set(numbers).size).toBe(numbers.length);
         });
     });
 });

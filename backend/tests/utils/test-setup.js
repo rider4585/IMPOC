@@ -36,6 +36,24 @@ export async function initializeTestDatabase() {
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_units_barcode_unique ON units (barcode) WHERE deleted_at IS NULL'
       );
 
+      // Money-out race backstops (from migration 20260908000001): prevent
+      // double-issue of refunds/cancels/returns for the same live parent.
+      await db.sequelize.query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_sale_reversals_refund_sale ON sale_reversals (sale_id) WHERE reversal_type = 'REFUND' AND deleted_at IS NULL"
+      );
+      await db.sequelize.query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_sale_reversals_cancel_sale ON sale_reversals (sale_id) WHERE reversal_type = 'CANCEL' AND deleted_at IS NULL"
+      );
+      await db.sequelize.query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_expense_reversals_cancel_expense ON expense_reversals (expense_id) WHERE reversal_type = 'CANCEL' AND deleted_at IS NULL"
+      );
+      await db.sequelize.query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_rental_reversals_cancel_agreement ON rental_reversals (agreement_id) WHERE reversal_type = 'CANCEL' AND deleted_at IS NULL"
+      );
+      await db.sequelize.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS uq_rental_returns_line ON rental_returns (rental_line_id) WHERE deleted_at IS NULL'
+      );
+
       // Create triggers and constraints that are in migrations but not created by sync()
       await db.sequelize.query(`
         CREATE OR REPLACE FUNCTION update_app_settings_updated_at()
