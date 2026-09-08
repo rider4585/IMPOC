@@ -9,6 +9,7 @@ export async function up(queryInterface) {
 
         ['roles.view', 'View roles'],
         ['roles.manage', 'Manage roles and permissions'],
+        ['users.assign_role', 'Assign and remove user roles'],
 
         ['inventory.view', 'View inventory'],
         ['inventory.create', 'Add inventory items'],
@@ -69,6 +70,7 @@ export async function down(queryInterface) {
             'users.create',
             'users.update',
             'users.delete',
+            'users.assign_role',
             'roles.view',
             'roles.manage',
             'inventory.view',

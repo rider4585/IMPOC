@@ -28,6 +28,13 @@ export default (sequelize) => {
                 allowNull: true,
             },
 
+            isPrivileged: {
+                type: DataTypes.BOOLEAN,
+                field: 'is_privileged',
+                allowNull: false,
+                defaultValue: false,
+            },
+
             createdAt: {
                 type: DataTypes.DATE,
                 field: 'created_at',

@@ -1,5 +1,6 @@
 import {Op} from 'sequelize';
 import {USER_STATUS} from "../../constants/user-status.js";
+import {PERMISSIONS} from '../../constants/permissions.js';
 import {
     User,
     Role,
@@ -8,6 +9,105 @@ import {
 } from '../../../database/models/index.js';
 
 import {hashPassword} from '../auth/password.service.js';
+import {userHasPermission} from '../auth/permission.service.js';
+
+const forbidden = (message) => {
+    const error = new Error(message);
+    error.statusCode = 403;
+    throw error;
+};
+
+const isPrivilegedRole = (role) => role.isPrivileged === true;
+
+const getUserWithRoles = async (uuid) => {
+    return User.findOne({
+        where: {
+            uuid,
+            status: {
+                [Op.ne]: USER_STATUS.DELETED,
+            },
+        },
+        include: {
+            model: Role,
+            as: 'roles',
+            through: {
+                attributes: [],
+            },
+        },
+    });
+};
+
+const hasPrivilegedRole = (user) =>
+    Array.isArray(user?.roles) &&
+    user.roles.some(isPrivilegedRole);
+
+const isLastActiveAdmin = async (userUuid) => {
+    const user = await User.findOne({
+        where: {
+            uuid: userUuid,
+        },
+        attributes: ['id'],
+    });
+
+    if (!user) {
+        return false;
+    }
+
+    const adminRole = await Role.findOne({
+        where: {
+            name: 'ADMIN',
+        },
+        attributes: ['id'],
+    });
+
+    if (!adminRole) {
+        return true;
+    }
+
+    const activeAdminCount = await UserRole.count({
+        where: {
+            roleId: adminRole.id,
+        },
+        include: [
+            {
+                model: User,
+                as: 'user',
+                where: {
+                    status: USER_STATUS.ACTIVE,
+                },
+                attributes: [],
+            },
+        ],
+    });
+
+    const targetHasAdminRole = await UserRole.findOne({
+        where: {
+            userId: user.id,
+            roleId: adminRole.id,
+        },
+    });
+
+    return targetHasAdminRole && activeAdminCount <= 1;
+};
+
+const assertCanMutatePrivileged = async (actorUuid, targetUser) => {
+    const actorPrivileged = await userHasPermission(
+        actorUuid,
+        PERMISSIONS.USERS.ASSIGN_ROLE
+    );
+
+    if (hasPrivilegedRole(targetUser) && !actorPrivileged) {
+        forbidden(
+            'Only an admin can update or suspend privileged users'
+        );
+    }
+};
+
+const assertNotLastActiveAdmin = async (userUuid) => {
+    if (await isLastActiveAdmin(userUuid)) {
+        forbidden('Cannot demote, suspend, or delete the last active admin');
+    }
+};
 
 export const getUsers = async () => {
     const users = await User.findAll({
@@ -34,7 +134,7 @@ export const getUsers = async () => {
     return users;
 };
 
-export const createUser = async ({username, email, password, firstName, lastName, phone, roleUuid}) => {
+export const createUser = async ({username, email, password, firstName, lastName, phone, roleUuid}, actorUuid) => {
     const transaction = await sequelize.transaction();
 
     try {
@@ -81,6 +181,19 @@ export const createUser = async ({username, email, password, firstName, lastName
             const error = new Error('Role not found');
             error.statusCode = 404;
             throw error;
+        }
+
+        if (isPrivilegedRole(role)) {
+            const actorPrivileged = await userHasPermission(
+                actorUuid,
+                PERMISSIONS.USERS.ASSIGN_ROLE
+            );
+
+            if (!actorPrivileged) {
+                forbidden(
+                    'Only an admin can create a user with a privileged role'
+                );
+            }
         }
 
         const passwordHash = await hashPassword(password);
@@ -150,18 +263,16 @@ export const getUserByUuid = async (uuid) => {
     return user;
 };
 
-export const updateUser = async (uuid, data) => {
-    const user = await User.findOne({
-        where: {
-            uuid,
-        },
-    });
+export const updateUser = async (uuid, data, actorUuid) => {
+    const user = await getUserWithRoles(uuid);
 
     if (!user) {
         const error = new Error('User not found');
         error.statusCode = 404;
         throw error;
     }
+
+    await assertCanMutatePrivileged(actorUuid, user);
 
     const updateData = {};
 
@@ -228,17 +339,19 @@ export const updateUser = async (uuid, data) => {
     return user;
 };
 
-export const updateUserStatus = async (uuid, status) => {
-    const user = await User.findOne({
-        where: {
-            uuid,
-        },
-    });
+export const updateUserStatus = async (uuid, status, actorUuid) => {
+    const user = await getUserWithRoles(uuid);
 
     if (!user) {
         const error = new Error('User not found');
         error.statusCode = 404;
         throw error;
+    }
+
+    await assertCanMutatePrivileged(actorUuid, user);
+
+    if (status !== USER_STATUS.ACTIVE) {
+        await assertNotLastActiveAdmin(uuid);
     }
 
     if (user.status === status) {
@@ -254,17 +367,19 @@ export const updateUserStatus = async (uuid, status) => {
     return user;
 };
 
-export const deleteUser = async (uuid) => {
-    const user = await User.findOne({
-        where: {
-            uuid,
-        },
-    });
+export const deleteUser = async (uuid, actorUuid) => {
+    const user = await getUserWithRoles(uuid);
 
     if (!user) {
         const error = new Error('User not found');
         error.statusCode = 404;
         throw error;
+    }
+
+    await assertCanMutatePrivileged(actorUuid, user);
+
+    if (user.status !== USER_STATUS.DELETED) {
+        await assertNotLastActiveAdmin(uuid);
     }
 
     if (user.status === USER_STATUS.DELETED) {

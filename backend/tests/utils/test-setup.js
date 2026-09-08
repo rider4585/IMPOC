@@ -135,11 +135,11 @@ export async function initializeTestDatabase() {
 export async function seedTestData() {
   // Create roles
   const roles = await db.Role.bulkCreate([
-    { name: 'ADMIN', description: 'Administrator with full access' },
-    { name: 'MANAGER', description: 'Manager role' },
-    { name: 'INVENTORY_MANAGER', description: 'Inventory manager role' },
-    { name: 'CASHIER', description: 'Cashier role' },
-    { name: 'ACCOUNTANT', description: 'Accountant role' },
+    { name: 'ADMIN', description: 'Administrator with full access', isPrivileged: true },
+    { name: 'MANAGER', description: 'Manager role', isPrivileged: false },
+    { name: 'INVENTORY_MANAGER', description: 'Inventory manager role', isPrivileged: false },
+    { name: 'CASHIER', description: 'Cashier role', isPrivileged: false },
+    { name: 'ACCOUNTANT', description: 'Accountant role', isPrivileged: false },
   ], { ignoreDuplicates: true });
 
   // Create permissions
@@ -176,6 +176,8 @@ export async function seedTestData() {
     // Role permissions
     { name: 'roles.view', description: 'View roles' },
     { name: 'roles.manage', description: 'Manage roles' },
+    // User role assignment
+    { name: 'users.assign_role', description: 'Assign and remove user roles' },
     // Picklists permissions
     { name: 'picklists.view', description: 'View picklists' },
     { name: 'picklists.create', description: 'Create picklists' },

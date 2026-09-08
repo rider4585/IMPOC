@@ -43,7 +43,8 @@ export const assignRoleToUser = async (req, res, next) => {
 
         const role = await assignRoleToUserAccount(
             userUuid,
-            roleUuid
+            roleUuid,
+            req.auth.userUuid
         );
 
         return res.status(201).json({
@@ -66,7 +67,8 @@ export const removeRoleFromUser = async (req, res, next) => {
 
         await removeRoleFromUserAccount(
             userUuid,
-            roleUuid
+            roleUuid,
+            req.auth.userUuid
         );
 
         return res.status(200).json({
