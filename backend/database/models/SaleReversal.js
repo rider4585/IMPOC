@@ -61,6 +61,26 @@ export default (sequelize) => {
             timestamps: true,
             underscored: true,
             paranoid: true,
+            indexes: [
+                {
+                    fields: ['sale_id'],
+                    unique: true,
+                    name: 'uq_sale_reversals_refund_sale',
+                    where: {
+                        reversal_type: 'REFUND',
+                        deleted_at: null,
+                    },
+                },
+                {
+                    fields: ['sale_id'],
+                    unique: true,
+                    name: 'uq_sale_reversals_cancel_sale',
+                    where: {
+                        reversal_type: 'CANCEL',
+                        deleted_at: null,
+                    },
+                },
+            ],
         }
     );
 

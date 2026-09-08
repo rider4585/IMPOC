@@ -128,6 +128,43 @@ export const cancelExpense = async ({ uuid, reason, actorUserId }) => {
             throw error;
         }
 
+        // CAS: atomically flip status completed -> cancelled before writing the
+        // reversal, so two concurrent cancels cannot both double-issue.
+        const [, affectedCount] = await sequelize.query(
+            `UPDATE expenses
+             SET status = :to, updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id AND status = :expectedFrom AND deleted_at IS NULL`,
+            {
+                replacements: {
+                    id: expense.id,
+                    to: 'cancelled',
+                    expectedFrom: 'completed',
+                },
+                type: sequelize.QueryTypes.UPDATE,
+                transaction,
+            }
+        );
+
+        if (affectedCount === 0) {
+            const realExpense = await Expense.findByPk(expense.id, {
+                attributes: ['uuid', 'status', 'deletedAt'],
+                transaction,
+            });
+            if (!realExpense || realExpense.deletedAt) {
+                const error = new Error(`Expense ${expense.uuid} was deleted`);
+                error.statusCode = 409;
+                throw error;
+            }
+            const realStatus = realExpense.status || 'unknown';
+            const error = new Error(
+                `Expense ${realExpense.uuid} is already ${realStatus}, cannot cancel`
+            );
+            error.statusCode = 409;
+            throw error;
+        }
+
+        // Record the reversal AFTER the conditional update wins, in the same
+        // transaction. History is never rewritten; reversals are append-only.
         await ExpenseReversal.create(
             {
                 expenseId: expense.id,
@@ -138,9 +175,8 @@ export const cancelExpense = async ({ uuid, reason, actorUserId }) => {
             { transaction }
         );
 
-        // Lifecycle marker only - the original amount is never touched
+        // Status already flipped to cancelled by the CAS above.
         expense.status = 'cancelled';
-        await expense.save({ transaction });
 
         await transaction.commit();
 

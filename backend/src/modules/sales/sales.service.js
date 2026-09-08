@@ -116,7 +116,13 @@ async function resolveSellableUnit({ unitUuid, barcode }, transaction) {
  * @param {Object} params - { customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, items, actorUserId }
  * @returns {Object} sale DTO
  */
-export const createSale = async ({ customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, items, actorUserId }) => {
+const MAX_NUMBER_RETRIES = 3;
+
+/**
+ * The body of createSale, run inside its own transaction. Retried by createSale
+ * when two concurrent checkouts race on the next S-number.
+ */
+const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, items, actorUserId }) => {
     const transaction = await sequelize.transaction();
     try {
         const units = [];
@@ -196,6 +202,30 @@ export const createSale = async ({ customerName, customerUuid, soldAt, paymentMe
 };
 
 /**
+ * Create/checkout a RETAIL sale. Wrapped in a retry loop so two concurrent
+ * checkouts that race on the next S-number (read MAX + 1) do not collide: the
+ * loser hits the unique sale_number constraint, rolls back, regenerates a fresh
+ * number and retries.
+ */
+export const createSale = async (params) => {
+    for (let attempt = 1; attempt <= MAX_NUMBER_RETRIES; attempt += 1) {
+        try {
+            return await createSaleOnce(params);
+        } catch (error) {
+            const isNumberCollision =
+                error &&
+                (error.parent && error.parent.code === '23505') &&
+                error.name === 'SequelizeUniqueConstraintError';
+            if (!isNumberCollision || attempt === MAX_NUMBER_RETRIES) {
+                throw error;
+            }
+        }
+    }
+    // Unreachable: the loop always returns or throws above.
+    throw new Error('createSale retry exhausted');
+};
+
+/**
  * List sales, newest first, with their lines.
  */
 export const listSales = async () => {
@@ -258,7 +288,43 @@ export const cancelSale = async ({ uuid, reason, actorUserId }) => {
             throw error;
         }
 
-        // Record the reversal (settlement) row - history is never rewritten
+        // CAS: atomically flip status completed -> cancelled before writing the
+        // reversal, so two concurrent cancels cannot both double-issue.
+        const [, affectedCount] = await sequelize.query(
+            `UPDATE sales
+             SET status = :to, updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id AND status = :expectedFrom AND deleted_at IS NULL`,
+            {
+                replacements: {
+                    id: sale.id,
+                    to: 'cancelled',
+                    expectedFrom: 'completed',
+                },
+                type: sequelize.QueryTypes.UPDATE,
+                transaction,
+            }
+        );
+
+        if (affectedCount === 0) {
+            const realSale = await Sale.findByPk(sale.id, {
+                attributes: ['saleNumber', 'status', 'deletedAt'],
+                transaction,
+            });
+            if (!realSale || realSale.deletedAt) {
+                const error = new Error(`Sale ${sale.saleNumber} was deleted`);
+                error.statusCode = 409;
+                throw error;
+            }
+            const realStatus = realSale.status || 'unknown';
+            const error = new Error(
+                `Sale ${realSale.saleNumber} is already ${realStatus}, cannot cancel`
+            );
+            error.statusCode = 409;
+            throw error;
+        }
+
+        // Record the reversal (settlement) row after the conditional update
+        // wins, in the same transaction - history is never rewritten
         await SaleReversal.create(
             {
                 saleId: sale.id,
@@ -287,9 +353,9 @@ export const cancelSale = async ({ uuid, reason, actorUserId }) => {
             }
         }
 
-        // Lifecycle marker only - financial fields are never touched
+        // Status already flipped to cancelled by the CAS above; stale in-memory
+        // value is refreshed for the DTO.
         sale.status = 'cancelled';
-        await sale.save({ transaction });
 
         await transaction.commit();
 
@@ -323,12 +389,43 @@ export const refundSale = async ({ uuid, reason, actorUserId }) => {
             throw error;
         }
 
-        if (sale.status !== 'completed') {
-            const error = new Error(`Sale ${sale.saleNumber} is not completed and cannot be refunded`);
+        // CAS: atomically flip status completed -> refunded to prevent two concurrent
+        // requests from both passing the check and double-issuing the refund.
+        const [, affectedCount] = await sequelize.query(
+            `UPDATE sales
+             SET status = :to, updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id AND status = :expectedFrom AND deleted_at IS NULL`,
+            {
+                replacements: {
+                    id: sale.id,
+                    to: 'refunded',
+                    expectedFrom: 'completed',
+                },
+                type: sequelize.QueryTypes.UPDATE,
+                transaction,
+            }
+        );
+
+        if (affectedCount === 0) {
+            const realSale = await Sale.findByPk(sale.id, {
+                attributes: ['saleNumber', 'status', 'deletedAt'],
+                transaction,
+            });
+            if (!realSale || realSale.deletedAt) {
+                const error = new Error(`Sale ${sale.saleNumber} was deleted`);
+                error.statusCode = 409;
+                throw error;
+            }
+            const realStatus = realSale.status || 'unknown';
+            const error = new Error(
+                `Sale ${realSale.saleNumber} is already ${realStatus}, cannot refund`
+            );
             error.statusCode = 409;
             throw error;
         }
 
+        // Record the refund reversal AFTER the conditional update wins, in the
+        // same transaction. History is never rewritten; reversals are append-only.
         await SaleReversal.create(
             {
                 saleId: sale.id,
@@ -338,10 +435,6 @@ export const refundSale = async ({ uuid, reason, actorUserId }) => {
             },
             { transaction }
         );
-
-        // Lifecycle marker only - financial fields are never touched
-        sale.status = 'refunded';
-        await sale.save({ transaction });
 
         await transaction.commit();
 
