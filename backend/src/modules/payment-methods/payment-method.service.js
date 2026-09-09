@@ -9,6 +9,27 @@ export const getPaymentMethods = async () => {
     return paymentMethods;
 };
 
+/**
+ * SEC-M-8: a paymentMethod snapshot written to the financial ledger (sales /
+ * rentals) must be the name of an active payment_methods picklist entry so
+ * payment-channel reporting stays clean. Absent/empty values are allowed.
+ */
+export const assertPaymentMethodInPicklist = async (name, transaction) => {
+    if (name === undefined || name === null || name === '') {
+        return;
+    }
+    const method = await PaymentMethod.findOne({
+        where: { name, isActive: true, deletedAt: null },
+        attributes: ['id'],
+        transaction,
+    });
+    if (!method) {
+        const error = new Error(`paymentMethod '${name}' is not in the payment methods picklist`);
+        error.statusCode = 400;
+        throw error;
+    }
+};
+
 export const createPaymentMethod = async ({ name }) => {
     const transaction = await sequelize.transaction();
 

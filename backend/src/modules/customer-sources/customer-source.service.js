@@ -9,6 +9,27 @@ export const getCustomerSources = async () => {
     return customerSources;
 };
 
+/**
+ * SEC-M-8: a customerSource snapshot written to the financial ledger (sales /
+ * rentals) must be the name of an active customer_sources picklist entry.
+ * Absent/empty values are allowed.
+ */
+export const assertCustomerSourceInPicklist = async (name, transaction) => {
+    if (name === undefined || name === null || name === '') {
+        return;
+    }
+    const source = await CustomerSource.findOne({
+        where: { name, isActive: true, deletedAt: null },
+        attributes: ['id'],
+        transaction,
+    });
+    if (!source) {
+        const error = new Error(`customerSource '${name}' is not in the customer sources picklist`);
+        error.statusCode = 400;
+        throw error;
+    }
+};
+
 export const createCustomerSource = async ({ name }) => {
     const transaction = await sequelize.transaction();
 

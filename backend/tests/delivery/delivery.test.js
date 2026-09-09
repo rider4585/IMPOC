@@ -8,9 +8,61 @@ import deliveryRoutes from '../../src/modules/delivery/delivery.routes.js';
 import errorMiddleware from '../../src/middleware/error.middleware.js';
 
 const testApp = express();
-testApp.use(express.json());
+// Match app.js (limit: '15mb') so the SEC-M-6 size-cap test exercises the
+// receiptPayload schema cap, not body-parser's default 100kb limit.
+testApp.use(express.json({ limit: '15mb' }));
 testApp.use('/api/delivery', deliveryRoutes);
 testApp.use(errorMiddleware);
+
+function buildValidReceiptPayload() {
+    return {
+        store: { name: 'SHREE Fashion Store', address: 'Main Bazaar', phone: '9876543210' },
+        transaction: {
+            type: 'SALE',
+            number: 'S-0001',
+            date: '2026-09-01',
+            paymentMethod: 'Cash',
+            totalPaise: '1000',
+            paidPaise: '1000',
+            changePaise: '0',
+            status: 'completed',
+        },
+        customer: { name: 'Priya', phone: '9876543210', email: null },
+        lines: [{
+            productName: 'Sari',
+            productType: 'Garment',
+            colour: 'Red',
+            size: 'L',
+            quantity: 1,
+            unitPricePaise: '1000',
+            lineTotalPaise: '1000',
+        }],
+        totals: {
+            subtotalPaise: '1000',
+            discountPaise: '0',
+            totalPaise: '1000',
+            amountPaidPaise: '1000',
+            balancePaise: '0',
+            itemsCount: 1,
+        },
+    };
+}
+
+// 200 max-length lines pass the shape bounds but blow the serialized size cap.
+function buildOversizedReceiptPayload() {
+    const long = (n) => 'x'.repeat(n);
+    const payload = buildValidReceiptPayload();
+    payload.lines = Array.from({ length: 200 }, () => ({
+        productName: long(255),
+        productType: long(255),
+        colour: long(255),
+        size: long(255),
+        quantity: 1,
+        unitPricePaise: '1'.repeat(40),
+        lineTotalPaise: '1'.repeat(40),
+    }));
+    return payload;
+}
 
 describe('Delivery logs module - /api/delivery/logs', () => {
     let managerToken;
@@ -52,6 +104,31 @@ describe('Delivery logs module - /api/delivery/logs', () => {
             .post('/api/auth/login')
             .send({ username: mgrData.username, password: mgrData.password });
         managerToken = mgrLogin.body.data.accessToken;
+
+        // SALE/RENTAL delivery logs must reference real records (SEC-M-6),
+        // so create the fixtures the tests point at before running.
+        await db.Sale.create({
+            uuid: saleUuid,
+            saleNumber: 'S-DELIV1',
+            soldAt: '2026-09-01',
+            totalPaise: 100000,
+            status: 'completed',
+        });
+        await db.Sale.create({
+            uuid: saleUuid2,
+            saleNumber: 'S-DELIV2',
+            soldAt: '2026-09-02',
+            totalPaise: 200000,
+            status: 'completed',
+        });
+        await db.RentalAgreement.create({
+            uuid: rentalUuid,
+            agreementNumber: 'R-DELIV1',
+            startDate: '2026-09-01',
+            dueDate: '2026-09-04',
+            depositRefundablePaise: 5000,
+            status: 'active',
+        });
     });
 
     afterEach(async () => {
@@ -62,6 +139,8 @@ describe('Delivery logs module - /api/delivery/logs', () => {
     });
 
     afterAll(async () => {
+        await db.RentalAgreement.destroy({ where: { uuid: rentalUuid }, force: true });
+        await db.Sale.destroy({ where: { uuid: { [db.Sequelize.Op.in]: [saleUuid, saleUuid2] } }, force: true });
         await closeDatabase();
     });
 
@@ -127,6 +206,88 @@ describe('Delivery logs module - /api/delivery/logs', () => {
                     channel: 'WHATSAPP',
                 });
             expect(res.statusCode).toBe(400);
+        });
+
+        it('should reject a delivery log referencing an unknown entity (SEC-M-6)', async () => {
+            const res = await request(testApp)
+                .post('/api/delivery/logs')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({
+                    entityType: 'SALE',
+                    entityUuid: missingUuid,
+                    channel: 'WHATSAPP',
+                });
+            expect(res.statusCode).toBe(400);
+            expect(res.body.success).toBe(false);
+            expect(res.body.message).toMatch(/unknown SALE entity/);
+        });
+
+        it('should reject a delivery log referencing an unknown rental entity (SEC-M-6)', async () => {
+            const res = await request(testApp)
+                .post('/api/delivery/logs')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({
+                    entityType: 'RENTAL',
+                    entityUuid: missingUuid,
+                    channel: 'EMAIL',
+                });
+            expect(res.statusCode).toBe(400);
+            expect(res.body.message).toMatch(/unknown RENTAL entity/);
+        });
+
+        it('should accept a delivery log with a valid receiptPayload (SEC-M-6 positive)', async () => {
+            const res = await createLog({
+                entityType: 'SALE',
+                entityUuid: saleUuid2,
+                channel: 'WHATSAPP',
+                status: 'DELIVERED',
+                receiptPayload: buildValidReceiptPayload(),
+            });
+
+            expect(res.statusCode).toBe(201);
+            expect(res.body.data.log.receiptPayload).toBeTruthy();
+            expect(res.body.data.log.receiptPayload.totals.totalPaise).toBe('1000');
+        });
+
+        it('should reject a receiptPayload with the wrong shape (SEC-M-6)', async () => {
+            const res = await request(testApp)
+                .post('/api/delivery/logs')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({
+                    entityType: 'SALE',
+                    entityUuid: saleUuid,
+                    channel: 'WHATSAPP',
+                    receiptPayload: { store: { name: 123 }, transaction: {}, totals: {}, lines: 'nope' },
+                });
+            expect(res.statusCode).toBe(400);
+            expect(res.body.success).toBe(false);
+        });
+
+        it('should reject an arbitrarily structured receiptPayload blob (SEC-M-6)', async () => {
+            const res = await request(testApp)
+                .post('/api/delivery/logs')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({
+                    entityType: 'SALE',
+                    entityUuid: saleUuid,
+                    channel: 'WHATSAPP',
+                    receiptPayload: { anything: 'goes', nested: { arbitrary: [1, 2, 3] } },
+                });
+            expect(res.statusCode).toBe(400);
+        });
+
+        it('should reject an oversized receiptPayload (SEC-M-6 size cap)', async () => {
+            const res = await request(testApp)
+                .post('/api/delivery/logs')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({
+                    entityType: 'SALE',
+                    entityUuid: saleUuid,
+                    channel: 'WHATSAPP',
+                    receiptPayload: buildOversizedReceiptPayload(),
+                });
+            expect(res.statusCode).toBe(400);
+            expect(res.body.message).toMatch(/size cap/);
         });
     });
 

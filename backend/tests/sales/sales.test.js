@@ -31,6 +31,8 @@ describe('Sales / POS module (T-08)', () => {
     let productType;
     let unit1;
     let unit2;
+    let unit5;
+    let unit6;
 
     async function scanUnit(barcode) {
         const res = await request(app)
@@ -47,6 +49,10 @@ describe('Sales / POS module (T-08)', () => {
 
     beforeAll(async () => {
         await initializeTestDatabase();
+
+        // SEC-M-8: ledger snapshots must reference active picklist entries.
+        await db.PaymentMethod.create({ name: 'Cash', isActive: true });
+        await db.CustomerSource.create({ name: 'Instagram', isActive: true });
 
         // MANAGER has sales.* permissions (view/create/cancel/refund)
         const mgrData = generateTestUser({ password: 'TestPassword123!' });
@@ -101,7 +107,7 @@ describe('Sales / POS module (T-08)', () => {
             vendor,
             productType,
             overrides: {
-                quantity: 10,
+                quantity: 12,
                 buyingPricePaise: 100000,
                 sellingPricePaise: 200000,
                 floorPricePaise: 150000,
@@ -111,12 +117,16 @@ describe('Sales / POS module (T-08)', () => {
 
         unit1 = await scanUnit('A1000000001');
         unit2 = await scanUnit('A1000000002');
+        unit5 = await scanUnit('A1000000005');
+        unit6 = await scanUnit('A1000000006');
     });
 
     afterAll(async () => {
         await db.User.destroy({
             where: { username: { [db.Sequelize.Op.like]: 'testuser_%' } },
         });
+        await db.PaymentMethod.destroy({ where: { name: 'Cash' }, force: true });
+        await db.CustomerSource.destroy({ where: { name: 'Instagram' }, force: true });
         await db.Unit.destroy({ where: { stockId: stock.id }, force: true });
         await db.Stock.destroy({ where: { id: stock.id }, force: true });
         await db.TripVendor.destroy({ where: { tripId: trip.id }, force: true });
@@ -244,6 +254,41 @@ describe('Sales / POS module (T-08)', () => {
                 .get('/api/sales')
                 .set('Authorization', `Bearer ${cashierToken}`)
                 .expect(200);
+        });
+
+        it('should reject a paymentMethod outside the active picklist (SEC-M-8)', async () => {
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ unitUuid: unit5.uuid }], paymentMethod: 'Credit Card' })
+                .expect(400);
+
+            expect(res.body.success).toBe(false);
+            expect(res.body.message).toMatch(/not in the payment methods picklist/);
+        });
+
+        it('should reject a customerSource outside the active picklist (SEC-M-8)', async () => {
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ unitUuid: unit6.uuid }], customerSource: 'TikTok' })
+                .expect(400);
+
+            expect(res.body.success).toBe(false);
+            expect(res.body.message).toMatch(/not in the customer sources picklist/);
+        });
+
+        it('should allow an absent paymentMethod/customerSource (SEC-M-8)', async () => {
+            // unit3 was already sold by the cashier test; reuse a fresh unit.
+            const unit7 = await scanUnit('A1000000007');
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ unitUuid: unit7.uuid }] })
+                .expect(201);
+
+            expect(res.body.data.paymentMethod).toBe(null);
+            expect(res.body.data.customerSource).toBe(null);
         });
     });
 
