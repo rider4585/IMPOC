@@ -9,6 +9,8 @@ import {
     sequelize,
 } from '../../../database/models/index.js';
 import { transitionUnit } from '../units/units.service.js';
+import { assertPaymentMethodInPicklist } from '../payment-methods/payment-method.service.js';
+import { assertCustomerSourceInPicklist } from '../customer-sources/customer-source.service.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { DAMAGE_GRADE_OUTCOMES } from '../../constants/damage-grade-outcome.js';
 
@@ -205,6 +207,10 @@ const createRentalOnce = async ({ customerName, customerUuid, startDate, rentalD
         const days = rentalDays || DEFAULT_RENTAL_DAYS;
         const due = addDays(start, days);
         const agreementNumber = await nextAgreementNumber(transaction);
+
+        // SEC-M-8: ledger snapshots must reference the active picklists.
+        await assertPaymentMethodInPicklist(paymentMethod, transaction);
+        await assertCustomerSourceInPicklist(customerSource, transaction);
 
         // Snapshot of total deposit collected at hand-out (never mutated)
         const depositRefundablePaise = Number(units.reduce((sum, u) => sum + BigInt(u.depositPaise), 0n));

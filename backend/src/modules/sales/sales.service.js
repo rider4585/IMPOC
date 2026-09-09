@@ -1,5 +1,7 @@
 import { Sale, SaleLine, SaleReversal, Unit, Customer, sequelize } from '../../../database/models/index.js';
 import { transitionUnit } from '../units/units.service.js';
+import { assertPaymentMethodInPicklist } from '../payment-methods/payment-method.service.js';
+import { assertCustomerSourceInPicklist } from '../customer-sources/customer-source.service.js';
 import { CHANNEL } from '../../constants/channel.js';
 
 /**
@@ -143,6 +145,10 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
         const saleNumber = await nextSaleNumber(transaction);
 
         const totalPaise = Number(units.reduce((sum, u) => sum + BigInt(u.sellingPricePaise), 0n));
+
+        // SEC-M-8: ledger snapshots must reference the active picklists.
+        await assertPaymentMethodInPicklist(paymentMethod, transaction);
+        await assertCustomerSourceInPicklist(customerSource, transaction);
 
         const sale = await Sale.create(
             {

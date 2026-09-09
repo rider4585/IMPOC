@@ -52,6 +52,10 @@ describe('Rental agreements module (T-10)', () => {
     beforeAll(async () => {
         await initializeTestDatabase();
 
+        // SEC-M-8: ledger snapshots must reference active picklist entries.
+        await db.PaymentMethod.create({ name: 'Cash', isActive: true });
+        await db.CustomerSource.create({ name: 'WhatsApp group', isActive: true });
+
         // MANAGER role lacks rentals.* until god seeds them; add them here for the suite
         const managerRole = await db.Role.findOne({ where: { name: 'MANAGER' } });
         for (const name of RENTAL_PERMISSIONS) {
@@ -139,6 +143,8 @@ describe('Rental agreements module (T-10)', () => {
         await db.User.destroy({
             where: { username: { [db.Sequelize.Op.like]: 'testuser_%' } },
         });
+        await db.PaymentMethod.destroy({ where: { name: 'Cash' }, force: true });
+        await db.CustomerSource.destroy({ where: { name: 'WhatsApp group' }, force: true });
         await db.Unit.destroy({ where: { stockId: stock.id }, force: true });
         await db.Stock.destroy({ where: { id: stock.id }, force: true });
         await db.TripVendor.destroy({ where: { tripId: trip.id }, force: true });
@@ -235,6 +241,42 @@ describe('Rental agreements module (T-10)', () => {
                 statusCode: 400,
                 message: expect.stringMatching(/exactly one of barcode or unitUuid/),
             });
+        });
+
+        it('should reject a paymentMethod outside the active picklist (SEC-M-8)', async () => {
+            const u6 = await scanUnit('RA0000000006');
+            const res = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ unitUuid: u6.uuid }], paymentMethod: 'UPI' })
+                .expect(400);
+
+            expect(res.body.success).toBe(false);
+            expect(res.body.message).toMatch(/not in the payment methods picklist/);
+        });
+
+        it('should reject a customerSource outside the active picklist (SEC-M-8)', async () => {
+            const u7 = await scanUnit('RA0000000007');
+            const res = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ unitUuid: u7.uuid }], customerSource: 'Print ad' })
+                .expect(400);
+
+            expect(res.body.success).toBe(false);
+            expect(res.body.message).toMatch(/not in the customer sources picklist/);
+        });
+
+        it('should allow checkout without paymentMethod/customerSource (SEC-M-8)', async () => {
+            const u8 = await scanUnit('RA0000000008');
+            const res = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ unitUuid: u8.uuid }] })
+                .expect(201);
+
+            expect(res.body.data.paymentMethod).toBe(null);
+            expect(res.body.data.customerSource).toBe(null);
         });
     });
 
