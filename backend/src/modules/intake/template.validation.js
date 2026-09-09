@@ -8,7 +8,14 @@ const paiseOptional = z
     .refine((v) => v === undefined || (!Number.isNaN(Number(v)) && Number(v) >= 0), {
         message: 'Amount must be a non-negative number',
     })
-    .transform((v) => (v === undefined ? undefined : Number(v)));
+    .transform((v) => (v === undefined ? undefined : Number(v)))
+    .pipe(
+        z
+            .number()
+            .int('Amount must be an integer')
+            .max(Number.MAX_SAFE_INTEGER, 'Amount exceeds maximum safe integer value')
+            .optional()
+    );
 
 const paiseNullable = z
     .union([z.string(), z.number()])
@@ -21,7 +28,15 @@ const paiseNullable = z
         if (v === undefined) return undefined;
         if (v === null) return null;
         return Number(v);
-    });
+    })
+    .pipe(
+        z
+            .number()
+            .int('Amount must be an integer')
+            .max(Number.MAX_SAFE_INTEGER, 'Amount exceeds maximum safe integer value')
+            .nullable()
+            .optional()
+    );
 
 export const createTemplateSchema = z.object({
     vendorUuid: uuidSchema,
@@ -33,7 +48,13 @@ export const createTemplateSchema = z.object({
         .refine((v) => !Number.isNaN(Number(v)) && Number(v) >= 0, {
             message: 'Buying price must be a non-negative number',
         })
-        .transform((v) => Number(v)),
+        .transform((v) => Number(v))
+        .pipe(
+            z
+                .number()
+                .int('Buying price must be an integer')
+                .max(Number.MAX_SAFE_INTEGER, 'Buying price exceeds maximum safe integer value')
+        ),
     wholeBuyingPricePaise: paiseNullable,
     defaultQuantity: z.number().int().min(1).optional().nullable(),
     defaultSellingPricePaise: paiseOptional,
@@ -51,7 +72,14 @@ export const updateTemplateSchema = z.object({
         .refine((v) => v === undefined || (!Number.isNaN(Number(v)) && Number(v) >= 0), {
             message: 'Buying price must be a non-negative number',
         })
-        .transform((v) => (v === undefined ? undefined : Number(v))),
+        .transform((v) => (v === undefined ? undefined : Number(v)))
+        .pipe(
+            z
+                .number()
+                .int('Buying price must be an integer')
+                .max(Number.MAX_SAFE_INTEGER, 'Buying price exceeds maximum safe integer value')
+                .optional()
+        ),
     wholeBuyingPricePaise: paiseNullable,
     defaultQuantity: z.number().int().min(1).optional().nullable(),
     defaultSellingPricePaise: paiseOptional,

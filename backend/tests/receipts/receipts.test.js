@@ -162,7 +162,8 @@ return db.Unit.create({
             expect(receipt.transaction.type).toBe('SALE');
             expect(receipt.transaction.number).toBe('S-RECEIPT');
             expect(receipt.customer.name).toBe('TEST_Customer_ReceiptBuyer');
-            expect(receipt.customer.phone).toBe('+919800000001');
+            expect(receipt.customer.phone).toBeUndefined();
+            expect(receipt.customer.email).toBeUndefined();
             expect(receipt.lines).toHaveLength(1);
             expect(receipt.lines[0].productName).toBe(productType.name);
             expect(receipt.lines[0].colour).toBe('Blue');

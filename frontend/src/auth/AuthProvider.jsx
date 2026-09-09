@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
 
   /**
    * Sign in with username and password
-   * Stores token in memory and localStorage (for page reload recovery)
+   * Stores token in memory only - token restored via httpOnly refresh cookie on page reload
    * Stores user and permissions in memory; transitions status to signed-in
    */
   const signIn = useCallback(async (username, password) => {
@@ -53,7 +53,6 @@ export function AuthProvider({ children }) {
 
     setAccessToken(data.accessToken);
     accessTokenRef.current = data.accessToken;
-    localStorage.setItem('accessToken', data.accessToken);
     setCurrentUser({
       uuid: data.uuid,
       username: data.username,
@@ -70,7 +69,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
-   * Sign out: calls POST /auth/logout, clears token from memory and storage, transitions to signed-out
+   * Sign out: calls POST /auth/logout, clears token from memory, transitions to signed-out
    */
   const signOut = useCallback(async () => {
     try {
@@ -82,14 +81,13 @@ export function AuthProvider({ children }) {
       setCurrentUser(null);
       setPermissions([]);
       setStatus('signed-out');
-      localStorage.removeItem('accessToken');
     }
   }, [updateAccessToken]);
 
   /**
    * Boot-time session restoration:
    * 1. Tries POST /auth/refresh (cookie automatic)
-   * 2. If that fails, tries to restore token from localStorage
+   * 2. If that fails, user must re-login
    * 3. Then fetches user info with the token
    * Sets status to 'restoring' during the process
    */
@@ -100,18 +98,8 @@ export function AuthProvider({ children }) {
       try {
         // Attempt to refresh the access token using the httpOnly cookie
         let newAccessToken;
-        try {
-          const refreshData = await refreshAPI();
-          newAccessToken = refreshData.accessToken;
-        } catch (refreshError) {
-          // Refresh failed - try to restore token from localStorage as fallback
-          const storedToken = localStorage.getItem('accessToken');
-          if (storedToken) {
-            newAccessToken = storedToken;
-          } else {
-            throw refreshError; // No cookie, no stored token - sign out
-          }
-        }
+        const refreshData = await refreshAPI();
+        newAccessToken = refreshData.accessToken;
 
         if (!isMountedRef.current) return;
         // Make the new access token available to the getter synchronously so
@@ -145,7 +133,6 @@ export function AuthProvider({ children }) {
         setCurrentUser(null);
         setPermissions([]);
         setStatus('signed-out');
-        localStorage.removeItem('accessToken');
       }
     };
 

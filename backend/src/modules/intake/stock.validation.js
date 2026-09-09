@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { CHANNEL } from '../../constants/channel.js';
 
+const MAX_SAFE_MONEY = Number.MAX_SAFE_INTEGER;
+
 export const createStockSchema = z
     .object({
         tripUuid: z
@@ -31,13 +33,13 @@ export const createStockSchema = z
             .number()
             .int('Buying price must be an integer')
             .min(0, 'Buying price cannot be negative')
-            .max(9223372036854775807, 'Buying price exceeds maximum BIGINT value'),
+            .max(MAX_SAFE_MONEY, 'Buying price exceeds maximum BIGINT value'),
 
         wholeBuyingPricePaise: z
             .number()
             .int('Whole buying price must be an integer')
             .min(0, 'Whole buying price cannot be negative')
-            .max(9223372036854775807, 'Whole buying price exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Whole buying price exceeds maximum BIGINT value')
             .nullable()
             .optional(),
 
@@ -45,13 +47,13 @@ export const createStockSchema = z
             .number()
             .int('Selling price must be an integer')
             .min(0, 'Selling price cannot be negative')
-            .max(9223372036854775807, 'Selling price exceeds maximum BIGINT value'),
+            .max(MAX_SAFE_MONEY, 'Selling price exceeds maximum BIGINT value'),
 
         floorPricePaise: z
             .number()
             .int('Floor price must be an integer')
             .min(0, 'Floor price cannot be negative')
-            .max(9223372036854775807, 'Floor price exceeds maximum BIGINT value'),
+            .max(MAX_SAFE_MONEY, 'Floor price exceeds maximum BIGINT value'),
 
         channel: z
             .enum([CHANNEL.RETAIL, CHANNEL.RENTAL])
@@ -61,7 +63,7 @@ export const createStockSchema = z
             .number()
             .int('Rent per day must be an integer')
             .min(0, 'Rent per day cannot be negative')
-            .max(9223372036854775807, 'Rent per day exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Rent per day exceeds maximum BIGINT value')
             .nullable()
             .optional(),
 
@@ -69,7 +71,7 @@ export const createStockSchema = z
             .number()
             .int('Deposit must be an integer')
             .min(0, 'Deposit cannot be negative')
-            .max(9223372036854775807, 'Deposit exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Deposit exceeds maximum BIGINT value')
             .nullable()
             .optional(),
 
@@ -77,7 +79,7 @@ export const createStockSchema = z
             .number()
             .int('Overdue per day must be an integer')
             .min(1, 'Overdue per day must be greater than 0')
-            .max(9223372036854775807, 'Overdue per day exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Overdue per day exceeds maximum BIGINT value')
             .nullable()
             .optional(),
     })
@@ -152,7 +154,7 @@ export const updateStockSchema = z
             .number()
             .int('Whole buying price must be an integer')
             .min(0, 'Whole buying price cannot be negative')
-            .max(9223372036854775807, 'Whole buying price exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Whole buying price exceeds maximum BIGINT value')
             .nullable()
             .optional(),
 
@@ -167,28 +169,28 @@ export const updateStockSchema = z
             .number()
             .int('Buying price must be an integer')
             .min(0, 'Buying price cannot be negative')
-            .max(9223372036854775807, 'Buying price exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Buying price exceeds maximum BIGINT value')
             .optional(),
 
         sellingPricePaise: z
             .number()
             .int('Selling price must be an integer')
             .min(0, 'Selling price cannot be negative')
-            .max(9223372036854775807, 'Selling price exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Selling price exceeds maximum BIGINT value')
             .optional(),
 
         floorPricePaise: z
             .number()
             .int('Floor price must be an integer')
             .min(0, 'Floor price cannot be negative')
-            .max(9223372036854775807, 'Floor price exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Floor price exceeds maximum BIGINT value')
             .optional(),
 
         rentPerDayPaise: z
             .number()
             .int('Rent per day must be an integer')
             .min(0, 'Rent per day cannot be negative')
-            .max(9223372036854775807, 'Rent per day exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Rent per day exceeds maximum BIGINT value')
             .nullable()
             .optional(),
 
@@ -196,7 +198,7 @@ export const updateStockSchema = z
             .number()
             .int('Deposit must be an integer')
             .min(0, 'Deposit cannot be negative')
-            .max(9223372036854775807, 'Deposit exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Deposit exceeds maximum BIGINT value')
             .nullable()
             .optional(),
 
@@ -204,7 +206,7 @@ export const updateStockSchema = z
             .number()
             .int('Overdue per day must be an integer')
             .min(1, 'Overdue per day must be greater than 0')
-            .max(9223372036854775807, 'Overdue per day exceeds maximum BIGINT value')
+            .max(MAX_SAFE_MONEY, 'Overdue per day exceeds maximum BIGINT value')
             .nullable()
             .optional(),
     })

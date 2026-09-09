@@ -150,7 +150,7 @@ describe('Trips Module - /api/trips', () => {
       expect(res.statusCode).toBe(200);
       const foundTrip = res.body.data.find((t) => t.uuid === trip.uuid);
       expect(foundTrip).toBeDefined();
-      expect(foundTrip.variancePaise).toBe(75000);
+      expect(foundTrip.variancePaise).toBe("75000");
     });
   });
 
@@ -190,9 +190,9 @@ describe('Trips Module - /api/trips', () => {
       expect(res.body.data.vendors).toHaveLength(1);
       expect(res.body.data.vendors[0].vendorUuid).toBe(activeVendor.uuid);
       expect(res.body.data.vendors[0].billReference).toBe('TEST_INV-004');
-      expect(res.body.data.vendors[0].totalPaidPaise).toBe(50000);
-      expect(res.body.data.totalPaidPaise).toBe(50000);
-      expect(res.body.data.variancePaise).toBe(50000); // No stocks yet
+      expect(res.body.data.vendors[0].totalPaidPaise).toBe("50000");
+      expect(res.body.data.totalPaidPaise).toBe("50000");
+      expect(res.body.data.variancePaise).toBe("50000"); // No stocks yet
       expect(res.body.data).toHaveProperty('createdAt');
       expect(res.body.data).toHaveProperty('updatedAt');
       expect(res.body.data).not.toHaveProperty('id');
@@ -211,8 +211,8 @@ describe('Trips Module - /api/trips', () => {
 
       expect(res.statusCode).toBe(201);
       expect(res.body.data.vendors).toHaveLength(2);
-      expect(res.body.data.totalPaidPaise).toBe(50000);
-      expect(res.body.data.variancePaise).toBe(50000);
+      expect(res.body.data.totalPaidPaise).toBe("50000");
+      expect(res.body.data.variancePaise).toBe("50000");
     });
 
     it('should create trip without vendors', async () => {
@@ -223,8 +223,8 @@ describe('Trips Module - /api/trips', () => {
 
       expect(res.statusCode).toBe(201);
       expect(res.body.data.vendors).toHaveLength(0);
-      expect(res.body.data.totalPaidPaise).toBe(0);
-      expect(res.body.data.variancePaise).toBe(0);
+      expect(res.body.data.totalPaidPaise).toBe("0");
+      expect(res.body.data.variancePaise).toBe("0");
     });
 
     it('should return 404 when vendor does not exist', async () => {
@@ -362,7 +362,7 @@ describe('Trips Module - /api/trips', () => {
       expect(res.body.data.tripUuid).toBe(trip.uuid);
       expect(res.body.data.vendorUuid).toBe(activeVendor.uuid);
       expect(res.body.data.billReference).toBe('TEST_INV-ADD');
-      expect(res.body.data.totalPaidPaise).toBe(60000);
+      expect(res.body.data.totalPaidPaise).toBe("60000");
     });
 
     it('should return 409 when vendor already on the trip', async () => {
@@ -494,8 +494,8 @@ describe('Trips Module - /api/trips', () => {
       expect(res.body.data.uuid).toBe(trip.uuid);
       expect(res.body.data.name).toBe('TEST_Trip Detail');
       expect(res.body.data.purchasedOn).toBe('2026-08-26');
-      expect(res.body.data.totalPaidPaise).toBe(85000);
-      expect(res.body.data.variancePaise).toBe(85000); // No stocks yet
+      expect(res.body.data.totalPaidPaise).toBe("85000");
+      expect(res.body.data.variancePaise).toBe("85000"); // No stocks yet
       expect(res.body.data.vendors).toHaveLength(1);
       expect(res.body.data.vendors[0].vendorUuid).toBe(activeVendor.uuid);
       expect(res.body.data.stocks).toHaveLength(0);

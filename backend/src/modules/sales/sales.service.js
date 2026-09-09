@@ -142,7 +142,7 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
         const date = soldAt || new Date().toISOString().split('T')[0];
         const saleNumber = await nextSaleNumber(transaction);
 
-        const totalPaise = units.reduce((sum, u) => sum + Number(u.sellingPricePaise), 0);
+        const totalPaise = Number(units.reduce((sum, u) => sum + BigInt(u.sellingPricePaise), 0n));
 
         const sale = await Sale.create(
             {

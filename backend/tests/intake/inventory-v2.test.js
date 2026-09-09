@@ -259,8 +259,8 @@ describe('Inventory V2 - subtype + whole buying price (R-09)', () => {
             const found = res.body.data.find((t) => t.uuid === trip.uuid);
             expect(found).toBeDefined();
             // totalPaid 1000000 - buyingSum. Whole price 12000 wins over qty*buying (10*1000 = 10000).
-            expect(found.totalPaidPaise).toBe(1000000);
-            expect(found.variancePaise).toBe(1000000 - 12000);
+            expect(found.totalPaidPaise).toBe("1000000");
+            expect(found.variancePaise).toBe(String(1000000 - 12000));
         });
     });
 

@@ -84,21 +84,21 @@ export const getDashboard = async ({ from, to }) => {
 
     // Sales
     const completedSales = sales.filter((s) => s.status === 'completed');
-    const salesTotalPaise = completedSales.reduce((sum, s) => sum + Number(s.totalPaise), 0);
+    const salesTotalPaise = completedSales.reduce((sum, s) => sum + BigInt(s.totalPaise), 0n);
     const salesRefundsPaise = saleReversals
         .filter((r) => r.reversalType === 'REFUND')
-        .reduce((sum, r) => sum + Number(r.amountPaise), 0);
+        .reduce((sum, r) => sum + BigInt(r.amountPaise), 0n);
     const salesCancellationsPaise = saleReversals
         .filter((r) => r.reversalType === 'CANCEL')
-        .reduce((sum, r) => sum + Number(r.amountPaise), 0);
+        .reduce((sum, r) => sum + BigInt(r.amountPaise), 0n);
     const netSalesPaise = salesTotalPaise - salesRefundsPaise;
 
     // Expenses (completed only for P&L; report cancellations separately)
     const completedExpenses = expenses.filter((e) => e.status === 'completed');
-    const expensesTotalPaise = completedExpenses.reduce((sum, e) => sum + Number(e.amountPaise), 0);
+    const expensesTotalPaise = completedExpenses.reduce((sum, e) => sum + BigInt(e.amountPaise), 0n);
     const expensesCancelledPaise = expenses
         .filter((e) => e.status === 'cancelled')
-        .reduce((sum, e) => sum + Number(e.amountPaise), 0);
+        .reduce((sum, e) => sum + BigInt(e.amountPaise), 0n);
 
     // Rental revenue: earned rent for returned lines + overdue + damage, in period
     const rentalEarnedPaise = await rentalRevenueInPeriod(f, t);
@@ -152,16 +152,16 @@ export const getSalesReport = async ({ from, to }) => {
         refundedPaise: String(
             (sale.reversals || [])
                 .filter((r) => r.reversalType === 'REFUND')
-                .reduce((sum, r) => sum + Number(r.amountPaise), 0)
+                .reduce((sum, r) => sum + BigInt(r.amountPaise), 0n)
         ),
     }));
 
     const totals = {
         count: rows.length,
-        grossPaise: String(rows.reduce((sum, r) => sum + Number(r.totalPaise), 0)),
-        refundedPaise: String(rows.reduce((sum, r) => sum + Number(r.refundedPaise), 0)),
+        grossPaise: String(rows.reduce((sum, r) => sum + BigInt(r.totalPaise), 0n)),
+        refundedPaise: String(rows.reduce((sum, r) => sum + BigInt(r.refundedPaise), 0n)),
         netPaise: String(
-            rows.reduce((sum, r) => sum + Number(r.totalPaise) - Number(r.refundedPaise), 0)
+            rows.reduce((sum, r) => sum + BigInt(r.totalPaise) - BigInt(r.refundedPaise), 0n)
         ),
         unitsSold: rows.reduce((sum, r) => sum + r.units, 0),
     };
@@ -184,23 +184,23 @@ export const getRentalsReport = async ({ from, to }) => {
     });
 
     const statusCounts = { active: 0, completed: 0, cancelled: 0 };
-    let earnedPaise = 0;
-    let overdueChargePaise = 0;
-    let damageChargePaise = 0;
+    let earnedPaise = 0n;
+    let overdueChargePaise = 0n;
+    let damageChargePaise = 0n;
 
     const rows = agreements.map((agreement) => {
         statusCounts[agreement.status] = (statusCounts[agreement.status] || 0) + 1;
 
-        let agreementEarned = 0;
-        let agreementOverdue = 0;
-        let agreementDamage = 0;
+        let agreementEarned = 0n;
+        let agreementOverdue = 0n;
+        let agreementDamage = 0n;
 
         for (const line of agreement.lines || []) {
             for (const ret of line.returns || []) {
                 const rentedDays = daysBetween(agreement.startDate, ret.actualReturnDate);
-                agreementEarned += rentedDays * Number(line.rentPerDayPaise);
-                agreementOverdue += Number(ret.overdueChargePaise);
-                agreementDamage += Number(ret.damageChargePaise);
+                agreementEarned += BigInt(rentedDays) * BigInt(line.rentPerDayPaise);
+                agreementOverdue += BigInt(ret.overdueChargePaise);
+                agreementDamage += BigInt(ret.damageChargePaise);
             }
         }
         earnedPaise += agreementEarned;
@@ -221,7 +221,7 @@ export const getRentalsReport = async ({ from, to }) => {
             cancelledPaise: String(
                 (agreement.reversals || [])
                     .filter((r) => r.reversalType === 'CANCEL')
-                    .reduce((sum, r) => sum + Number(r.amountPaise), 0)
+                    .reduce((sum, r) => sum + BigInt(r.amountPaise), 0n)
             ),
         };
     });
@@ -263,16 +263,16 @@ export const getExpensesReport = async ({ from, to, category }) => {
     const byCategory = {};
     for (const row of rows) {
         if (row.status !== 'completed') continue;
-        byCategory[row.category] = (byCategory[row.category] || 0) + Number(row.amountPaise);
+        byCategory[row.category] = (byCategory[row.category] || 0n) + BigInt(row.amountPaise);
     }
     const categoryTotals = Object.entries(byCategory)
         .map(([name, total]) => ({ category: name, totalPaise: String(total) }))
-        .sort((a, b) => Number(b.totalPaise) - Number(a.totalPaise));
+        .sort((a, b) => (BigInt(b.totalPaise) > BigInt(a.totalPaise) ? 1 : BigInt(b.totalPaise) < BigInt(a.totalPaise) ? -1 : 0));
 
     const totals = {
         count: rows.length,
-        grossPaise: String(rows.reduce((sum, r) => sum + Number(r.amountPaise), 0)),
-        takenPaise: String(rows.filter((r) => r.status === 'completed').reduce((sum, r) => sum + Number(r.amountPaise), 0)),
+        grossPaise: String(rows.reduce((sum, r) => sum + BigInt(r.amountPaise), 0n)),
+        takenPaise: String(rows.filter((r) => r.status === 'completed').reduce((sum, r) => sum + BigInt(r.amountPaise), 0n)),
         categoryTotals,
     };
 
@@ -335,14 +335,14 @@ async function rentalRevenueInPeriod(from, to) {
         attributes: ['actualReturnDate', 'overdueChargePaise', 'damageChargePaise'],
     });
 
-    let earned = 0;
+    let earned = 0n;
     for (const ret of returns) {
         const startDate = ret.line && ret.line.agreement ? ret.line.agreement.startDate : null;
         if (!startDate || !dateInRange(startDate, from, to)) continue;
         const rentedDays = Math.max(1, daysBetween(startDate, ret.actualReturnDate));
-        earned += rentedDays * Number(ret.line.rentPerDayPaise);
-        earned += Number(ret.overdueChargePaise);
-        earned += Number(ret.damageChargePaise);
+        earned += BigInt(rentedDays) * BigInt(ret.line.rentPerDayPaise);
+        earned += BigInt(ret.overdueChargePaise);
+        earned += BigInt(ret.damageChargePaise);
     }
     return earned;
 }
@@ -395,7 +395,7 @@ export const getTripPnlReport = async () => {
     for (const stock of stocks) {
         const tripId = stock.tripId;
         (stockIdsByTrip[tripId] = stockIdsByTrip[tripId] || []).push(stock.id);
-        costByTrip[tripId] = (costByTrip[tripId] || 0) + Number(stock.quantity) * Number(stock.buyingPricePaise);
+        costByTrip[tripId] = (costByTrip[tripId] || 0n) + BigInt(stock.quantity) * BigInt(stock.buyingPricePaise);
     }
 
     const revenueByTrip = {};
@@ -404,7 +404,7 @@ export const getTripPnlReport = async () => {
         const stockId = line.unit ? line.unit.stockId : null;
         const tripId = stockId && Object.keys(stockIdsByTrip).find((t) => stockIdsByTrip[t].includes(stockId));
         if (tripId) {
-            revenueByTrip[tripId] = (revenueByTrip[tripId] || 0) + Number(line.sellingPricePaise);
+            revenueByTrip[tripId] = (revenueByTrip[tripId] || 0n) + BigInt(line.sellingPricePaise);
         }
     }
 
@@ -416,16 +416,16 @@ export const getTripPnlReport = async () => {
         const tripId = Object.keys(stockIdsByTrip).find((t) => stockIdsByTrip[t].includes(stockId));
         if (!tripId) continue;
         const rentedDays = Math.max(1, daysBetween(startDate, ret.actualReturnDate));
-        rentalEarnedByTrip[tripId] = (rentalEarnedByTrip[tripId] || 0)
-            + rentedDays * Number(ret.line.rentPerDayPaise)
-            + Number(ret.overdueChargePaise)
-            + Number(ret.damageChargePaise);
+        rentalEarnedByTrip[tripId] = (rentalEarnedByTrip[tripId] || 0n)
+            + BigInt(rentedDays) * BigInt(ret.line.rentPerDayPaise)
+            + BigInt(ret.overdueChargePaise)
+            + BigInt(ret.damageChargePaise);
     }
 
     const rows = trips.map((trip) => {
-        const costPaise = costByTrip[trip.id] || 0;
-        const revenuePaise = revenueByTrip[trip.id] || 0;
-        const rentalPaise = rentalEarnedByTrip[trip.id] || 0;
+        const costPaise = costByTrip[trip.id] || 0n;
+        const revenuePaise = revenueByTrip[trip.id] || 0n;
+        const rentalPaise = rentalEarnedByTrip[trip.id] || 0n;
         return {
             tripUuid: trip.uuid,
             tripName: trip.name,
@@ -481,7 +481,7 @@ export const getVendorSellThroughReport = async () => {
         const vendorId = line.unit ? stockVendor[line.unit.stockId] : null;
         if (!vendorId) continue;
         soldByVendor[vendorId] = (soldByVendor[vendorId] || 0) + 1;
-        salesRevenueByVendor[vendorId] = (salesRevenueByVendor[vendorId] || 0) + Number(line.sellingPricePaise);
+        salesRevenueByVendor[vendorId] = (salesRevenueByVendor[vendorId] || 0n) + BigInt(line.sellingPricePaise);
     }
 
     const rentedByVendor = {};
@@ -495,10 +495,10 @@ export const getVendorSellThroughReport = async () => {
             const startDate = rline.agreement ? rline.agreement.startDate : null;
             if (!startDate) continue;
             const rentedDays = Math.max(1, daysBetween(startDate, ret.actualReturnDate));
-            rentalDaysByVendor[vendorId] = (rentalDaysByVendor[vendorId] || 0)
-                + rentedDays * Number(rline.rentPerDayPaise)
-                + Number(ret.overdueChargePaise)
-                + Number(ret.damageChargePaise);
+            rentalDaysByVendor[vendorId] = (rentalDaysByVendor[vendorId] || 0n)
+                + BigInt(rentedDays) * BigInt(rline.rentPerDayPaise)
+                + BigInt(ret.overdueChargePaise)
+                + BigInt(ret.damageChargePaise);
         }
     }
 
@@ -507,8 +507,8 @@ export const getVendorSellThroughReport = async () => {
         vendorName: vendor.name,
         unitsSold: soldByVendor[vendor.id] || 0,
         unitsRented: rentedByVendor[vendor.id] || 0,
-        salesRevenuePaise: String(salesRevenueByVendor[vendor.id] || 0),
-        rentalEarnedPaise: String(rentalDaysByVendor[vendor.id] || 0),
+        salesRevenuePaise: String(salesRevenueByVendor[vendor.id] || 0n),
+        rentalEarnedPaise: String(rentalDaysByVendor[vendor.id] || 0n),
     }));
 
     return { rows };
@@ -591,11 +591,10 @@ export const getMarginsReport = async () => {
     const buckets = { trip: {}, vendor: {}, productType: {} };
 
     for (const unit of units) {
-        const buying = Number(unit.buyingPricePaise);
-        const selling = Number(unit.sellingPricePaise);
-        if (selling <= 0) continue;
+        const buying = BigInt(unit.buyingPricePaise);
+        const selling = BigInt(unit.sellingPricePaise);
+        if (selling <= 0n) continue;
         const margin = selling - buying;
-        const pct = (margin / selling) * 100;
 
         if (unit.stock) {
             pushMargin(buckets.trip, unit.stock.tripId, { label: `Trip ${unit.stock.tripId}`, margin, selling });
@@ -607,13 +606,21 @@ export const getMarginsReport = async () => {
 
     const finalize = (bucket) =>
         Object.entries(bucket)
-            .map(([key, agg]) => ({
-                key,
-                label: agg.label,
-                avgMarginPaise: String(Math.round(agg.marginSum / agg.count)),
-                avgMarginPct: Number((agg.marginSum / agg.sellingSum * 100).toFixed(1)),
-                units: agg.count,
-            }))
+            .map(([key, agg]) => {
+                const avgMarginPaise = agg.count > 0
+                    ? String(agg.marginSum / BigInt(agg.count) + ((agg.marginSum % BigInt(agg.count)) * 2n >= BigInt(agg.count) ? 1n : 0n))
+                    : '0';
+                const avgMarginPct = agg.sellingSum > 0n
+                    ? Number((agg.marginSum * 10000n / agg.sellingSum + 5n) / 10n) / 10
+                    : 0;
+                return {
+                    key,
+                    label: agg.label,
+                    avgMarginPaise,
+                    avgMarginPct,
+                    units: agg.count,
+                };
+            })
             .sort((a, b) => b.avgMarginPct - a.avgMarginPct);
 
     return {
@@ -625,7 +632,7 @@ export const getMarginsReport = async () => {
 
 function pushMargin(bucket, key, { label, margin, selling }) {
     if (key === null || key === undefined) return;
-    const agg = (bucket[key] = bucket[key] || { label, marginSum: 0, sellingSum: 0, count: 0 });
+    const agg = (bucket[key] = bucket[key] || { label, marginSum: 0n, sellingSum: 0n, count: 0 });
     agg.marginSum += margin;
     agg.sellingSum += selling;
     agg.count += 1;

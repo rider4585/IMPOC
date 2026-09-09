@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
+const MAX_SAFE_MONEY = Number.MAX_SAFE_INTEGER;
+
 const uuidSchema = z.string().uuid('Invalid UUID format');
 
 const paiseSchema = z
     .number()
     .int('Amount must be an integer')
     .min(0, 'Amount cannot be negative')
-    .max(9223372036854775807, 'Amount exceeds maximum BIGINT value');
+    .max(MAX_SAFE_MONEY, 'Amount exceeds maximum safe integer value');
 
 export const tripVendorBillSchema = z.object({
     vendorUuid: uuidSchema,

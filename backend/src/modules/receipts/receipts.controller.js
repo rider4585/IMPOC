@@ -1,5 +1,6 @@
 import { receiptQuerySchema } from './receipts.validation.js';
 import { buildReceipt, buildReceiptText } from './receipts.service.js';
+import { isPrivilegedActor } from '../users/user-role.service.js';
 
 /**
  * GET /api/receipts/preview?entityType=SALE|RENTAL&entityUuid=<uuid>
@@ -7,7 +8,8 @@ import { buildReceipt, buildReceiptText } from './receipts.service.js';
 export const previewReceipt = async (req, res, next) => {
     try {
         const query = receiptQuerySchema.parse(req.query);
-        const receipt = await buildReceipt({ entityType: query.entityType, entityUuid: query.entityUuid });
+        const isPrivileged = await isPrivilegedActor(req.auth.userUuid);
+        const receipt = await buildReceipt({ entityType: query.entityType, entityUuid: query.entityUuid, isPrivileged });
 
         if (!receipt) {
             return res.status(404).json({
@@ -28,7 +30,8 @@ export const previewReceipt = async (req, res, next) => {
 export const printReceipt = async (req, res, next) => {
     try {
         const query = receiptQuerySchema.parse(req.query);
-        const text = await buildReceiptText({ entityType: query.entityType, entityUuid: query.entityUuid });
+        const isPrivileged = await isPrivilegedActor(req.auth.userUuid);
+        const text = await buildReceiptText({ entityType: query.entityType, entityUuid: query.entityUuid, isPrivileged });
 
         if (text === null) {
             return res.status(404).json({

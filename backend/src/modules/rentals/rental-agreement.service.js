@@ -207,7 +207,7 @@ const createRentalOnce = async ({ customerName, customerUuid, startDate, rentalD
         const agreementNumber = await nextAgreementNumber(transaction);
 
         // Snapshot of total deposit collected at hand-out (never mutated)
-        const depositRefundablePaise = units.reduce((sum, u) => sum + Number(u.depositPaise), 0);
+        const depositRefundablePaise = Number(units.reduce((sum, u) => sum + BigInt(u.depositPaise), 0n));
 
         const agreement = await RentalAgreement.create(
             {
@@ -432,13 +432,14 @@ export const processRentalReturn = async ({ uuid, actualReturnDate, items, actor
 
             // Derived overdue: never stored as a mutable field
             const lateDays = Math.max(0, daysBetween(agreement.dueDate, returnDate));
-            const overdueChargePaise = lateDays * Number(line.overduePerDayPaise);
+            const overdueChargePaise = Number(BigInt(lateDays) * BigInt(line.overduePerDayPaise));
 
             // Damage charge is decided per item at return time; defaults to 0
-            const damageChargePaise = item.damageChargePaise !== undefined ? Number(item.damageChargePaise) : 0;
+            const damageChargePaise = item.damageChargePaise !== undefined ? Number(BigInt(item.damageChargePaise)) : 0;
 
             // Deposit actually refunded = deposit - overdue - damage, min 0
-            const depositRefundedPaise = Math.max(0, Number(line.depositPaise) - overdueChargePaise - damageChargePaise);
+            const refundable = BigInt(line.depositPaise) - BigInt(overdueChargePaise) - BigInt(damageChargePaise);
+            const depositRefundedPaise = Number(refundable > 0n ? refundable : 0n);
 
             let to;
             let cause = 'RETURN';

@@ -57,19 +57,29 @@ function rentalDaysBetween(fromStr, toStr) {
     return Math.max(1, Math.round((to - from) / 86400000));
 }
 
-function customerBlock(entity) {
+function customerBlock(entity, isPrivileged = false) {
     if (entity.customer) {
+        if (isPrivileged) {
+            return {
+                name: entity.customer.name,
+                phone: entity.customer.phone,
+                email: entity.customer.email,
+            };
+        }
         return {
             name: entity.customer.name,
-            phone: entity.customer.phone,
-            email: entity.customer.email,
         };
     }
     if (entity.customerName || entity.customerMobile) {
+        if (isPrivileged) {
+            return {
+                name: entity.customerName || null,
+                phone: entity.customerMobile || null,
+                email: null,
+            };
+        }
         return {
             name: entity.customerName || null,
-            phone: entity.customerMobile || null,
-            email: null,
         };
     }
     return null;
@@ -79,7 +89,7 @@ function customerBlock(entity) {
  * Build the structured receipt payload for a sale.
  * Totals are always recomputed from unit price snapshots on the lines.
  */
-async function buildSaleReceipt(uuid) {
+async function buildSaleReceipt(uuid, isPrivileged = false) {
     const sale = await Sale.findOne({
         where: { uuid, deletedAt: null },
         ...SALE_FIND_OPTIONS,
@@ -87,7 +97,7 @@ async function buildSaleReceipt(uuid) {
     if (!sale) return null;
 
     const lines = (sale.lines || []).map((line) => {
-        const unitPrice = Number(line.sellingPricePaise) || 0;
+        const unitPrice = BigInt(line.sellingPricePaise || 0);
         const unit = line.unit;
         return {
             productName: productTypeName(line),
@@ -100,11 +110,11 @@ async function buildSaleReceipt(uuid) {
         };
     });
 
-    const subtotalPaise = lines.reduce((sum, l) => sum + Number(l.lineTotalPaise), 0);
-    const discountPaise = 0;
+    const subtotalPaise = lines.reduce((sum, l) => sum + BigInt(l.lineTotalPaise), 0n);
+    const discountPaise = 0n;
     const totalPaise = subtotalPaise - discountPaise;
     const amountPaidPaise = totalPaise;
-    const balancePaise = 0;
+    const balancePaise = 0n;
 
     return {
         store: storeInfo(),
@@ -118,7 +128,7 @@ async function buildSaleReceipt(uuid) {
             changePaise: '0',
             status: sale.status,
         },
-        customer: customerBlock(sale),
+        customer: customerBlock(sale, isPrivileged),
         lines,
         totals: {
             subtotalPaise: String(subtotalPaise),
@@ -135,7 +145,7 @@ async function buildSaleReceipt(uuid) {
  * Build the structured receipt payload for a rental agreement.
  * Line totals = deposit + rent for the hand-out period (start -> due).
  */
-async function buildRentalReceipt(uuid) {
+async function buildRentalReceipt(uuid, isPrivileged = false) {
     const agreement = await RentalAgreement.findOne({
         where: { uuid, deletedAt: null },
         ...RENTAL_FIND_OPTIONS,
@@ -146,9 +156,9 @@ async function buildRentalReceipt(uuid) {
 
     const lines = (agreement.lines || []).map((line) => {
         const unit = line.unit;
-        const rentPerDay = Number(line.rentPerDayPaise) || 0;
-        const deposit = Number(line.depositPaise) || 0;
-        const rentTotal = rentPerDay * days;
+        const rentPerDay = BigInt(line.rentPerDayPaise || 0);
+        const deposit = BigInt(line.depositPaise || 0);
+        const rentTotal = rentPerDay * BigInt(days);
         return {
             productName: productTypeName(line),
             productType: productCategory(unit),
@@ -160,15 +170,15 @@ async function buildRentalReceipt(uuid) {
         };
     });
 
-    const rentTotalPaise = lines.reduce((sum, l) => sum + Number(l.lineTotalPaise), 0);
+    const rentTotalPaise = lines.reduce((sum, l) => sum + BigInt(l.lineTotalPaise), 0n);
     const depositTotalPaise = (agreement.lines || []).reduce(
-        (sum, line) => sum + (Number(line.depositPaise) || 0),
-        0
+        (sum, line) => sum + BigInt(line.depositPaise || 0),
+        0n
     );
     const rentOnlyPaise = rentTotalPaise - depositTotalPaise;
-    const discountPaise = 0;
+    const discountPaise = 0n;
     const balancePaise = rentOnlyPaise;
-    const amountPaidPaise = Number(agreement.depositRefundablePaise) || 0;
+    const amountPaidPaise = BigInt(agreement.depositRefundablePaise || 0);
 
     return {
         store: storeInfo(),
@@ -182,7 +192,7 @@ async function buildRentalReceipt(uuid) {
             changePaise: '0',
             status: agreement.status,
         },
-        customer: customerBlock(agreement),
+        customer: customerBlock(agreement, isPrivileged),
         lines,
         totals: {
             subtotalPaise: String(rentOnlyPaise),
@@ -197,7 +207,10 @@ async function buildRentalReceipt(uuid) {
 
 /** Paise -> "1234.56" */
 function paiseToRupees(paise) {
-    return (Number(paise) / 100).toFixed(2);
+    const b = BigInt(paise);
+    const rupees = Number(b / 100n);
+    const paisePart = Number(b % 100n);
+    return `${rupees}.${String(paisePart).padStart(2, '0')}`;
 }
 
 function padRight(text, width) {
@@ -257,7 +270,7 @@ function renderTextReceipt(receipt) {
     if (receipt.totals && typeof receipt.totals.subtotalPaise === 'string') {
         out.push(padRight('Subtotal', W - 10) + padLeft(paiseToRupees(receipt.totals.subtotalPaise), 10));
     }
-    if (receipt.totals && typeof receipt.totals.discountPaise === 'string' && Number(receipt.totals.discountPaise) > 0) {
+    if (receipt.totals && typeof receipt.totals.discountPaise === 'string' && BigInt(receipt.totals.discountPaise) > 0n) {
         out.push(padRight('Discount', W - 10) + padLeft(paiseToRupees(receipt.totals.discountPaise), 10));
     }
     out.push(padRight('TOTAL', W - 10) + padLeft(paiseToRupees(receipt.totals.totalPaise), 10));
@@ -284,12 +297,12 @@ function renderTextReceipt(receipt) {
 /**
  * Build a receipt for a sale or rental and return the structured payload.
  */
-export const buildReceipt = async ({ entityType, entityUuid }) => {
+export const buildReceipt = async ({ entityType, entityUuid, isPrivileged = false }) => {
     if (entityType === 'SALE') {
-        return buildSaleReceipt(entityUuid);
+        return buildSaleReceipt(entityUuid, isPrivileged);
     }
     if (entityType === 'RENTAL') {
-        return buildRentalReceipt(entityUuid);
+        return buildRentalReceipt(entityUuid, isPrivileged);
     }
     return null;
 };
@@ -297,8 +310,8 @@ export const buildReceipt = async ({ entityType, entityUuid }) => {
 /**
  * Build a receipt and return its 58mm plain-text rendering.
  */
-export const buildReceiptText = async ({ entityType, entityUuid }) => {
-    const receipt = await buildReceipt({ entityType, entityUuid });
+export const buildReceiptText = async ({ entityType, entityUuid, isPrivileged = false }) => {
+    const receipt = await buildReceipt({ entityType, entityUuid, isPrivileged });
     if (!receipt) return null;
     return renderTextReceipt(receipt);
 };

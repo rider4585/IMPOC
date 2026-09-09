@@ -221,8 +221,8 @@ export function computeVarianceForTrip(totalPaidPaise, stocks) {
     }
 
     const stockSum = stocks.reduce((sum, stock) => {
-        return sum + (stock.quantity * Number(stock.buyingPricePaise));
-    }, 0);
+        return sum + (BigInt(stock.quantity) * BigInt(stock.buyingPricePaise));
+    }, 0n);
 
     return totalPaidPaise - stockSum;
 }
@@ -257,7 +257,7 @@ function mapVendorHistoryDTO(vendor) {
         stocks = stocks.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
         // Compute variance for this vendor's bill on this trip
-        const variancePaise = computeVarianceForTrip(Number(tv.totalPaidPaise), stocks);
+        const variancePaise = computeVarianceForTrip(BigInt(tv.totalPaidPaise), stocks);
 
         return {
             uuid: tv.trip?.uuid || tv.uuid,

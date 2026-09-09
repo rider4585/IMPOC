@@ -90,9 +90,9 @@ export const listTrips = async () => {
         group: ['tripId'],
         raw: true,
     });
-    const sumByTrip = new Map(stockSums.map((row) => [row.tripId, Number(row.buyingSum) || 0]));
+    const sumByTrip = new Map(stockSums.map((row) => [row.tripId, row.buyingSum != null ? BigInt(row.buyingSum) : 0n]));
 
-    return trips.map((trip) => mapTripDTO(trip, sumByTrip.get(trip.id) || 0));
+    return trips.map((trip) => mapTripDTO(trip, sumByTrip.get(trip.id) ?? 0n));
 };
 
 /**
@@ -153,7 +153,7 @@ export const createTrip = async ({ name, purchasedOn, notes, vendors = [] }) => 
 
         await transaction.commit();
 
-        const totalPaidPaise = createdVendors.reduce((sum, tv) => sum + Number(tv.totalPaidPaise), 0);
+        const totalPaidPaise = createdVendors.reduce((sum, tv) => sum + BigInt(tv.totalPaidPaise), 0n);
 
         return {
             uuid: trip.uuid,
@@ -161,8 +161,8 @@ export const createTrip = async ({ name, purchasedOn, notes, vendors = [] }) => 
             purchasedOn: trip.purchasedOn,
             notes: trip.notes,
             status: trip.status,
-            totalPaidPaise: Number(totalPaidPaise),
-            variancePaise: Number(totalPaidPaise),
+            totalPaidPaise: String(totalPaidPaise),
+            variancePaise: String(totalPaidPaise),
             vendors: createdVendors,
             createdAt: trip.createdAt,
             updatedAt: trip.updatedAt,
@@ -394,7 +394,7 @@ export const getLastStockForTrip = async (tripUuid) => {
  */
 function mapTripDTO(trip, stockBuyingSum) {
     const tripVendors = trip.tripVendors || [];
-    const totalPaidPaise = tripVendors.reduce((sum, tv) => sum + Number(tv.totalPaidPaise), 0);
+    const totalPaidPaise = tripVendors.reduce((sum, tv) => sum + BigInt(tv.totalPaidPaise), 0n);
 
     let buyingSum;
     if (stockBuyingSum !== null) {
@@ -402,10 +402,10 @@ function mapTripDTO(trip, stockBuyingSum) {
     } else {
         buyingSum = (trip.stocks || []).reduce((sum, s) => {
             const cost = s.wholeBuyingPricePaise != null
-                ? Number(s.wholeBuyingPricePaise)
-                : (s.quantity * Number(s.buyingPricePaise));
+                ? BigInt(s.wholeBuyingPricePaise)
+                : (BigInt(s.quantity) * BigInt(s.buyingPricePaise));
             return sum + cost;
-        }, 0);
+        }, 0n);
     }
 
     const dto = {
@@ -414,13 +414,13 @@ function mapTripDTO(trip, stockBuyingSum) {
         purchasedOn: trip.purchasedOn,
         notes: trip.notes,
         status: trip.status,
-        totalPaidPaise: Number(totalPaidPaise),
-        variancePaise: Number(totalPaidPaise - buyingSum),
+        totalPaidPaise: String(totalPaidPaise),
+        variancePaise: String(totalPaidPaise - buyingSum),
         vendorSummary: tripVendors.map((tv) => ({
             vendorUuid: tv.vendor?.uuid || null,
             vendorName: tv.vendor?.name || null,
             billReference: tv.billReference,
-            totalPaidPaise: Number(tv.totalPaidPaise),
+            totalPaidPaise: String(tv.totalPaidPaise),
         })),
         createdAt: trip.createdAt,
         updatedAt: trip.updatedAt,
@@ -448,7 +448,7 @@ function mapTripVendorDTO(tripVendor, vendor, tripUuid) {
         vendorUuid: vendor?.uuid || null,
         vendorName: vendor?.name || null,
         billReference: tripVendor.billReference,
-        totalPaidPaise: Number(tripVendor.totalPaidPaise),
+        totalPaidPaise: String(tripVendor.totalPaidPaise),
         notes: tripVendor.notes,
         receiptImage: tripVendor.receiptImage ?? null,
         createdAt: tripVendor.createdAt,
