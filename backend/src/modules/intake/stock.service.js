@@ -1,5 +1,7 @@
 import { Stock, Trip, TripVendor, Vendor, ProductType, Unit, Colour, Size, sequelize } from '../../../database/models/index.js';
 import { Sequelize } from 'sequelize';
+import { userHasPermission } from '../auth/permission.service.js';
+import { PERMISSIONS } from '../../constants/permissions.js';
 
 const STOCK_INCLUDES = [
     {
@@ -25,10 +27,17 @@ const STOCK_INCLUDES = [
 ];
 
 /**
- * Verify that the given trip exists (access check for nested stock routes)
+ * Verify that the given user has access to the given trip
+ *
+ * The app is single-tenant (trips carry no owner/user tenant column), so the
+ * "ownership" boundary is the permission boundary: only a user holding
+ * INVENTORY.VIEW may resolve trips at all (defense in depth on top of the
+ * route-level authorize() guards). An unknown trip stays a 404 so callers
+ * lacking permission cannot probe whether a trip exists.
  * @param {string} tripUuid - Trip UUID to verify access to
  * @param {Object} user - User object from authentication middleware
  * @throws {Error} with statusCode 404 if trip not found
+ * @throws {Error} with statusCode 403 if user lacks INVENTORY.VIEW
  */
 export const verifyTripAccess = async (tripUuid, user) => {
     const trip = await Trip.findOne({
@@ -38,6 +47,20 @@ export const verifyTripAccess = async (tripUuid, user) => {
     if (!trip) {
         const error = new Error('Trip not found');
         error.statusCode = 404;
+        throw error;
+    }
+
+    if (user == null || user.uuid == null) {
+        const error = new Error('Authentication required');
+        error.statusCode = 401;
+        throw error;
+    }
+
+    const hasViewPermission = await userHasPermission(user.uuid, PERMISSIONS.INVENTORY.VIEW);
+
+    if (!hasViewPermission) {
+        const error = new Error('Forbidden');
+        error.statusCode = 403;
         throw error;
     }
 };
@@ -380,6 +403,7 @@ export const updateStock = async (tripUuid, stockUuid, updates) => {
  * A successful scan inserts both a units row and its first unit_status_events row atomically
  *
  * @param {Object} params
+ * @param {string} params.tripUuid - Trip UUID the stock must belong to (from the URL)
  * @param {string} params.stockUuid - Stock UUID
  * @param {string} params.barcode - Barcode to scan (1-12 chars)
  * @param {string} params.colourUuid - Colour UUID
@@ -389,6 +413,7 @@ export const updateStock = async (tripUuid, stockUuid, updates) => {
  * @throws {Error} with statusCode property for HTTP mapping
  */
 export const scanIntoStock = async ({
+    tripUuid,
     stockUuid,
     barcode,
     colourUuid,
@@ -407,9 +432,18 @@ export const scanIntoStock = async ({
     try {
         const { createUnitFromScan } = await import('../units/units.service.js');
 
-        // Resolve stock by UUID
+        // Resolve stock by UUID, but ONLY within the trip named in the URL
+        // (SEC-H-4: a stock that exists elsewhere must not be reachable by UUID alone).
         const stock = await Stock.findOne({
             where: { uuid: stockUuid },
+            include: [
+                {
+                    model: Trip,
+                    as: 'trip',
+                    where: { uuid: tripUuid },
+                    required: true,
+                },
+            ],
             transaction,
         });
 

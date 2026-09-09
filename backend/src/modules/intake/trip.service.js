@@ -1,5 +1,7 @@
 import { Trip, TripVendor, Vendor, Stock, ProductType, sequelize } from '../../../database/models/index.js';
 import { Sequelize } from 'sequelize';
+import { userHasPermission } from '../auth/permission.service.js';
+import { PERMISSIONS } from '../../constants/permissions.js';
 
 const STOCK_INCLUDE = (whereDeleted = { [Sequelize.Op.is]: null }) => ({
     model: Stock,
@@ -204,11 +206,17 @@ export const getTripByUuid = async (uuid) => {
 };
 
 /**
- * Verify that the user has access to the given trip
- * Currently, all authenticated users have access to all trips (can be enhanced with trip ownership)
+ * Verify that the given user has access to the given trip.
+ *
+ * The app is single-tenant (trips carry no owner/user tenant column), so the
+ * "ownership" boundary is the permission boundary: only a user holding
+ * INVENTORY.VIEW may resolve trips at all. An unknown trip stays a 404 so we
+ * never reveal whether a trip exists to a caller that merely lacks
+ * permission.
  * @param {string} tripUuid - Trip UUID to verify access to
  * @param {Object} user - User object from authentication middleware
  * @throws {Error} with statusCode 404 if trip not found
+ * @throws {Error} with statusCode 403 if user lacks INVENTORY.VIEW
  */
 export const verifyTripAccess = async (tripUuid, user) => {
     const trip = await Trip.findOne({
@@ -218,6 +226,20 @@ export const verifyTripAccess = async (tripUuid, user) => {
     if (!trip) {
         const error = new Error('Trip not found');
         error.statusCode = 404;
+        throw error;
+    }
+
+    if (user == null || user.uuid == null) {
+        const error = new Error('Authentication required');
+        error.statusCode = 401;
+        throw error;
+    }
+
+    const hasViewPermission = await userHasPermission(user.uuid, PERMISSIONS.INVENTORY.VIEW);
+
+    if (!hasViewPermission) {
+        const error = new Error('Forbidden');
+        error.statusCode = 403;
         throw error;
     }
 };

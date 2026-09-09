@@ -128,12 +128,18 @@ export const updateStock = async (req, res, next) => {
  */
 export const scanIntoStock = async (req, res, next) => {
     try {
+        assertUuid(req.params.tripUuid, 'trip');
         assertUuid(req.params.uuid, 'stock');
 
+        const { tripUuid } = req.params;
         const stockUuid = req.params.uuid;
         const data = scanIntoStockSchema.parse(req.body);
 
+        // Verify the caller may access the trip the URL claims (SEC-H-4)
+        await verifyTripAccess(tripUuid, req.user);
+
         const unit = await scanIntoStockService({
+            tripUuid,
             stockUuid,
             barcode: data.barcode,
             colourUuid: data.colourUuid,

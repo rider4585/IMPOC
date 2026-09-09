@@ -15,11 +15,11 @@ import {
 
 const router = express.Router();
 
-router.get('/', authenticate, getTemplates);
+router.get('/', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getTemplates);
 
 router.post('/', authenticate, authorize(PERMISSIONS.INVENTORY.CREATE), createTemplate);
 
-router.get('/:uuid', authenticate, getTemplateByUuid);
+router.get('/:uuid', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getTemplateByUuid);
 
 router.patch('/:uuid', authenticate, authorize(PERMISSIONS.INVENTORY.UPDATE), updateTemplate);
 

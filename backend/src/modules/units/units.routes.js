@@ -20,17 +20,17 @@ router.get('/', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), listAllUnit
 
 // GET /api/units/by-barcode/:barcode - Get unit by barcode
 // Must be before :uuid routes so it matches first
-router.get('/by-barcode/:barcode', authenticate, getUnitByBarcodeRoute);
+router.get('/by-barcode/:barcode', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getUnitByBarcodeRoute);
 
 // GET /api/units/:uuid/status-events - Get status events for a unit
 // Must be before /:uuid so it matches first
-router.get('/:uuid/status-events', authenticate, getStatusEvents);
+router.get('/:uuid/status-events', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getStatusEvents);
 
 // POST /api/units/:uuid/transition - Transition unit status via state machine
 // Must be before /:uuid so it matches first
 router.post('/:uuid/transition', authenticate, authorize(PERMISSIONS.INVENTORY.UPDATE), transitionUnitRoute);
 
 // GET /api/units/:uuid - Get unit by UUID
-router.get('/:uuid', authenticate, getUnit);
+router.get('/:uuid', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getUnit);
 
 export default router;

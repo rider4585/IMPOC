@@ -15,16 +15,16 @@ import {
 
 const router = express.Router();
 
-router.get('/', authenticate, getTrips);
+router.get('/', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getTrips);
 
 router.post('/', authenticate, authorize(PERMISSIONS.INVENTORY.CREATE), createTrip);
 
-router.get('/:tripUuid/clone-last-stock', authenticate, getCloneLastStock);
+router.get('/:tripUuid/clone-last-stock', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getCloneLastStock);
 
 router.post('/:uuid/vendors', authenticate, authorize(PERMISSIONS.INVENTORY.CREATE), addTripVendor);
 
 router.patch('/:uuid/vendors', authenticate, authorize(PERMISSIONS.INVENTORY.UPDATE), addTripVendor);
 
-router.get('/:uuid', authenticate, getTripByUuid);
+router.get('/:uuid', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getTripByUuid);
 
 export default router;

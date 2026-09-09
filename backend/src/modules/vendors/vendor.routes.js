@@ -15,13 +15,13 @@ import {
 
 const router = express.Router();
 
-router.get('/', authenticate, getVendors);
+router.get('/', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getVendors);
 
 router.post('/', authenticate, authorize(PERMISSIONS.INVENTORY.CREATE), createVendor);
 
-router.get('/:uuid/history', authenticate, getVendorHistory);
+router.get('/:uuid/history', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getVendorHistory);
 
-router.get('/:uuid', authenticate, getVendorByUuid);
+router.get('/:uuid', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getVendorByUuid);
 
 router.patch('/:uuid', authenticate, authorize(PERMISSIONS.INVENTORY.UPDATE), updateVendor);
 

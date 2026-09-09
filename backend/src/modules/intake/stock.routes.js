@@ -17,13 +17,13 @@ import {
 const router = express.Router({ mergeParams: true });
 
 // GET all stocks for a trip
-router.get('/', authenticate, getStocksByTrip);
+router.get('/', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getStocksByTrip);
 
 // POST to create a new stock
 router.post('/', authenticate, authorize(PERMISSIONS.INVENTORY.CREATE), createStock);
 
 // GET a specific stock by UUID
-router.get('/:uuid', authenticate, getStockByUuid);
+router.get('/:uuid', authenticate, authorize(PERMISSIONS.INVENTORY.VIEW), getStockByUuid);
 
 // POST to scan a unit into a stock
 router.post('/:uuid/scan', authenticate, authorize(PERMISSIONS.INVENTORY.CREATE), scanIntoStock);

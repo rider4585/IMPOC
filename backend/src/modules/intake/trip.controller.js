@@ -9,6 +9,7 @@ import {
     getTripByUuid as getTripByUuidService,
     addTripVendor as addTripVendorService,
     getLastStockForTrip as getLastStockForTripService,
+    verifyTripAccess,
 } from './trip.service.js';
 
 /**
@@ -131,6 +132,8 @@ export const getCloneLastStock = async (req, res, next) => {
         }
 
         const { tripUuid } = req.params;
+
+        await verifyTripAccess(tripUuid, req.user);
 
         const cloneStockData = await getLastStockForTripService(tripUuid);
 
