@@ -7,6 +7,8 @@ import {
 
 import { JWT_ALGORITHM } from '../modules/auth/token.service.js';
 
+import { USER_STATUS } from '../constants/user-status.js';
+
 const getRequiredEnv = (key) => {
     const value = process.env[key];
 
@@ -103,7 +105,7 @@ export const authenticate = async (req, res, next) => {
                 {
                     model: User,
                     as: 'user',
-                    attributes: ['id', 'uuid'],
+                    attributes: ['id', 'uuid', 'status'],
                 },
             ],
         });
@@ -135,6 +137,23 @@ export const authenticate = async (req, res, next) => {
         if (!session.user || session.user.uuid !== payload.sub) {
             const error = new Error(
                 'Invalid access token'
+            );
+            error.statusCode = 401;
+            throw error;
+        }
+
+        /*
+         * SEC-H-9: A suspended or deleted user must not keep using an access
+         * token or session that was issued before the status change. The
+         * refresh path already enforces this (auth-token.service.js), but the
+         * access-token path only checks the session -, so a deactivated user's
+         * still-live session/token would otherwise remain valid until expiry.
+         * Surface the identical 401 the refresh path returns for a non-ACTIVE
+         * account.
+         */
+        if (session.user.status !== USER_STATUS.ACTIVE) {
+            const error = new Error(
+                'Account is suspended'
             );
             error.statusCode = 401;
             throw error;

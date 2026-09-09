@@ -16,11 +16,15 @@ import {
 
 import { authenticate } from '../../middleware/auth.middleware.js';
 import { requireSpaHeader } from '../../middleware/require-spa-header.middleware.js';
+import {
+    ipLoginRateLimit,
+    accountLoginLockout,
+} from '../../middleware/rate-limit.middleware.js';
 
 const router = express.Router();
 
-router.post('/login', login);
-router.post('/refresh', requireSpaHeader, refresh);
+router.post('/login', ipLoginRateLimit, accountLoginLockout, login);
+router.post('/refresh', ipLoginRateLimit, requireSpaHeader, refresh);
 router.post('/logout', authenticate, requireSpaHeader, logout);
 router.post('/logout-all', authenticate, requireSpaHeader, logoutAll);
 router.get('/me', authenticate, getCurrentUser);
