@@ -68,6 +68,10 @@ const SAFE_4XX_MESSAGES = Object.freeze([
     'Overdue per day must be greater than rent per day',
     'At least one item is required',
     'At least one item',
+    'not in the payment methods picklist',
+    'not in the customer sources picklist',
+    'references unknown',
+    'is not in the picklist',
     // Barcode geometry / generation params
     'Pages must be a positive integer',
     'Pages cannot exceed',

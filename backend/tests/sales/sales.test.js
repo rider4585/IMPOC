@@ -261,7 +261,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: unit5.uuid }], paymentMethod: 'Credit Card' })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: unit5.uuid }], paymentMethod: 'Credit Card' })
                 .expect(400);
 
             expect(res.body.success).toBe(false);
@@ -272,7 +272,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: unit6.uuid }], customerSource: 'TikTok' })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: unit6.uuid }], customerSource: 'TikTok' })
                 .expect(400);
 
             expect(res.body.success).toBe(false);
@@ -285,7 +285,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: unit7.uuid }] })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: unit7.uuid }] })
                 .expect(201);
 
             expect(res.body.data.paymentMethod).toBe(null);

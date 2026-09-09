@@ -250,7 +250,7 @@ describe('Rental agreements module (T-10)', () => {
             const res = await request(testApp)
                 .post('/api/rentals')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: u6.uuid }], paymentMethod: 'UPI' })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: u6.uuid }], paymentMethod: 'UPI' })
                 .expect(400);
 
             expect(res.body.success).toBe(false);
@@ -262,7 +262,7 @@ describe('Rental agreements module (T-10)', () => {
             const res = await request(testApp)
                 .post('/api/rentals')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: u7.uuid }], customerSource: 'Print ad' })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: u7.uuid }], customerSource: 'Print ad' })
                 .expect(400);
 
             expect(res.body.success).toBe(false);
@@ -274,7 +274,7 @@ describe('Rental agreements module (T-10)', () => {
             const res = await request(testApp)
                 .post('/api/rentals')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: u8.uuid }] })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: u8.uuid }] })
                 .expect(201);
 
             expect(res.body.data.paymentMethod).toBe(null);
