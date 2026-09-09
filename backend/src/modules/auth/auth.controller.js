@@ -14,17 +14,58 @@ import { revokeAuthSession, revokeAllAuthSessions } from './auth-session.service
 
 import { getUserPermissions } from './permission.service.js';
 
+/*
+ * The refresh-token cookie is only ever read by the auth endpoints
+ * (/login sets it, /refresh rotates it, /logout + /logout-all clear it), so it
+ * is scoped to the auth prefix rather than the whole origin. A narrower path
+ * shrinks the surface over which the cookie is transmitted.
+ */
+const REFRESH_COOKIE_PATH = '/api/auth';
+
+/*
+ * SEC-H-10: secure-cookie policy for the refresh token.
+ *
+ * - secure defaults TRUE (fails safe) in every environment, not only production.
+ * - COOKIE_SECURE=false is the single documented override. It drops the Secure
+ *   flag AND permits issuing over plain HTTP — the escape hatch for a trusted
+ *   LAN-HTTP deployment. Without that override, we refuse to set the cookie in
+ *   production over plain HTTP: browsers will not send or store a Secure cookie
+ *   over http, so setting one there would silently break refresh while the token
+ *   also travels unencrypted.
+ */
+const refreshSecureEnabled = () => {
+    if (process.env.COOKIE_SECURE === 'false') {
+        return false;
+    }
+    return true;
+};
+
+const assertCookieTransportAllowed = (req) => {
+    if (
+        refreshSecureEnabled() &&
+        !req.secure &&
+        process.env.NODE_ENV === 'production'
+    ) {
+        const error = new Error(
+            'Secure refresh-token cookie requires HTTPS. Set COOKIE_SECURE=false only for a trusted LAN-HTTP deployment.'
+        );
+        error.statusCode = 500;
+        throw error;
+    }
+};
+
 // Refresh-token cookie options. The domain is intentionally NOT hardcoded to
 // 'localhost': a host-only cookie (no Domain attribute) works on localhost AND
 // on a LAN IP (e.g. 192.168.x.x:5173) when the app is reached from another
 // device. Set COOKIE_DOMAIN only when you need a shared/cross-host cookie.
-function cookieOptions(refreshToken, expiresAt) {
+function cookieOptions(req, refreshToken, expiresAt) {
+    assertCookieTransportAllowed(req);
     const isProduction = process.env.NODE_ENV === 'production';
     const opts = {
         httpOnly: true,
-        secure: isProduction,
+        secure: refreshSecureEnabled(),
         sameSite: isProduction ? 'strict' : 'lax',
-        path: '/',
+        path: REFRESH_COOKIE_PATH,
         expires: expiresAt,
     };
     if (process.env.COOKIE_DOMAIN) {
@@ -36,12 +77,12 @@ function cookieOptions(refreshToken, expiresAt) {
 // Options for clearing the refresh-token cookie. Must mirror cookieOptions
 // (path + optional domain + sameSite/secure) so the expiry directive matches
 // the cookie as it was set — otherwise a stale cookie survives logout.
-function cookieClearOptions() {
+function cookieClearOptions(req) {
     const isProduction = process.env.NODE_ENV === 'production';
     const opts = {
-        path: '/',
+        path: REFRESH_COOKIE_PATH,
         sameSite: isProduction ? 'strict' : 'lax',
-        secure: isProduction,
+        secure: refreshSecureEnabled(),
     };
     if (process.env.COOKIE_DOMAIN) {
         opts.domain = process.env.COOKIE_DOMAIN;
@@ -63,7 +104,7 @@ export const login = async (req, res, next) => {
 
         // Set refresh token as an httpOnly cookie
         try {
-            res.cookie('refreshToken', tokens.refreshToken, cookieOptions(tokens.refreshToken, tokens.expiresAt));
+            res.cookie('refreshToken', tokens.refreshToken, cookieOptions(req, tokens.refreshToken, tokens.expiresAt));
         } catch (cookieError) {
             const error = new Error('Failed to set refresh token cookie');
             error.statusCode = 500;
@@ -106,7 +147,7 @@ export const refresh = async (req, res, next) => {
 
         // Set new refresh token as an httpOnly cookie
         try {
-            res.cookie('refreshToken', tokens.refreshToken, cookieOptions(tokens.refreshToken, tokens.expiresAt));
+            res.cookie('refreshToken', tokens.refreshToken, cookieOptions(req, tokens.refreshToken, tokens.expiresAt));
         } catch (cookieError) {
             const error = new Error('Failed to set refresh token cookie');
             error.statusCode = 500;
@@ -129,7 +170,7 @@ export const logout = async (req, res, next) => {
     try {
         await revokeAuthSession(req.auth.sessionUuid);
 
-        res.clearCookie('refreshToken', cookieClearOptions());
+        res.clearCookie('refreshToken', cookieClearOptions(req));
 
         return res.status(200).json({
             success: true,
@@ -144,7 +185,7 @@ export const logoutAll = async (req, res, next) => {
     try {
         await revokeAllAuthSessions(req.auth.userUuid);
 
-        res.clearCookie('refreshToken', cookieClearOptions());
+        res.clearCookie('refreshToken', cookieClearOptions(req));
 
         return res.status(200).json({
             success: true,

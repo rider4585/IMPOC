@@ -5,6 +5,10 @@ import { initializeTestDatabase, cleanupTestDatabase, closeDatabase, generateTes
 import argon2 from 'argon2';
 import jwt from 'jsonwebtoken';
 import { validateJwtSecret, assertJwtSecrets } from '../../src/modules/auth/token.service.js';
+import {
+    resetLoginThrottling,
+} from '../../src/middleware/rate-limit.middleware.js';
+import { USER_STATUS } from '../../src/constants/user-status.js';
 
 describe('Auth Module - /api/auth', () => {
   let testDb;
@@ -786,9 +790,16 @@ describe('Auth Module - /api/auth', () => {
 
       expect(loginRes.statusCode).toBe(200);
 
-      const setCookieHeader = loginRes.headers['set-cookie'][0];
-      const refreshTokenMatch = setCookieHeader.match(/refreshToken=([^;]+)/);
-      const refreshTokenValue = refreshTokenMatch ? refreshTokenMatch[1] : null;
+      const refreshCookieValue = (res) => {
+        const header = res.headers['set-cookie'][0];
+        const match = header.match(/refreshToken=([^;]+)/);
+        return match ? match[1] : null;
+      };
+
+      // A refresh rotates the token, so each request must present the token
+      // from the previous response (the secure cookie is not echoed back over
+      // the plain-HTTP test transport).
+      let refreshTokenValue = refreshCookieValue(loginRes);
 
       // Test with lowercase variation - should now be accepted
       const res1 = await agent
@@ -798,6 +809,7 @@ describe('Auth Module - /api/auth', () => {
         .send({});
 
       expect(res1.statusCode).toBe(200);
+      refreshTokenValue = refreshCookieValue(res1);
 
       // Test with mixed case variation
       const res2 = await agent
@@ -807,6 +819,7 @@ describe('Auth Module - /api/auth', () => {
         .send({});
 
       expect(res2.statusCode).toBe(200);
+      refreshTokenValue = refreshCookieValue(res2);
 
       // Test with uppercase variation
       const res3 = await agent
@@ -841,9 +854,16 @@ describe('Auth Module - /api/auth', () => {
 
       expect(loginRes.statusCode).toBe(200);
 
-      const setCookieHeader = loginRes.headers['set-cookie'][0];
-      const refreshTokenMatch = setCookieHeader.match(/refreshToken=([^;]+)/);
-      const refreshTokenValue = refreshTokenMatch ? refreshTokenMatch[1] : null;
+      const refreshCookieValue = (res) => {
+        const header = res.headers['set-cookie'][0];
+        const match = header.match(/refreshToken=([^;]+)/);
+        return match ? match[1] : null;
+      };
+
+      // A refresh rotates the token, so each request must present the token
+      // from the previous response (the secure cookie is not echoed back over
+      // the plain-HTTP test transport).
+      let refreshTokenValue = refreshCookieValue(loginRes);
 
       // Test with leading whitespace - should now be accepted
       const res1 = await agent
@@ -853,6 +873,7 @@ describe('Auth Module - /api/auth', () => {
         .send({});
 
       expect(res1.statusCode).toBe(200);
+      refreshTokenValue = refreshCookieValue(res1);
 
       // Test with trailing whitespace
       const res2 = await agent
@@ -862,6 +883,7 @@ describe('Auth Module - /api/auth', () => {
         .send({});
 
       expect(res2.statusCode).toBe(200);
+      refreshTokenValue = refreshCookieValue(res2);
 
       // Test with both leading and trailing whitespace
       const res3 = await agent
@@ -1195,6 +1217,291 @@ describe('Auth Module - /api/auth', () => {
           process.env.JWT_REFRESH_SECRET = originalRefresh;
         }
       }
+    });
+  });
+
+  describe('SEC-H-1: login rate limiting + account lockout', () => {
+    const withEnv = async (env, fn) => {
+      const saved = {};
+      for (const key of Object.keys(env)) {
+        saved[key] = process.env[key];
+        process.env[key] = String(env[key]);
+      }
+      try {
+        await fn();
+      } finally {
+        for (const key of Object.keys(saved)) {
+          if (saved[key] === undefined) {
+            delete process.env[key];
+          } else {
+            process.env[key] = saved[key];
+          }
+        }
+        resetLoginThrottling();
+      }
+    };
+
+    const makeUser = async (overrides = {}) => {
+      const testUser = generateTestUser(overrides);
+      const passwordHash = await argon2.hash(testUser.password);
+      await db.User.create({
+        username: testUser.username,
+        email: testUser.email,
+        firstName: testUser.firstName,
+        lastName: testUser.lastName,
+        passwordHash,
+      });
+      return testUser;
+    };
+
+    it('locks an account after N failed logins and rejects even its correct password', async () => {
+      await withEnv({ LOGIN_ACCOUNT_MAX_FAILED: 3 }, async () => {
+        const testUser = await makeUser();
+
+        for (let i = 0; i < 3; i += 1) {
+          const fail = await request(app)
+            .post('/api/auth/login')
+            .send({ username: testUser.username, password: 'WrongPassword123!' });
+          expect(fail.statusCode).toBe(401);
+        }
+
+        // Account is now locked; the correct password must also be rejected (429).
+        const locked = await request(app)
+          .post('/api/auth/login')
+          .send({ username: testUser.username, password: testUser.password });
+        expect(locked.statusCode).toBe(429);
+        expect(locked.body.message).toMatch(/locked/i);
+      });
+    });
+
+    it('counts the account-not-found path toward the same lockout (no username enumeration bypass)', async () => {
+      await withEnv({ LOGIN_ACCOUNT_MAX_FAILED: 3 }, async () => {
+        // Use a username that never exists - each attempt is 401 "Invalid username or password".
+        const phantom = 'phantom_account_sec_h1';
+        resetLoginThrottling();
+
+        for (let i = 0; i < 3; i += 1) {
+          const fail = await request(app)
+            .post('/api/auth/login')
+            .send({ username: phantom, password: 'WrongPassword123!' });
+          expect(fail.statusCode).toBe(401);
+        }
+
+        const locked = await request(app)
+          .post('/api/auth/login')
+          .send({ username: phantom, password: 'Anything123!' });
+        expect(locked.statusCode).toBe(429);
+        expect(locked.body.message).toMatch(/locked/i);
+      });
+    });
+
+    it('resets the failure counter on a successful login', async () => {
+      await withEnv({ LOGIN_ACCOUNT_MAX_FAILED: 5 }, async () => {
+        const testUser = await makeUser();
+
+        // Two failures (counter = 2).
+        for (let i = 0; i < 2; i += 1) {
+          const fail = await request(app)
+            .post('/api/auth/login')
+            .send({ username: testUser.username, password: 'WrongPassword123!' });
+          expect(fail.statusCode).toBe(401);
+        }
+
+        // Successful login must reset the counter back to 0.
+        const ok = await request(app)
+          .post('/api/auth/login')
+          .send({ username: testUser.username, password: testUser.password });
+        expect(ok.statusCode).toBe(200);
+
+        // Four more failures (counter = 4) is still BELOW the threshold of 5, so
+        // the account must NOT be locked here. If the counter had not been reset
+        // by the successful login, it would be 2+4=6 and already locked.
+        for (let i = 0; i < 4; i += 1) {
+          const fail = await request(app)
+            .post('/api/auth/login')
+            .send({ username: testUser.username, password: 'WrongPassword123!' });
+          expect(fail.statusCode).toBe(401);
+        }
+
+        // The next failure pushes counter to 5 and locks the account.
+        await request(app)
+          .post('/api/auth/login')
+          .send({ username: testUser.username, password: 'WrongPassword123!' });
+
+        const locked = await request(app)
+          .post('/api/auth/login')
+          .send({ username: testUser.username, password: testUser.password });
+        expect(locked.statusCode).toBe(429);
+        expect(locked.body.message).toMatch(/locked/i);
+      });
+    });
+
+    it('applies a per-IP throttle on login attempts', async () => {
+      await withEnv({ LOGIN_IP_MAX: 3 }, async () => {
+        const testUser = await makeUser();
+
+        for (let i = 0; i < 3; i += 1) {
+          const r = await request(app)
+            .post('/api/auth/login')
+            .send({ username: testUser.username, password: 'WrongPassword123!' });
+          expect(r.statusCode).toBe(401);
+        }
+
+        // 4th attempt from the same IP (all supertest calls share 127.0.0.1) -> 429.
+        const throttled = await request(app)
+          .post('/api/auth/login')
+          .send({ username: testUser.username, password: 'WrongPassword123!' });
+        expect(throttled.statusCode).toBe(429);
+        expect(throttled.body.message).toMatch(/Too many/i);
+      });
+    });
+  });
+
+  describe('SEC-H-9: suspended/deleted user invalidates live access tokens', () => {
+    it('rejects a previously-issued access token after the user is suspended -> 401', async () => {
+      const testUser = generateTestUser();
+      const passwordHash = await argon2.hash(testUser.password);
+      const user = await db.User.create({
+        username: testUser.username,
+        email: testUser.email,
+        firstName: testUser.firstName,
+        lastName: testUser.lastName,
+        passwordHash,
+      });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ username: testUser.username, password: testUser.password });
+      expect(loginRes.statusCode).toBe(200);
+      const accessToken = loginRes.body.data.accessToken;
+
+      // A suspended user keeps their session row, but its token must stop working.
+      await db.User.update(
+        { status: USER_STATUS.SUSPENDED },
+        { where: { uuid: user.uuid } }
+      );
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body.message).toMatch(/suspended/i);
+    });
+
+    it('rejects a previously-issued access token after the user is deleted -> 401', async () => {
+      const testUser = generateTestUser();
+      const passwordHash = await argon2.hash(testUser.password);
+      const user = await db.User.create({
+        username: testUser.username,
+        email: testUser.email,
+        firstName: testUser.firstName,
+        lastName: testUser.lastName,
+        passwordHash,
+      });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ username: testUser.username, password: testUser.password });
+      const accessToken = loginRes.body.data.accessToken;
+
+      await db.User.update(
+        { status: USER_STATUS.DELETED },
+        { where: { uuid: user.uuid } }
+      );
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('still accepts an active user token (positive control)', async () => {
+      const testUser = generateTestUser();
+      const passwordHash = await argon2.hash(testUser.password);
+      await db.User.create({
+        username: testUser.username,
+        email: testUser.email,
+        firstName: testUser.firstName,
+        lastName: testUser.lastName,
+        passwordHash,
+      });
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ username: testUser.username, password: testUser.password });
+      const accessToken = loginRes.body.data.accessToken;
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(res.statusCode).toBe(200);
+    });
+  });
+
+  describe('SEC-H-10: refresh-cookie secure policy', () => {
+    const withSecureEnv = async (value, fn) => {
+      const saved = process.env.COOKIE_SECURE;
+      if (value === undefined) {
+        delete process.env.COOKIE_SECURE;
+      } else {
+        process.env.COOKIE_SECURE = String(value);
+      }
+      try {
+        await fn();
+      } finally {
+        if (saved === undefined) {
+          delete process.env.COOKIE_SECURE;
+        } else {
+          process.env.COOKIE_SECURE = saved;
+        }
+      }
+    };
+
+    const makeUser = async () => {
+      const testUser = generateTestUser();
+      const passwordHash = await argon2.hash(testUser.password);
+      await db.User.create({
+        username: testUser.username,
+        email: testUser.email,
+        firstName: testUser.firstName,
+        lastName: testUser.lastName,
+        passwordHash,
+      });
+      return testUser;
+    };
+
+    it('sets the refresh cookie with Secure + HttpOnly + scoped to the auth prefix by default', async () => {
+      await withSecureEnv(undefined, async () => {
+        const testUser = await makeUser();
+
+        const res = await request(app)
+          .post('/api/auth/login')
+          .send({ username: testUser.username, password: testUser.password });
+
+        expect(res.statusCode).toBe(200);
+        const setCookie = res.headers['set-cookie'][0];
+        expect(setCookie).toContain('Secure');
+        expect(setCookie).toContain('HttpOnly');
+        expect(setCookie).toContain('Path=/api/auth');
+      });
+    });
+
+    it('drops the Secure flag only when the documented COOKIE_SECURE=false override is set', async () => {
+      await withSecureEnv('false', async () => {
+        const testUser = await makeUser();
+
+        const res = await request(app)
+          .post('/api/auth/login')
+          .send({ username: testUser.username, password: testUser.password });
+
+        expect(res.statusCode).toBe(200);
+        const setCookie = res.headers['set-cookie'][0];
+        expect(setCookie).not.toContain('Secure');
+        expect(setCookie).toContain('HttpOnly');
+        expect(setCookie).toContain('Path=/api/auth');
+      });
     });
   });
 });
