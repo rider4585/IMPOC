@@ -13,6 +13,51 @@ import {
     cancelRental as cancelRentalService,
     patchRental as patchRentalService,
 } from './rental-agreement.service.js';
+import { lookup } from '../idempotency/idempotency.service.js';
+import { GESTURE_TYPES } from '../../constants/gesture-type.js';
+import { userHasBroadReadScope } from '../auth/permission.service.js';
+
+/**
+ * Return a fresh fetch of the entity a request key points at, so a replayed
+ * money-writing request serves the already-applied result instead of running
+ * the write again (SEC-M-3).
+ */
+const sendAgreementReplay = async (replay, res) => {
+    if (!replay.result_uuid) {
+        const error = new Error('Cached result UUID is missing');
+        error.statusCode = 500;
+        throw error;
+    }
+
+    const cached = await getRentalByUuidService(replay.result_uuid);
+
+    if (!cached) {
+        const error = new Error('Cached agreement record is missing');
+        error.statusCode = 500;
+        throw error;
+    }
+
+    return res.status(200).json({
+        success: true,
+        message: 'Rental agreement already processed (request replayed)',
+        data: cached,
+    });
+};
+
+const handleDuplicateKey = async (gestureType, requestUuid, res, error) => {
+    if (error.name !== 'SequelizeUniqueConstraintError') {
+        throw error;
+    }
+
+    // A concurrent request with the same request key won the race:
+    // replay its result instead of double-processing the money write.
+    const replay = await lookup(gestureType, requestUuid);
+    if (replay.found) {
+        return sendAgreementReplay(replay, res);
+    }
+
+    throw error;
+};
 
 /**
  * POST /api/rentals - Checkout a rental (hand-out)
@@ -21,22 +66,32 @@ export const createRental = async (req, res, next) => {
     try {
         const body = createRentalBodySchema.parse(req.body);
 
-        const agreement = await createRentalService({
-            customerName: body.customerName,
-            customerUuid: body.customerUuid,
-            startDate: body.startDate,
-            rentalDays: body.rentalDays,
-            paymentMethod: body.paymentMethod,
-            customerSource: body.customerSource,
-            notes: body.notes,
-            items: body.items,
-            actorUserId: req.user?.id,
-        });
+        const replay = await lookup(GESTURE_TYPES.RENTAL_BOOK, body.requestUuid);
+        if (replay.found) {
+            return sendAgreementReplay(replay, res);
+        }
 
-        return res.status(201).json({
-            success: true,
-            data: agreement,
-        });
+        try {
+            const agreement = await createRentalService({
+                customerName: body.customerName,
+                customerUuid: body.customerUuid,
+                startDate: body.startDate,
+                rentalDays: body.rentalDays,
+                paymentMethod: body.paymentMethod,
+                customerSource: body.customerSource,
+                notes: body.notes,
+                items: body.items,
+                requestUuid: body.requestUuid,
+                actorUserId: req.user?.id,
+            });
+
+            return res.status(201).json({
+                success: true,
+                data: agreement,
+            });
+        } catch (error) {
+            return handleDuplicateKey(GESTURE_TYPES.RENTAL_BOOK, body.requestUuid, res, error);
+        }
     } catch (error) {
         next(error);
     }
@@ -47,7 +102,13 @@ export const createRental = async (req, res, next) => {
  */
 export const listRentals = async (req, res, next) => {
     try {
-        const agreements = await listRentalsService();
+        const viewAll = await userHasBroadReadScope(req.auth.userUuid);
+
+        const agreements = await listRentalsService({
+            actorUserId: req.user?.id,
+            viewAll,
+        });
+
         return res.status(200).json({
             success: true,
             data: agreements,
@@ -64,7 +125,12 @@ export const getRentalByUuid = async (req, res, next) => {
     try {
         const { uuid } = rentalUuidParamSchema.parse(req.params);
 
-        const agreement = await getRentalByUuidService(uuid);
+        const viewAll = await userHasBroadReadScope(req.auth.userUuid);
+
+        const agreement = await getRentalByUuidService(uuid, {
+            actorUserId: req.user?.id,
+            viewAll,
+        });
 
         if (!agreement) {
             return res.status(404).json({
@@ -90,17 +156,27 @@ export const processRentalReturn = async (req, res, next) => {
         const { uuid } = rentalUuidParamSchema.parse(req.params);
         const body = returnBodySchema.parse(req.body);
 
-        const agreement = await processRentalReturnService({
-            uuid,
-            actualReturnDate: body.actualReturnDate,
-            items: body.items,
-            actorUserId: req.user?.id,
-        });
+        const replay = await lookup(GESTURE_TYPES.RENTAL_SETTLE, body.requestUuid);
+        if (replay.found) {
+            return sendAgreementReplay(replay, res);
+        }
 
-        return res.status(200).json({
-            success: true,
-            data: agreement,
-        });
+        try {
+            const agreement = await processRentalReturnService({
+                uuid,
+                actualReturnDate: body.actualReturnDate,
+                items: body.items,
+                requestUuid: body.requestUuid,
+                actorUserId: req.user?.id,
+            });
+
+            return res.status(200).json({
+                success: true,
+                data: agreement,
+            });
+        } catch (error) {
+            return handleDuplicateKey(GESTURE_TYPES.RENTAL_SETTLE, body.requestUuid, res, error);
+        }
     } catch (error) {
         next(error);
     }
@@ -114,16 +190,26 @@ export const cancelRental = async (req, res, next) => {
         const { uuid } = rentalUuidParamSchema.parse(req.params);
         const body = cancelBodySchema.parse(req.body);
 
-        const agreement = await cancelRentalService({
-            uuid,
-            reason: body.reason,
-            actorUserId: req.user?.id,
-        });
+        const replay = await lookup(GESTURE_TYPES.RENTAL_CANCEL, body.requestUuid);
+        if (replay.found) {
+            return sendAgreementReplay(replay, res);
+        }
 
-        return res.status(200).json({
-            success: true,
-            data: agreement,
-        });
+        try {
+            const agreement = await cancelRentalService({
+                uuid,
+                reason: body.reason,
+                requestUuid: body.requestUuid,
+                actorUserId: req.user?.id,
+            });
+
+            return res.status(200).json({
+                success: true,
+                data: agreement,
+            });
+        } catch (error) {
+            return handleDuplicateKey(GESTURE_TYPES.RENTAL_CANCEL, body.requestUuid, res, error);
+        }
     } catch (error) {
         next(error);
     }

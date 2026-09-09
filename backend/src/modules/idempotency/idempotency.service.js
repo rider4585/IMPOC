@@ -38,3 +38,33 @@ export const lookup = async (gestureType, requestUuid) => {
         result_uuid: requestKey.result_uuid,
     };
 };
+
+/**
+ * Record a processed request by gesture type and request UUID.
+ * Inserted last inside the caller's transaction so a concurrent duplicate
+ * request hits the unique (gesture_type, request_uuid) constraint and fails
+ * the whole transaction; the controller then re-lookups and replays the cached
+ * result instead of double-processing the money write.
+ *
+ * @param {Object} params - { gestureType, requestUuid, resultKind, resultUuid, actorUserId }
+ * @param {Object} [transaction] - The caller's transaction (optional)
+ * @returns {Promise<RequestKey>}
+ */
+export const record = async ({ gestureType, requestUuid, resultKind, resultUuid, actorUserId }, transaction) => {
+    if (!gestureType || !requestUuid || !resultKind || !resultUuid) {
+        const error = new Error('Cannot record request key: missing required fields');
+        error.statusCode = 500;
+        throw error;
+    }
+
+    return RequestKey.create(
+        {
+            gesture_type: gestureType,
+            request_uuid: requestUuid,
+            result_kind: resultKind,
+            result_uuid: resultUuid,
+            actor_user_id: actorUserId ?? null,
+        },
+        transaction ? { transaction } : undefined
+    );
+};

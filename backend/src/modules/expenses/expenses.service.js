@@ -3,6 +3,8 @@ import {
     ExpenseReversal,
     sequelize,
 } from '../../../database/models/index.js';
+import { record as recordRequestKey } from '../idempotency/idempotency.service.js';
+import { GESTURE_TYPES } from '../../constants/gesture-type.js';
 
 function mapExpenseDTO(expense, reversals = []) {
     return {
@@ -26,28 +28,63 @@ function mapExpenseDTO(expense, reversals = []) {
 }
 
 /**
- * Create a new expense.
+ * Create a new expense. Wrapped in a transaction so the idempotency key
+ * (SEC-M-3) is recorded atomically with the expense row.
  */
-export const createExpense = async ({ amountPaise, category, purpose, expenseDate, notes, actorUserId }) => {
-    const expense = await Expense.create({
-        amountPaise,
-        category,
-        purpose: purpose || null,
-        expenseDate: expenseDate || new Date().toISOString().split('T')[0],
-        status: 'completed',
-        notes: notes || null,
-        createdBy: actorUserId || null,
-    });
+export const createExpense = async ({ amountPaise, category, purpose, expenseDate, notes, actorUserId, requestUuid }) => {
+    const transaction = await sequelize.transaction();
+    try {
+        const expense = await Expense.create(
+            {
+                amountPaise,
+                category,
+                purpose: purpose || null,
+                expenseDate: expenseDate || new Date().toISOString().split('T')[0],
+                status: 'completed',
+                notes: notes || null,
+                createdBy: actorUserId || null,
+            },
+            { transaction }
+        );
 
-    return mapExpenseDTO(expense);
+        // Idempotency key (SEC-M-3): record last, inside the transaction, so a
+        // concurrent duplicate request fails the write and replays the cache.
+        if (requestUuid) {
+            await recordRequestKey(
+                {
+                    gestureType: GESTURE_TYPES.EXPENSE_CREATE,
+                    requestUuid,
+                    resultKind: 'EXPENSE',
+                    resultUuid: expense.uuid,
+                    actorUserId,
+                },
+                transaction
+            );
+        }
+
+        await transaction.commit();
+
+        return mapExpenseDTO(expense);
+    } catch (error) {
+        await transaction.rollback();
+        throw error;
+    }
 };
 
 /**
- * List expenses, newest first.
+ * List expenses, newest first. Unless the caller has a broad read scope
+ * (ADMIN/MANAGER), only expenses the caller created are visible (SEC-M-5).
+ *
+ * @param {Object} [options] - { actorUserId, viewAll }
  */
-export const listExpenses = async () => {
+export const listExpenses = async ({ actorUserId, viewAll } = {}) => {
+    const where = { deletedAt: null };
+    if (!viewAll && actorUserId) {
+        where.createdBy = actorUserId;
+    }
+
     const expenses = await Expense.findAll({
-        where: { deletedAt: null },
+        where,
         order: [['createdAt', 'DESC']],
         include: [{ association: 'reversals' }],
     });
@@ -56,15 +93,23 @@ export const listExpenses = async () => {
 };
 
 /**
- * Get a single expense by uuid.
+ * Get a single expense by uuid. Records created by another user are not
+ * returned unless the caller has a broad read scope (SEC-M-5).
+ *
+ * @param {string} uuid
+ * @param {Object} [options] - { actorUserId, viewAll }
  */
-export const getExpenseByUuid = async (uuid) => {
+export const getExpenseByUuid = async (uuid, { actorUserId, viewAll } = {}) => {
     const expense = await Expense.findOne({
         where: { uuid, deletedAt: null },
         include: [{ association: 'reversals' }],
     });
 
     if (!expense) {
+        return null;
+    }
+
+    if (!viewAll && actorUserId && expense.createdBy !== actorUserId) {
         return null;
     }
 
@@ -111,7 +156,7 @@ export const updateExpense = async ({ uuid, updates, actorUserId }) => {
  * Cancel a completed expense: snapshot a reversal row (CANCEL) and mark the
  * expense cancelled. The completed financial record is never mutated.
  */
-export const cancelExpense = async ({ uuid, reason, actorUserId }) => {
+export const cancelExpense = async ({ uuid, reason, actorUserId, requestUuid }) => {
     const transaction = await sequelize.transaction();
     try {
         const expense = await Expense.findOne({ where: { uuid, deletedAt: null }, transaction });
@@ -177,6 +222,20 @@ export const cancelExpense = async ({ uuid, reason, actorUserId }) => {
 
         // Status already flipped to cancelled by the CAS above.
         expense.status = 'cancelled';
+
+        // Idempotency key (SEC-M-3): record last, inside the transaction.
+        if (requestUuid) {
+            await recordRequestKey(
+                {
+                    gestureType: GESTURE_TYPES.EXPENSE_REVERSE,
+                    requestUuid,
+                    resultKind: 'EXPENSE_CANCEL',
+                    resultUuid: expense.uuid,
+                    actorUserId,
+                },
+                transaction
+            );
+        }
 
         await transaction.commit();
 

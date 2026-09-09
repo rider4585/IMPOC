@@ -65,3 +65,40 @@ export const userHasPermission = async (
 
     return permissions.has(requiredPermission);
 };
+
+/*
+ * SEC-M-5: roles with a broad read scope may list/get records created by any
+ * user. Everyone else only sees records they created themselves.
+ */
+const BROAD_READ_ROLE_NAMES = new Set(['ADMIN', 'MANAGER']);
+
+export const getUserRoleNames = async (userUuid) => {
+    const user = await User.findOne({
+        where: { uuid: userUuid },
+        attributes: ['id', 'uuid'],
+        include: {
+            model: Role,
+            as: 'roles',
+            attributes: ['name'],
+            through: {
+                attributes: [],
+            },
+        },
+    });
+
+    if (!user) {
+        return [];
+    }
+
+    return user.roles.map((role) => role.name);
+};
+
+export const userHasBroadReadScope = async (userUuid) => {
+    if (!userUuid) {
+        return false;
+    }
+
+    const roleNames = await getUserRoleNames(userUuid);
+
+    return roleNames.some((name) => BROAD_READ_ROLE_NAMES.has(name));
+};

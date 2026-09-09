@@ -1,7 +1,8 @@
 import express from 'express';
 import request from 'supertest';
+import { v4 as uuidv4 } from 'uuid';
 import * as db from '../../database/models/index.js';
-import { initializeTestDatabase, generateTestUser, closeDatabase, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
+import { initializeTestDatabase, generateTestUser, generateTestRole, closeDatabase, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
 import argon2 from 'argon2';
 import app from '../../app.js';
 import rentalRoutes from '../../src/modules/rentals/rental-agreement.routes.js';
@@ -155,6 +156,7 @@ describe('Rental agreements module (T-10)', () => {
                 .post('/api/rentals')
                 .set('Authorization', `Bearer ${managerToken}`)
                 .send({
+                    requestUuid: uuidv4(),
                     customerName: 'Rental Customer',
                     startDate: '2026-09-01',
                     rentalDays: 5,
@@ -199,7 +201,7 @@ describe('Rental agreements module (T-10)', () => {
             const res = await request(testApp)
                 .post('/api/rentals')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{}] })
+                .send({ requestUuid: uuidv4(), items: [{}] })
                 .expect(400);
 
             expect(res.body.success).toBe(false);
@@ -211,7 +213,7 @@ describe('Rental agreements module (T-10)', () => {
             const res = await request(testApp)
                 .post('/api/rentals')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: u4.uuid, barcode: u4.barcode }] })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: u4.uuid, barcode: u4.barcode }] })
                 .expect(400);
 
             expect(res.body.success).toBe(false);
@@ -223,7 +225,7 @@ describe('Rental agreements module (T-10)', () => {
             const res = await request(testApp)
                 .post('/api/rentals')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ barcode: u5.barcode }] })
+                .send({ requestUuid: uuidv4(), items: [{ barcode: u5.barcode }] })
                 .expect(201);
 
             expect(res.body.data.lines).toHaveLength(1);
@@ -256,6 +258,7 @@ describe('Rental agreements module (T-10)', () => {
                 .post(`/api/rentals/${global.__agreementUuid}/return`)
                 .set('Authorization', `Bearer ${managerToken}`)
                 .send({
+                    requestUuid: uuidv4(),
                     actualReturnDate: '2026-09-02',
                     items: [{ barcode: 'RA0000000001' }],
                 })
@@ -278,6 +281,7 @@ describe('Rental agreements module (T-10)', () => {
                 .post(`/api/rentals/${global.__agreementUuid}/return`)
                 .set('Authorization', `Bearer ${managerToken}`)
                 .send({
+                    requestUuid: uuidv4(),
                     actualReturnDate: '2026-09-10', // 4 days past due date 2026-09-06
                     items: [{ barcode: 'RA0000000002', gradeUuid: gradeMaintenance.uuid, damageChargePaise: 3000 }],
                 })
@@ -305,7 +309,7 @@ describe('Rental agreements module (T-10)', () => {
             await request(testApp)
                 .post(`/api/rentals/${global.__agreementUuid}/return`)
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ barcode: 'RA0000000001' }] })
+                .send({ requestUuid: uuidv4(), items: [{ barcode: 'RA0000000001' }] })
                 .expect(409);
         });
     });
@@ -318,13 +322,13 @@ describe('Rental agreements module (T-10)', () => {
             const createRes = await request(testApp)
                 .post('/api/rentals')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: a1.uuid }, { unitUuid: a2.uuid }] })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: a1.uuid }, { unitUuid: a2.uuid }] })
                 .expect(201);
 
             const cancelRes = await request(testApp)
                 .post(`/api/rentals/${createRes.body.data.uuid}/cancel`)
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ reason: 'Customer cancelled' })
+                .send({ requestUuid: uuidv4(), reason: 'Customer cancelled' })
                 .expect(200);
 
             expect(cancelRes.body.data.status).toBe('cancelled');
@@ -343,17 +347,17 @@ describe('Rental agreements module (T-10)', () => {
             const createRes = await request(testApp)
                 .post('/api/rentals')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: a3.uuid }] })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: a3.uuid }] })
                 .expect(201);
             await request(testApp)
                 .post(`/api/rentals/${createRes.body.data.uuid}/cancel`)
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ reason: 'cancel' })
+                .send({ requestUuid: uuidv4(), reason: 'cancel' })
                 .expect(200);
             await request(testApp)
                 .post(`/api/rentals/${createRes.body.data.uuid}/cancel`)
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ reason: 'again' })
+                .send({ requestUuid: uuidv4(), reason: 'again' })
                 .expect(409);
         });
     });
@@ -431,6 +435,167 @@ describe('Rental agreements module (T-10)', () => {
             const numbers = agreements.map((a) => a.agreementNumber);
             expect(numbers[0]).not.toBe(numbers[1]);
             expect(new Set(numbers).size).toBe(numbers.length);
+        });
+    });
+
+    describe('SEC-M-5 - read scoping for rentals', () => {
+        let limitedToken;
+
+        beforeAll(async () => {
+            // A non-broad user with rentals.view + rentals.create only.
+            const role = await db.Role.create({
+                name: generateTestRole().name,
+                description: 'Rental limited-read role (test)',
+            });
+            for (const name of ['rentals.view', 'rentals.create']) {
+                const perm = await db.Permission.findOrCreate({
+                    where: { name },
+                    defaults: { description: `Rental ${name} permission (test)` },
+                });
+                await role.addPermission(perm[0]);
+            }
+
+            const data = generateTestUser({ password: 'TestPassword123!' });
+            const user = await db.User.create({
+                username: data.username,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                email: data.email,
+                passwordHash: await argon2.hash(data.password),
+            });
+            await user.addRole(role);
+            const login = await request(app)
+                .post('/api/auth/login')
+                .send({ username: data.username, password: data.password });
+            limitedToken = login.body.data.accessToken;
+        });
+
+        it('should let a non-broad user see only their own agreements', async () => {
+            const mgrUuid = global.__agreementUuid;
+            const u = await scanUnit('RA0000000990');
+
+            const own = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${limitedToken}`)
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: u.uuid }] })
+                .expect(201);
+            const ownUuid = own.body.data.uuid;
+
+            const ownGet = await request(testApp)
+                .get(`/api/rentals/${ownUuid}`)
+                .set('Authorization', `Bearer ${limitedToken}`)
+                .expect(200);
+            expect(ownGet.body.data.uuid).toBe(ownUuid);
+
+            await request(testApp)
+                .get(`/api/rentals/${mgrUuid}`)
+                .set('Authorization', `Bearer ${limitedToken}`)
+                .expect(404);
+
+            const list = await request(testApp)
+                .get('/api/rentals')
+                .set('Authorization', `Bearer ${limitedToken}`)
+                .expect(200);
+            const uuids = list.body.data.map((a) => a.uuid);
+            expect(uuids).toContain(ownUuid);
+            expect(uuids).not.toContain(mgrUuid);
+        });
+
+        it('should let a manager (broad read scope) see agreements created by others', async () => {
+            const list = await request(testApp)
+                .get('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+            const uuids = list.body.data.map((a) => a.uuid);
+            expect(uuids).toContain(global.__agreementUuid);
+        });
+    });
+
+    describe('SEC-M-3 - request-key idempotency for rentals', () => {
+        it('should replay a repeated checkout with the cached agreement instead of another agreement', async () => {
+            const u = await scanUnit('RA0000000991');
+            const requestUuid = uuidv4();
+
+            const first = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, items: [{ unitUuid: u.uuid }] })
+                .expect(201);
+            const agreementUuid = first.body.data.uuid;
+
+            const replay = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, items: [{ unitUuid: u.uuid }] })
+                .expect(200);
+
+            expect(replay.body.data.uuid).toBe(agreementUuid);
+            expect(replay.body.message).toContain('Rental agreement already processed (request replayed)');
+
+            const count = await db.RentalAgreement.count({ where: { uuid: agreementUuid } });
+            expect(count).toBe(1);
+        });
+
+        it('should replay a repeated return and keep a single returned line', async () => {
+            const u = await scanUnit('RA0000000992');
+            const created = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: u.uuid }] })
+                .expect(201);
+            const agreementUuid = created.body.data.uuid;
+
+            const requestUuid = uuidv4();
+            await request(testApp)
+                .post(`/api/rentals/${agreementUuid}/return`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, actualReturnDate: '2026-09-10', items: [{ barcode: 'RA0000000992' }] })
+                .expect(200);
+
+            const replay = await request(testApp)
+                .post(`/api/rentals/${agreementUuid}/return`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, actualReturnDate: '2026-09-10', items: [{ barcode: 'RA0000000992' }] })
+                .expect(200);
+
+            expect(replay.body.data.status).toBe('completed');
+            expect(replay.body.message).toContain('Rental agreement already processed (request replayed)');
+
+            const lineRow = await db.RentalLine.findOne({ where: { unitUuid: u.uuid } });
+            const returns = await db.RentalReturn.count({ where: { rentalLineId: lineRow.id, deletedAt: null } });
+            expect(returns).toBe(1);
+        });
+
+        it('should replay a repeated cancel and keep a single cancellation', async () => {
+            const u = await scanUnit('RA0000000993');
+            const created = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: u.uuid }] })
+                .expect(201);
+            const agreementUuid = created.body.data.uuid;
+
+            const requestUuid = uuidv4();
+            await request(testApp)
+                .post(`/api/rentals/${agreementUuid}/cancel`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, reason: 'first cancel' })
+                .expect(200);
+
+            const replay = await request(testApp)
+                .post(`/api/rentals/${agreementUuid}/cancel`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, reason: 'first cancel' })
+                .expect(200);
+
+            expect(replay.body.data.status).toBe('cancelled');
+            expect(replay.body.message).toContain('Rental agreement already processed (request replayed)');
+
+            const agreementRow = await db.RentalAgreement.findOne({ where: { uuid: agreementUuid } });
+            const reversals = await db.RentalReversal.count({
+                where: { agreementId: agreementRow.id, reversalType: 'CANCEL', deletedAt: null },
+            });
+            expect(reversals).toBe(1);
         });
     });
 });

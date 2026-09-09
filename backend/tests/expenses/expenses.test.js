@@ -1,5 +1,6 @@
 import express from 'express';
 import request from 'supertest';
+import { v4 as uuidv4 } from 'uuid';
 import * as db from '../../database/models/index.js';
 import { initializeTestDatabase, generateTestUser, closeDatabase } from '../utils/test-setup.js';
 import argon2 from 'argon2';
@@ -72,7 +73,7 @@ describe('Expenses module (T-12)', () => {
             const res = await request(testApp)
                 .post('/api/expenses')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ amountPaise: 250000, category: 'Utilities', purpose: 'Electricity bill' })
+                .send({ requestUuid: uuidv4(), amountPaise: 250000, category: 'Utilities', purpose: 'Electricity bill' })
                 .expect(201);
 
             expect(res.body.success).toBe(true);
@@ -140,7 +141,7 @@ describe('Expenses module (T-12)', () => {
             const res = await request(testApp)
                 .post(`/api/expenses/${global.__expenseUuid}/cancel`)
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ reason: 'Vendor refunded us' })
+                .send({ requestUuid: uuidv4(), reason: 'Vendor refunded us' })
                 .expect(200);
 
             expect(res.body.data.status).toBe('cancelled');
@@ -154,7 +155,7 @@ describe('Expenses module (T-12)', () => {
             await request(testApp)
                 .post(`/api/expenses/${global.__expenseUuid}/cancel`)
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ reason: 'again' })
+                .send({ requestUuid: uuidv4(), reason: 'again' })
                 .expect(409);
         });
     });
@@ -184,6 +185,147 @@ describe('Expenses module (T-12)', () => {
                 where: { expenseId: expenseRow.id, reversalType: 'CANCEL', deletedAt: null },
             });
             expect(reversals).toBe(1);
+        });
+    });
+
+    describe('SEC-M-5 - read scoping for expenses', () => {
+        let accountantToken;
+        let accountantExpenseUuid;
+
+        beforeAll(async () => {
+            // ACCOUNTANT has expenses.view + expenses.create (test-setup seed)
+            const acctData = generateTestUser({ password: 'TestPassword123!' });
+            const accountant = await db.User.create({
+                username: acctData.username,
+                firstName: acctData.firstName,
+                lastName: acctData.lastName,
+                email: acctData.email,
+                passwordHash: await argon2.hash(acctData.password),
+            });
+            const acctRole = await db.Role.findOne({ where: { name: 'ACCOUNTANT' } });
+            await accountant.addRole(acctRole);
+            const acctLogin = await request(app)
+                .post('/api/auth/login')
+                .send({ username: acctData.username, password: acctData.password });
+            accountantToken = acctLogin.body.data.accessToken;
+
+            const own = await request(testApp)
+                .post('/api/expenses')
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .send({ requestUuid: uuidv4(), amountPaise: 111, category: 'OwnBooks' })
+                .expect(201);
+            accountantExpenseUuid = own.body.data.uuid;
+        });
+
+        it('should let a non-broad user see only their own expenses', async () => {
+            const mgrUuid = global.__expenseUuid;
+
+            const ownGet = await request(testApp)
+                .get(`/api/expenses/${accountantExpenseUuid}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+            expect(ownGet.body.data.uuid).toBe(accountantExpenseUuid);
+
+            await request(testApp)
+                .get(`/api/expenses/${mgrUuid}`)
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(404);
+
+            const list = await request(testApp)
+                .get('/api/expenses')
+                .set('Authorization', `Bearer ${accountantToken}`)
+                .expect(200);
+            const uuids = list.body.data.map((e) => e.uuid);
+            expect(uuids).toContain(accountantExpenseUuid);
+            expect(uuids).not.toContain(mgrUuid);
+        });
+
+        it('should let a manager (broad read scope) see expenses created by others', async () => {
+            const list = await request(testApp)
+                .get('/api/expenses')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+            const uuids = list.body.data.map((e) => e.uuid);
+            expect(uuids).toContain(global.__expenseUuid);
+            expect(uuids).toContain(accountantExpenseUuid);
+        });
+    });
+
+    describe('SEC-M-3 - request-key idempotency for expenses', () => {
+        it('should replay a repeated create with the cached expense instead of creating another', async () => {
+            const requestUuid = uuidv4();
+
+            const first = await request(testApp)
+                .post('/api/expenses')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, amountPaise: 500000, category: 'IdemTest' })
+                .expect(201);
+            const expenseUuid = first.body.data.uuid;
+
+            const replay = await request(testApp)
+                .post('/api/expenses')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, amountPaise: 500000, category: 'IdemTest' })
+                .expect(200);
+
+            expect(replay.body.data.uuid).toBe(expenseUuid);
+            expect(replay.body.message).toContain('Expense already processed (request replayed)');
+
+            const count = await db.Expense.count({ where: { uuid: expenseUuid } });
+            expect(count).toBe(1);
+        });
+
+        it('should replay a repeated cancel and keep a single reversal', async () => {
+            const created = await request(testApp)
+                .post('/api/expenses')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid: uuidv4(), amountPaise: 222, category: 'IdemCancel' })
+                .expect(201);
+            const expenseUuid = created.body.data.uuid;
+
+            const requestUuid = uuidv4();
+            await request(testApp)
+                .post(`/api/expenses/${expenseUuid}/cancel`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, reason: 'first cancel' })
+                .expect(200);
+
+            const replay = await request(testApp)
+                .post(`/api/expenses/${expenseUuid}/cancel`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, reason: 'first cancel' })
+                .expect(200);
+
+            expect(replay.body.data.status).toBe('cancelled');
+            expect(replay.body.message).toContain('Expense already processed (request replayed)');
+
+            const expenseRow = await db.Expense.findOne({ where: { uuid: expenseUuid } });
+            const reversals = await db.ExpenseReversal.count({
+                where: { expenseId: expenseRow.id, reversalType: 'CANCEL', deletedAt: null },
+            });
+            expect(reversals).toBe(1);
+        });
+
+        it('should resolve concurrent creates sharing a requestUuid to one persisted expense', async () => {
+            const requestUuid = uuidv4();
+            const send = () =>
+                request(testApp)
+                    .post('/api/expenses')
+                    .set('Authorization', `Bearer ${managerToken}`)
+                    .send({ requestUuid, amountPaise: 333, category: 'IdemRace' });
+
+            const results = await Promise.allSettled([send(), send()]);
+            const fulfilled = results.filter((r) => r.status === 'fulfilled');
+            expect(fulfilled).toHaveLength(2);
+
+            const statuses = fulfilled.map((r) => r.value.status).sort();
+            expect(statuses).toEqual([200, 201]);
+
+            const uuids = fulfilled.map((r) => r.value.body.data.uuid);
+            expect(new Set(uuids).size).toBe(1);
+
+            const count = await db.Expense.count({ where: { uuid: uuids[0] } });
+            expect(count).toBe(1);
         });
     });
 });

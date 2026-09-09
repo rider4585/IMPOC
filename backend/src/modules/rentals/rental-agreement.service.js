@@ -11,6 +11,8 @@ import {
 import { transitionUnit } from '../units/units.service.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { DAMAGE_GRADE_OUTCOMES } from '../../constants/damage-grade-outcome.js';
+import { record as recordRequestKey } from '../idempotency/idempotency.service.js';
+import { GESTURE_TYPES } from '../../constants/gesture-type.js';
 
 /**
  * Resolve a linked customer by uuid (if supplied).
@@ -189,7 +191,7 @@ function mapAgreementDTO(agreement, lines = [], returns = [], reversals = []) {
  * @param {Object} params - { customerName, customerUuid, startDate, rentalDays, paymentMethod, customerSource, notes, items, actorUserId }
  * @returns {Object} agreement DTO
  */
-const createRentalOnce = async ({ customerName, customerUuid, startDate, rentalDays, paymentMethod, customerSource, notes, items, actorUserId }) => {
+const createRentalOnce = async ({ customerName, customerUuid, startDate, rentalDays, paymentMethod, customerSource, notes, items, actorUserId, requestUuid }) => {
     const transaction = await sequelize.transaction();
     try {
         const units = [];
@@ -257,6 +259,21 @@ const createRentalOnce = async ({ customerName, customerUuid, startDate, rentalD
             );
         }
 
+        // Idempotency key (SEC-M-3): record last, inside the transaction, so a
+        // concurrent duplicate request fails the write and replays the cache.
+        if (requestUuid) {
+            await recordRequestKey(
+                {
+                    gestureType: GESTURE_TYPES.RENTAL_BOOK,
+                    requestUuid,
+                    resultKind: 'RENTAL',
+                    resultUuid: agreement.uuid,
+                    actorUserId,
+                },
+                transaction
+            );
+        }
+
         await transaction.commit();
 
         const fullAgreement = await RentalAgreement.findByPk(agreement.id, {
@@ -286,10 +303,19 @@ export const createRental = async (params) => {
         try {
             return await createRentalOnce(params);
         } catch (error) {
+            // Only the agreement-number collision is retryable. A request-keys
+            // unique violation (same gesture + request_uuid) must surface to the
+            // controller so it re-lookups and replays instead of being mistaken
+            // for a number race (SEC-M-3). Accept both the migration's index
+            // name and sequelize sync's generated constraint name.
+            const constraint = error && error.parent && error.parent.constraint;
             const isNumberCollision =
                 error &&
-                (error.parent && error.parent.code === '23505') &&
-                error.name === 'SequelizeUniqueConstraintError';
+                error.name === 'SequelizeUniqueConstraintError' &&
+                error.parent &&
+                error.parent.code === '23505' &&
+                (constraint === 'rental_agreements_agreement_number' ||
+                    constraint === 'rental_agreements_agreement_number_key');
             if (!isNumberCollision || attempt === MAX_NUMBER_RETRIES) {
                 throw error;
             }
@@ -300,11 +326,20 @@ export const createRental = async (params) => {
 };
 
 /**
- * List agreements, newest first, with lines and returns.
+ * List agreements, newest first, with lines and returns. Unless the caller has
+ * a broad read scope (ADMIN/MANAGER), only agreements the caller created are
+ * visible (SEC-M-5).
+ *
+ * @param {Object} [options] - { actorUserId, viewAll }
  */
-export const listRentals = async () => {
+export const listRentals = async ({ actorUserId, viewAll } = {}) => {
+    const where = { deletedAt: null };
+    if (!viewAll && actorUserId) {
+        where.createdBy = actorUserId;
+    }
+
     const agreements = await RentalAgreement.findAll({
-        where: { deletedAt: null },
+        where,
         order: [['createdAt', 'DESC']],
         include: [
             { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }, { association: 'returns' }] },
@@ -320,9 +355,13 @@ export const listRentals = async () => {
 };
 
 /**
- * Get a single agreement by uuid.
+ * Get a single agreement by uuid. Records created by another user are not
+ * returned unless the caller has a broad read scope (SEC-M-5).
+ *
+ * @param {string} uuid
+ * @param {Object} [options] - { actorUserId, viewAll }
  */
-export const getRentalByUuid = async (uuid) => {
+export const getRentalByUuid = async (uuid, { actorUserId, viewAll } = {}) => {
     const agreement = await RentalAgreement.findOne({
         where: { uuid, deletedAt: null },
         include: [
@@ -334,6 +373,10 @@ export const getRentalByUuid = async (uuid) => {
     });
 
     if (!agreement) {
+        return null;
+    }
+
+    if (!viewAll && actorUserId && agreement.createdBy !== actorUserId) {
         return null;
     }
 
@@ -370,7 +413,7 @@ async function resolveDamageGrade(gradeUuid, transaction) {
  * @param {Object} params - { uuid, actualReturnDate, items, actorUserId }
  * @returns {Object} agreement DTO
  */
-export const processRentalReturn = async ({ uuid, actualReturnDate, items, actorUserId }) => {
+export const processRentalReturn = async ({ uuid, actualReturnDate, items, actorUserId, requestUuid }) => {
     const transaction = await sequelize.transaction();
     try {
         const agreement = await RentalAgreement.findOne({
@@ -536,6 +579,20 @@ export const processRentalReturn = async ({ uuid, actualReturnDate, items, actor
             }
         }
 
+        // Idempotency key (SEC-M-3): record last, inside the transaction.
+        if (requestUuid) {
+            await recordRequestKey(
+                {
+                    gestureType: GESTURE_TYPES.RENTAL_SETTLE,
+                    requestUuid,
+                    resultKind: 'RENTAL_RETURN',
+                    resultUuid: agreement.uuid,
+                    actorUserId,
+                },
+                transaction
+            );
+        }
+
         await transaction.commit();
 
         const fullAgreement = await RentalAgreement.findByPk(agreement.id, {
@@ -559,7 +616,7 @@ export const processRentalReturn = async ({ uuid, actualReturnDate, items, actor
  * still-rented unit back to in_stock via RETURN. Lines already returned are left
  * untouched. Completed financials are never mutated.
  */
-export const cancelRental = async ({ uuid, reason, actorUserId }) => {
+export const cancelRental = async ({ uuid, reason, actorUserId, requestUuid }) => {
     const transaction = await sequelize.transaction();
     try {
         const agreement = await RentalAgreement.findOne({
@@ -649,6 +706,20 @@ export const cancelRental = async ({ uuid, reason, actorUserId }) => {
 
         // Status already flipped to cancelled by the CAS above.
         agreement.status = 'cancelled';
+
+        // Idempotency key (SEC-M-3): record last, inside the transaction.
+        if (requestUuid) {
+            await recordRequestKey(
+                {
+                    gestureType: GESTURE_TYPES.RENTAL_CANCEL,
+                    requestUuid,
+                    resultKind: 'RENTAL_CANCEL',
+                    resultUuid: agreement.uuid,
+                    actorUserId,
+                },
+                transaction
+            );
+        }
 
         await transaction.commit();
 

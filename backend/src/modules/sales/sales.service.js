@@ -1,6 +1,8 @@
 import { Sale, SaleLine, SaleReversal, Unit, Customer, sequelize } from '../../../database/models/index.js';
 import { transitionUnit } from '../units/units.service.js';
 import { CHANNEL } from '../../constants/channel.js';
+import { record as recordRequestKey } from '../idempotency/idempotency.service.js';
+import { GESTURE_TYPES } from '../../constants/gesture-type.js';
 
 /**
  * Resolve a linked customer by uuid (if supplied).
@@ -127,7 +129,7 @@ const MAX_NUMBER_RETRIES = 3;
  * The body of createSale, run inside its own transaction. Retried by createSale
  * when two concurrent checkouts race on the next S-number.
  */
-const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, items, actorUserId }) => {
+const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, items, actorUserId, requestUuid }) => {
     const transaction = await sequelize.transaction();
     try {
         const units = [];
@@ -189,6 +191,21 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
             );
         }
 
+        // Idempotency key (SEC-M-3): record last, inside the transaction, so a
+        // concurrent duplicate request fails the write and replays the cache.
+        if (requestUuid) {
+            await recordRequestKey(
+                {
+                    gestureType: GESTURE_TYPES.SALE_CHECKOUT,
+                    requestUuid,
+                    resultKind: 'SALE',
+                    resultUuid: sale.uuid,
+                    actorUserId,
+                },
+                transaction
+            );
+        }
+
         await transaction.commit();
 
         const fullSale = await Sale.findByPk(sale.id, {
@@ -217,10 +234,18 @@ export const createSale = async (params) => {
         try {
             return await createSaleOnce(params);
         } catch (error) {
+            // Only the sale-number collision is retryable. A request-keys unique
+            // violation (same gesture + request_uuid) must surface to the
+            // controller so it re-lookups and replays instead of being mistaken
+            // for a number race (SEC-M-3). Accept both the migration's index
+            // name and sequelize sync's generated constraint name.
+            const constraint = error && error.parent && error.parent.constraint;
             const isNumberCollision =
                 error &&
-                (error.parent && error.parent.code === '23505') &&
-                error.name === 'SequelizeUniqueConstraintError';
+                error.name === 'SequelizeUniqueConstraintError' &&
+                error.parent &&
+                error.parent.code === '23505' &&
+                (constraint === 'sales_sale_number' || constraint === 'sales_sale_number_key');
             if (!isNumberCollision || attempt === MAX_NUMBER_RETRIES) {
                 throw error;
             }
@@ -231,11 +256,20 @@ export const createSale = async (params) => {
 };
 
 /**
- * List sales, newest first, with their lines.
+ * List sales, newest first, with their lines. Unless the caller has a broad
+ * read scope (ADMIN/MANAGER), only sales the caller created are visible
+ * (SEC-M-5).
+ *
+ * @param {Object} [options] - { actorUserId, viewAll }
  */
-export const listSales = async () => {
+export const listSales = async ({ actorUserId, viewAll } = {}) => {
+    const where = { deletedAt: null };
+    if (!viewAll && actorUserId) {
+        where.createdBy = actorUserId;
+    }
+
     const sales = await Sale.findAll({
-        where: { deletedAt: null },
+        where,
         order: [['createdAt', 'DESC']],
         include: [
             { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
@@ -247,9 +281,13 @@ export const listSales = async () => {
 };
 
 /**
- * Get a single sale by uuid.
+ * Get a single sale by uuid. Records created by another user are not returned
+ * unless the caller has a broad read scope (SEC-M-5).
+ *
+ * @param {string} uuid
+ * @param {Object} [options] - { actorUserId, viewAll }
  */
-export const getSaleByUuid = async (uuid) => {
+export const getSaleByUuid = async (uuid, { actorUserId, viewAll } = {}) => {
     const sale = await Sale.findOne({
         where: { uuid, deletedAt: null },
         include: [
@@ -262,6 +300,10 @@ export const getSaleByUuid = async (uuid) => {
         return null;
     }
 
+    if (!viewAll && actorUserId && sale.createdBy !== actorUserId) {
+        return null;
+    }
+
     return mapSaleDTO(sale, sale.lines || [], sale.reversals || []);
 };
 
@@ -270,7 +312,7 @@ export const getSaleByUuid = async (uuid) => {
  * sold unit back to in_stock (EXCHANGE), and mark the sale cancelled.
  * The completed sale's financial fields are never mutated.
  */
-export const cancelSale = async ({ uuid, reason, actorUserId }) => {
+export const cancelSale = async ({ uuid, reason, actorUserId, requestUuid }) => {
     const transaction = await sequelize.transaction();
     try {
         const sale = await Sale.findOne({
@@ -362,6 +404,20 @@ export const cancelSale = async ({ uuid, reason, actorUserId }) => {
         // value is refreshed for the DTO.
         sale.status = 'cancelled';
 
+        // Idempotency key (SEC-M-3): record last, inside the transaction.
+        if (requestUuid) {
+            await recordRequestKey(
+                {
+                    gestureType: GESTURE_TYPES.SALE_CANCEL,
+                    requestUuid,
+                    resultKind: 'SALE_CANCEL',
+                    resultUuid: sale.uuid,
+                    actorUserId,
+                },
+                transaction
+            );
+        }
+
         await transaction.commit();
 
         const fullSale = await Sale.findByPk(sale.id, {
@@ -383,7 +439,7 @@ export const cancelSale = async ({ uuid, reason, actorUserId }) => {
  * Refund a completed sale: snapshot a reversal row (REFUND). Units stay sold.
  * An identical-item return/exchange is handled by the cancel flow.
  */
-export const refundSale = async ({ uuid, reason, actorUserId }) => {
+export const refundSale = async ({ uuid, reason, actorUserId, requestUuid }) => {
     const transaction = await sequelize.transaction();
     try {
         const sale = await Sale.findOne({ where: { uuid, deletedAt: null }, transaction });
@@ -440,6 +496,20 @@ export const refundSale = async ({ uuid, reason, actorUserId }) => {
             },
             { transaction }
         );
+
+        // Idempotency key (SEC-M-3): record last, inside the transaction.
+        if (requestUuid) {
+            await recordRequestKey(
+                {
+                    gestureType: GESTURE_TYPES.SALE_REFUND,
+                    requestUuid,
+                    resultKind: 'SALE_REFUND',
+                    resultUuid: sale.uuid,
+                    actorUserId,
+                },
+                transaction
+            );
+        }
 
         await transaction.commit();
 
