@@ -7,6 +7,51 @@ import {
     refundSale as refundSaleService,
     patchSale as patchSaleService,
 } from './sales.service.js';
+import { lookup } from '../idempotency/idempotency.service.js';
+import { GESTURE_TYPES } from '../../constants/gesture-type.js';
+import { userHasBroadReadScope } from '../auth/permission.service.js';
+
+/**
+ * Return a fresh fetch of the entity a request key points at, so a replayed
+ * money-writing request serves the already-applied result instead of running
+ * the write again (SEC-M-3).
+ */
+const sendSaleReplay = async (replay, res) => {
+    if (!replay.result_uuid) {
+        const error = new Error('Cached result UUID is missing');
+        error.statusCode = 500;
+        throw error;
+    }
+
+    const cached = await getSaleByUuidService(replay.result_uuid);
+
+    if (!cached) {
+        const error = new Error('Cached sale record is missing');
+        error.statusCode = 500;
+        throw error;
+    }
+
+    return res.status(200).json({
+        success: true,
+        message: 'Sale already processed (request replayed)',
+        data: cached,
+    });
+};
+
+const handleDuplicateKey = async (gestureType, requestUuid, res, error) => {
+    if (error.name !== 'SequelizeUniqueConstraintError') {
+        throw error;
+    }
+
+    // A concurrent request with the same request key won the race:
+    // replay its result instead of double-processing the money write.
+    const replay = await lookup(gestureType, requestUuid);
+    if (replay.found) {
+        return sendSaleReplay(replay, res);
+    }
+
+    throw error;
+};
 
 /**
  * POST /api/sales - Checkout a RETAIL sale
@@ -15,23 +60,33 @@ export const createSale = async (req, res, next) => {
     try {
         const body = createSaleBodySchema.parse(req.body);
 
-        const sale = await createSaleService({
-            customerName: body.customerName,
-            customerUuid: body.customerUuid,
-            soldAt: body.soldAt,
-            paymentMethod: body.paymentMethod,
-            customerSource: body.customerSource,
-            notes: body.notes,
-            items: body.items,
-            actorUserId: req.user?.id,
-        });
+        const replay = await lookup(GESTURE_TYPES.SALE_CHECKOUT, body.requestUuid);
+        if (replay.found) {
+            return sendSaleReplay(replay, res);
+        }
 
-        return res.status(201).json({
-            success: true,
-            data: sale,
-        });
+        try {
+            const sale = await createSaleService({
+                customerName: body.customerName,
+                customerUuid: body.customerUuid,
+                soldAt: body.soldAt,
+                paymentMethod: body.paymentMethod,
+                customerSource: body.customerSource,
+                notes: body.notes,
+                items: body.items,
+                requestUuid: body.requestUuid,
+                actorUserId: req.user?.id,
+            });
+
+            return res.status(201).json({
+                success: true,
+                data: sale,
+            });
+        } catch (error) {
+            return handleDuplicateKey(GESTURE_TYPES.SALE_CHECKOUT, body.requestUuid, res, error);
+        }
     } catch (error) {
-        next(error);
+        return next(error);
     }
 };
 
@@ -40,7 +95,13 @@ export const createSale = async (req, res, next) => {
  */
 export const listSales = async (req, res, next) => {
     try {
-        const sales = await listSalesService();
+        const viewAll = await userHasBroadReadScope(req.auth.userUuid);
+
+        const sales = await listSalesService({
+            actorUserId: req.user?.id,
+            viewAll,
+        });
+
         return res.status(200).json({
             success: true,
             data: sales,
@@ -57,7 +118,12 @@ export const getSaleByUuid = async (req, res, next) => {
     try {
         const { uuid } = saleUuidParamSchema.parse(req.params);
 
-        const sale = await getSaleByUuidService(uuid);
+        const viewAll = await userHasBroadReadScope(req.auth.userUuid);
+
+        const sale = await getSaleByUuidService(uuid, {
+            actorUserId: req.user?.id,
+            viewAll,
+        });
 
         if (!sale) {
             return res.status(404).json({
@@ -83,16 +149,26 @@ export const cancelSale = async (req, res, next) => {
         const { uuid } = saleUuidParamSchema.parse(req.params);
         const body = reversalBodySchema.parse(req.body);
 
-        const sale = await cancelSaleService({
-            uuid,
-            reason: body.reason,
-            actorUserId: req.user?.id,
-        });
+        const replay = await lookup(GESTURE_TYPES.SALE_CANCEL, body.requestUuid);
+        if (replay.found) {
+            return sendSaleReplay(replay, res);
+        }
 
-        return res.status(200).json({
-            success: true,
-            data: sale,
-        });
+        try {
+            const sale = await cancelSaleService({
+                uuid,
+                reason: body.reason,
+                requestUuid: body.requestUuid,
+                actorUserId: req.user?.id,
+            });
+
+            return res.status(200).json({
+                success: true,
+                data: sale,
+            });
+        } catch (error) {
+            return handleDuplicateKey(GESTURE_TYPES.SALE_CANCEL, body.requestUuid, res, error);
+        }
     } catch (error) {
         next(error);
     }
@@ -106,16 +182,26 @@ export const refundSale = async (req, res, next) => {
         const { uuid } = saleUuidParamSchema.parse(req.params);
         const body = reversalBodySchema.parse(req.body);
 
-        const sale = await refundSaleService({
-            uuid,
-            reason: body.reason,
-            actorUserId: req.user?.id,
-        });
+        const replay = await lookup(GESTURE_TYPES.SALE_REFUND, body.requestUuid);
+        if (replay.found) {
+            return sendSaleReplay(replay, res);
+        }
 
-        return res.status(200).json({
-            success: true,
-            data: sale,
-        });
+        try {
+            const sale = await refundSaleService({
+                uuid,
+                reason: body.reason,
+                requestUuid: body.requestUuid,
+                actorUserId: req.user?.id,
+            });
+
+            return res.status(200).json({
+                success: true,
+                data: sale,
+            });
+        } catch (error) {
+            return handleDuplicateKey(GESTURE_TYPES.SALE_REFUND, body.requestUuid, res, error);
+        }
     } catch (error) {
         next(error);
     }

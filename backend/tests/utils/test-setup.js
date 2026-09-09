@@ -95,7 +95,7 @@ export async function initializeTestDatabase() {
       );
 
       await db.sequelize.query(
-        `ALTER TABLE request_keys ADD CONSTRAINT request_keys_gesture_type_check CHECK (gesture_type IN ('SALE_CHECKOUT', 'SALE_EXCHANGE', 'RENTAL_BOOK', 'RENTAL_HANDOVER', 'RENTAL_AMEND', 'RENTAL_CANCEL', 'RENTAL_SETTLE', 'RENTAL_WRITE_OFF', 'UNIT_RECOVER', 'UNIT_TRANSITION', 'EXPENSE_CREATE', 'EXPENSE_REVERSE', 'INTAKE_SCAN', 'BARCODE_GENERATE', 'BARCODE_GENERATE_TEST'))`
+        `ALTER TABLE request_keys ADD CONSTRAINT request_keys_gesture_type_check CHECK (gesture_type IN ('SALE_CHECKOUT', 'SALE_EXCHANGE', 'SALE_CANCEL', 'SALE_REFUND', 'RENTAL_BOOK', 'RENTAL_HANDOVER', 'RENTAL_AMEND', 'RENTAL_CANCEL', 'RENTAL_SETTLE', 'RENTAL_WRITE_OFF', 'UNIT_RECOVER', 'UNIT_TRANSITION', 'EXPENSE_CREATE', 'EXPENSE_REVERSE', 'INTAKE_SCAN', 'BARCODE_GENERATE', 'BARCODE_GENERATE_TEST'))`
       );
 
       // Create barcode_seq sequence (from migration 20260824000002)

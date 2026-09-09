@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { requestUuidSchema } from '../idempotency/idempotency.validation.js';
+
 const uuidSchema = z.string().uuid('Invalid UUID format');
 
 /**
@@ -21,6 +23,7 @@ const itemSchema = z
  * Validation schema for POST /api/rentals (checkout / hand-out)
  */
 export const createRentalBodySchema = z.object({
+    requestUuid: requestUuidSchema.shape.requestUuid,
     customerName: z.string().trim().max(255).optional().default(undefined),
     customerUuid: uuidSchema.nullable().optional().default(undefined),
     startDate: z.string().date('Invalid date').optional().default(undefined),
@@ -53,6 +56,7 @@ export const rentalUuidParamSchema = z.object({
  * Returns one or more units. gradeUuid refers to a damage grade (optional).
  */
 export const returnBodySchema = z.object({
+    requestUuid: requestUuidSchema.shape.requestUuid,
     actualReturnDate: z.string().date('Invalid date').optional().default(undefined),
     items: z.array(
         z.object({
@@ -69,5 +73,6 @@ export const returnBodySchema = z.object({
  * Validation schema for POST /api/rentals/:uuid/cancel
  */
 export const cancelBodySchema = z.object({
+    requestUuid: requestUuidSchema.shape.requestUuid,
     reason: z.string().trim().max(2000).optional().default(undefined),
 });

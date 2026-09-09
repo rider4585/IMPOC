@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { requestUuidSchema } from '../idempotency/idempotency.validation.js';
+
 const uuidSchema = z.string().uuid('Invalid UUID format');
 
 /**
@@ -19,9 +21,11 @@ const sellableUnitItemSchema = z
 
 /**
  * Validation schema for POST /api/sales (checkout)
+ * requestUuid: idempotency key (SEC-M-3) - a replayed request is not double-applied.
  * items: one or more units to be sold (by barcode or unitUuid)
  */
 export const createSaleBodySchema = z.object({
+    requestUuid: requestUuidSchema.shape.requestUuid,
     customerName: z.string().trim().max(255).optional().default(undefined),
     customerUuid: uuidSchema.nullable().optional().default(undefined),
     soldAt: z.string().date('Invalid date').optional().default(undefined),
@@ -53,5 +57,6 @@ export const saleUuidParamSchema = z.object({
  * Validation schema for POST /api/sales/:uuid/cancel and /refund
  */
 export const reversalBodySchema = z.object({
+    requestUuid: requestUuidSchema.shape.requestUuid,
     reason: z.string().trim().max(2000).optional().default(undefined),
 });

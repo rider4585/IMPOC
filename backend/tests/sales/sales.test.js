@@ -1,5 +1,6 @@
 import express from 'express';
 import request from 'supertest';
+import { v4 as uuidv4 } from 'uuid';
 import * as db from '../../database/models/index.js';
 import { initializeTestDatabase, generateTestUser, closeDatabase, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
 import argon2 from 'argon2';
@@ -34,9 +35,9 @@ describe('Sales / POS module (T-08)', () => {
     let unit5;
     let unit6;
 
-    async function scanUnit(barcode) {
+    async function scanUnit(barcode, targetStock = stock) {
         const res = await request(app)
-            .post(`/api/trips/${trip.uuid}/stocks/${stock.uuid}/scan`)
+            .post(`/api/trips/${trip.uuid}/stocks/${targetStock.uuid}/scan`)
             .set('Authorization', `Bearer ${managerToken}`)
             .send({
                 barcode,
@@ -139,7 +140,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ customerName: 'Walk-in', paymentMethod: 'Cash', customerSource: 'Instagram', items: [{ unitUuid: unit1.uuid }, { unitUuid: unit2.uuid }] })
+                .send({ requestUuid: uuidv4(), customerName: 'Walk-in', paymentMethod: 'Cash', customerSource: 'Instagram', items: [{ unitUuid: unit1.uuid }, { unitUuid: unit2.uuid }] })
                 .expect(201);
 
             expect(res.body.success).toBe(true);
@@ -164,7 +165,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${cashierToken}`)
-                .send({ items: [{ unitUuid: unit3.uuid }] })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: unit3.uuid }] })
                 .expect(201);
 
             expect(res.body.data.lines).toHaveLength(1);
@@ -202,7 +203,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: rentalUnit.uuid }] })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: rentalUnit.uuid }] })
                 .expect(400);
 
             expect(res.body.success).toBe(false);
@@ -212,7 +213,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{}] })
+                .send({ requestUuid: uuidv4(), items: [{}] })
                 .expect(400);
 
             expect(res.body.success).toBe(false);
@@ -223,7 +224,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ unitUuid: unit1.uuid, barcode: unit1.barcode }] })
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: unit1.uuid, barcode: unit1.barcode }] })
                 .expect(400);
 
             expect(res.body.success).toBe(false);
@@ -235,7 +236,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post('/api/sales')
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ items: [{ barcode: unit4.barcode }] })
+                .send({ requestUuid: uuidv4(), items: [{ barcode: unit4.barcode }] })
                 .expect(201);
 
             expect(res.body.data.lines).toHaveLength(1);
@@ -311,7 +312,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post(`/api/sales/${saleUuid}/cancel`)
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ reason: 'Customer changed mind' })
+                .send({ requestUuid: uuidv4(), reason: 'Customer changed mind' })
                 .expect(200);
 
             expect(res.body.data.status).toBe('cancelled');
@@ -338,7 +339,7 @@ describe('Sales / POS module (T-08)', () => {
             const res = await request(testApp)
                 .post(`/api/sales/${saleUuid}/refund`)
                 .set('Authorization', `Bearer ${managerToken}`)
-                .send({ reason: 'Defective product' })
+                .send({ requestUuid: uuidv4(), reason: 'Defective product' })
                 .expect(200);
 
             expect(res.body.data.status).toBe('refunded');
@@ -414,6 +415,185 @@ describe('Sales / POS module (T-08)', () => {
 
             const allDistinct = new Set(numbers).size === numbers.length;
             expect(allDistinct).toBe(true);
+        });
+    });
+
+    describe('SEC-M-5 - read scoping for sales', () => {
+        it('should let a cashier (broad read? no) see only their own sales', async () => {
+            const mgrSaleUuid = global.__saleUuid;
+            const cashierSaleUuid = global.__cashierSaleUuid;
+
+            const ownGet = await request(testApp)
+                .get(`/api/sales/${cashierSaleUuid}`)
+                .set('Authorization', `Bearer ${cashierToken}`)
+                .expect(200);
+            expect(ownGet.body.data.uuid).toBe(cashierSaleUuid);
+
+            await request(testApp)
+                .get(`/api/sales/${mgrSaleUuid}`)
+                .set('Authorization', `Bearer ${cashierToken}`)
+                .expect(404);
+
+            const list = await request(testApp)
+                .get('/api/sales')
+                .set('Authorization', `Bearer ${cashierToken}`)
+                .expect(200);
+            const uuids = list.body.data.map((s) => s.uuid);
+            expect(uuids).toContain(cashierSaleUuid);
+            expect(uuids).not.toContain(mgrSaleUuid);
+        });
+
+        it('should let a manager (broad read scope) see sales created by others', async () => {
+            const list = await request(testApp)
+                .get('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+            const uuids = list.body.data.map((s) => s.uuid);
+            expect(uuids).toContain(global.__saleUuid);
+            expect(uuids).toContain(global.__cashierSaleUuid);
+        });
+    });
+
+    describe('SEC-M-3 - request-key idempotency for sales', () => {
+        let idemStock;
+
+        beforeAll(async () => {
+            // Dedicated stock so the idempotency suite has spare declared
+            // quantity (the main stock holds 10 units).
+            idemStock = await createTestStock({
+                trip,
+                tripVendor,
+                vendor,
+                productType,
+                overrides: {
+                    quantity: 30,
+                    buyingPricePaise: 100000,
+                    sellingPricePaise: 200000,
+                    floorPricePaise: 150000,
+                    channel: 'RETAIL',
+                },
+            });
+        });
+
+        it('should replay a repeated checkout with the cached sale instead of another sale', async () => {
+            const u = await scanUnit('IDEMCO01', idemStock);
+
+            const requestUuid = uuidv4();
+            const first = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, items: [{ unitUuid: u.uuid }] })
+                .expect(201);
+            const saleUuid = first.body.data.uuid;
+
+            const replay = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, items: [{ unitUuid: u.uuid }] })
+                .expect(200);
+
+            expect(replay.body.data.uuid).toBe(saleUuid);
+            expect(replay.body.message).toContain('Sale already processed (request replayed)');
+
+            const count = await db.Sale.count({ where: { uuid: saleUuid } });
+            expect(count).toBe(1);
+        });
+
+        it('should replay a repeated cancel and keep a single cancellation', async () => {
+            const u = await scanUnit('IDEMCO02', idemStock);
+            const created = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: u.uuid }] })
+                .expect(201);
+            const saleUuid = created.body.data.uuid;
+
+            const requestUuid = uuidv4();
+            await request(testApp)
+                .post(`/api/sales/${saleUuid}/cancel`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, reason: 'first cancel' })
+                .expect(200);
+
+            const replay = await request(testApp)
+                .post(`/api/sales/${saleUuid}/cancel`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, reason: 'first cancel' })
+                .expect(200);
+
+            expect(replay.body.data.status).toBe('cancelled');
+            expect(replay.body.message).toContain('Sale already processed (request replayed)');
+
+            const saleRow = await db.Sale.findOne({ where: { uuid: saleUuid } });
+            const reversals = await db.SaleReversal.count({
+                where: { saleId: saleRow.id, reversalType: 'CANCEL', deletedAt: null },
+            });
+            expect(reversals).toBe(1);
+        });
+
+        it('should replay a repeated refund and keep a single refund', async () => {
+            const u = await scanUnit('IDEMCO03', idemStock);
+            const created = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: u.uuid }] })
+                .expect(201);
+            const saleUuid = created.body.data.uuid;
+
+            const requestUuid = uuidv4();
+            await request(testApp)
+                .post(`/api/sales/${saleUuid}/refund`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, reason: 'first refund' })
+                .expect(200);
+
+            const replay = await request(testApp)
+                .post(`/api/sales/${saleUuid}/refund`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid, reason: 'first refund' })
+                .expect(200);
+
+            expect(replay.body.data.status).toBe('refunded');
+            expect(replay.body.message).toContain('Sale already processed (request replayed)');
+
+            const saleRow = await db.Sale.findOne({ where: { uuid: saleUuid } });
+            const reversals = await db.SaleReversal.count({
+                where: { saleId: saleRow.id, reversalType: 'REFUND', deletedAt: null },
+            });
+            expect(reversals).toBe(1);
+        });
+
+        it('should resolve concurrent checkouts sharing a requestUuid to one persisted sale', async () => {
+            const u = await scanUnit('IDEMCO04', idemStock);
+            const requestUuid = uuidv4();
+
+            const send = () =>
+                request(testApp)
+                    .post('/api/sales')
+                    .set('Authorization', `Bearer ${managerToken}`)
+                    .send({ requestUuid, items: [{ unitUuid: u.uuid }] });
+
+            const results = await Promise.allSettled([send(), send()]);
+
+            // Exactly one checkout wins; the loser either replays the winner's
+            // cached sale (200) or 409s on the already-sold unit - but never a
+            // second persisted sale (SEC-M-3).
+            const wins = results.filter((r) => r.status === 'fulfilled' && r.value.status === 201);
+            expect(wins).toHaveLength(1);
+
+            const loser = results.find((r) => r !== wins[0]);
+            const loserStatus =
+                loser.status === 'fulfilled' ? loser.value.status : (loser.reason && loser.reason.status) || 0;
+            if (loserStatus === 200) {
+                expect(loser.value.body.message).toContain('Sale already processed (request replayed)');
+                expect(loser.value.body.data.uuid).toBe(wins[0].value.body.data.uuid);
+            } else {
+                expect(loserStatus).toBeGreaterThanOrEqual(400);
+                expect(loserStatus).toBeLessThan(500);
+            }
+
+            const lines = await db.SaleLine.count({ where: { unitUuid: u.uuid } });
+            expect(lines).toBe(1);
         });
     });
 });

@@ -1,11 +1,14 @@
 import { z } from 'zod';
 
+import { requestUuidSchema } from '../idempotency/idempotency.validation.js';
+
 const uuidSchema = z.string().uuid('Invalid UUID format');
 
 /**
  * Validation schema for POST /api/expenses (create)
  */
 export const createExpenseBodySchema = z.object({
+    requestUuid: requestUuidSchema.shape.requestUuid,
     amountPaise: z.number().int().nonnegative('Amount must be >= 0'),
     category: z.string().trim().min(1, 'Category is required').max(100),
     purpose: z.string().trim().max(2000).optional().default(undefined),
@@ -35,5 +38,6 @@ export const expenseUuidParamSchema = z.object({
  * Validation schema for POST /api/expenses/:uuid/cancel
  */
 export const cancelExpenseBodySchema = z.object({
+    requestUuid: requestUuidSchema.shape.requestUuid,
     reason: z.string().trim().max(2000).optional().default(undefined),
 });

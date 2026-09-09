@@ -147,7 +147,10 @@ describe('Story 3.3: Scan units into a stock', () => {
             }).expect(409);
 
             expect(res.body.success).toBe(false);
-            expect(res.body.message).toContain('Barcode already bound to unit');
+            // The duplicate-barcode error carries a bound unit UUID and a
+            // `(status: ...)` fragment, so SEC-M-7 masks it entirely.
+            expect(res.body.message).toBe('Request could not be processed');
+            expect(res.body.message).not.toContain('Barcode already bound to unit');
         });
 
         it('should reject scan when stock has reached its declared quantity', async () => {
