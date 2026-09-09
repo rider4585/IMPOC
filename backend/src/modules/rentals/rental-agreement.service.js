@@ -80,6 +80,11 @@ function daysBetween(fromStr, toStr) {
  * @returns {Promise<Unit>}
  */
 async function resolveRentableUnit({ unitUuid, barcode }, transaction) {
+    if (!unitUuid && !barcode) {
+        const error = new Error('Each item must specify exactly one of barcode or unitUuid');
+        error.statusCode = 400;
+        throw error;
+    }
     const where = unitUuid ? { uuid: unitUuid } : { barcode };
     const unit = await Unit.findOne({
         where: { ...where, deletedAt: null },

@@ -198,6 +198,47 @@ describe('Sales / POS module (T-08)', () => {
             expect(res.body.success).toBe(false);
         });
 
+        it('should reject a sale item with neither barcode nor unitUuid (SEC-H-6)', async () => {
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{}] })
+                .expect(400);
+
+            expect(res.body.success).toBe(false);
+            expect(res.body.message).toMatch(/exactly one of barcode or unitUuid/);
+        });
+
+        it('should reject a sale item with both barcode and unitUuid (SEC-H-6)', async () => {
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ unitUuid: unit1.uuid, barcode: unit1.barcode }] })
+                .expect(400);
+
+            expect(res.body.success).toBe(false);
+            expect(res.body.message).toMatch(/exactly one of barcode or unitUuid/);
+        });
+
+        it('should allow a sale item resolved by barcode only (SEC-H-6 positive control)', async () => {
+            const unit4 = await scanUnit('A1000000004');
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ barcode: unit4.barcode }] })
+                .expect(201);
+
+            expect(res.body.data.lines).toHaveLength(1);
+            expect(res.body.data.lines[0].barcode).toBe(unit4.barcode);
+        });
+
+        it('should reject at the service layer when a sale item has no identifier (SEC-H-6)', async () => {
+            await expect(createSale({ items: [{}], actorUserId: managerUserId })).rejects.toMatchObject({
+                statusCode: 400,
+                message: expect.stringMatching(/exactly one of barcode or unitUuid/),
+            });
+        });
+
         it('should not require cancel permission for listing (sales.view)', async () => {
             await request(testApp)
                 .get('/api/sales')

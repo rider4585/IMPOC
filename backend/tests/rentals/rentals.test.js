@@ -194,6 +194,48 @@ describe('Rental agreements module (T-10)', () => {
                 .send({ items: [{ unitUuid: u3.uuid }] })
                 .expect(403);
         });
+
+        it('should reject a rental item with neither barcode nor unitUuid (SEC-H-6)', async () => {
+            const res = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{}] })
+                .expect(400);
+
+            expect(res.body.success).toBe(false);
+            expect(res.body.message).toMatch(/exactly one of barcode or unitUuid/);
+        });
+
+        it('should reject a rental item with both barcode and unitUuid (SEC-H-6)', async () => {
+            const u4 = await scanUnit('RA0000000004');
+            const res = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ unitUuid: u4.uuid, barcode: u4.barcode }] })
+                .expect(400);
+
+            expect(res.body.success).toBe(false);
+            expect(res.body.message).toMatch(/exactly one of barcode or unitUuid/);
+        });
+
+        it('should allow a rental item resolved by barcode only (SEC-H-6 positive control)', async () => {
+            const u5 = await scanUnit('RA0000000005');
+            const res = await request(testApp)
+                .post('/api/rentals')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ items: [{ barcode: u5.barcode }] })
+                .expect(201);
+
+            expect(res.body.data.lines).toHaveLength(1);
+            expect(res.body.data.lines[0].barcode).toBe(u5.barcode);
+        });
+
+        it('should reject at the service layer when a rental item has no identifier (SEC-H-6)', async () => {
+            await expect(createRental({ items: [{}], actorUserId: managerUserId })).rejects.toMatchObject({
+                statusCode: 400,
+                message: expect.stringMatching(/exactly one of barcode or unitUuid/),
+            });
+        });
     });
 
     describe('GET /api/rentals', () => {
