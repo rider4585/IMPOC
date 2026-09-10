@@ -82,7 +82,14 @@ export const Dialog = ({
                 )}
               </div>
             )}
-            <div className="min-h-0 flex-1 overflow-y-auto text-sm text-[var(--ink)]">{children}</div>
+            {/*
+              -mx-2 px-2: `overflow-y-auto` also clips the X axis, which would
+              cut a full-width field's 2px focus ring flush at the body edge
+              (the "border overlap" seen in modals). The negative margin + equal
+              padding pushes the clip boundary 8px outward while keeping content
+              aligned with the title/footer, so focus rings render fully.
+            */}
+            <div className="-mx-2 min-h-0 flex-1 overflow-y-auto px-2 py-0.5 text-sm text-[var(--ink)]">{children}</div>
             {footer && <div className="mt-4 flex shrink-0 justify-end gap-2">{footer}</div>}
           </motion.div>
         </div>
