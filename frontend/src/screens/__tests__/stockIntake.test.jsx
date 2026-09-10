@@ -165,29 +165,31 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
     expect(screen.queryByTestId('save-unit')).not.toBeInTheDocument();
   });
 
-  it('pre-fills colour + size from the previous unit but shows the form and does NOT auto-commit until Save (or a fresh pick)', async () => {
+  it('starts each unit blank (no carry-over) and auto-commits once both colour + size are picked', async () => {
     setup();
     renderIntake();
     await waitFor(() => expect(screen.getByText(/0 of 3/)).toBeInTheDocument());
 
-    // Save a first unit with Red/M — the pick commits it.
+    // Save a first unit with Red/M — picking both commits it.
     await enterDecodedState('100001');
     await pickColourSize('Red', 'M');
     await waitFor(() => expect(screen.getByText(/1 of 3/)).toBeInTheDocument());
 
-    // Second unit: colour+size pre-fill from the last saved unit, but the form
-    // is shown and NOTHING is auto-saved — the operator must confirm each unit.
+    // Second unit: dropdowns are BLANK (the previous unit's pick does not carry
+    // over) and nothing is auto-saved. Save stays disabled until both chosen.
     await enterDecodedState('100002');
     expect(screen.getByText(/1 of 3/)).toBeInTheDocument();
     expect(tripsService.scanBarcodeIntoStock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('save-unit')).toBeDisabled();
 
-    // Tapping Save commits with the pre-filled colour/size (no re-pick needed).
-    fireEvent.click(screen.getByTestId('save-unit'));
+    // Picking both commits (picking the second field is the commit) — and a
+    // fresh, different pick proves nothing was pre-selected.
+    await pickColourSize('Blue', 'L');
     await waitFor(() => expect(screen.getByText(/2 of 3/)).toBeInTheDocument());
     expect(tripsService.scanBarcodeIntoStock).toHaveBeenLastCalledWith(
       't1',
       'S1',
-      { barcode: '100002', colourUuid: 'c1', sizeUuid: 's1' }
+      { barcode: '100002', colourUuid: 'c2', sizeUuid: 's2' }
     );
   });
 });

@@ -65,13 +65,6 @@ export function StockIntake() {
   // is already in flight (e.g. colour/size change mid-save).
   const savingRef = useRef(false);
 
-  // Auto-commit only when the operator has actively picked/changed colour or
-  // size for THIS unit — not when they were merely pre-filled from the last
-  // saved unit. Reset on every fresh decode so each scanned unit shows its
-  // colour/size form instead of silently auto-saving the previous unit's picks.
-  // (Size-run mode keeps auto-advancing — it is the deliberate fast path.)
-  const pickedSinceDecodeRef = useRef(false);
-
   const scannedCount = stock?.unitsScannedCount ?? 0;
   const quantity = stock ? Number(stock.quantity) : 0;
   const isFull = scannedCount >= quantity;
@@ -109,26 +102,29 @@ export function StockIntake() {
     return () => clearTimeout(decodeTimerRef.current);
   }, [state]);
 
-  // Pre-fill colour/size from last saved unit
+  // Pre-fill for SIZE-RUN mode ONLY: colour carries from the last saved unit
+  // and size advances through the configured run (the deliberate fast path).
+  // In normal mode each unit starts BLANK — the fields are cleared on every
+  // decode — so the operator always picks colour + size for each unit.
   useEffect(() => {
-    if (state === STATES.DECODED) {
+    if (state !== STATES.DECODED) return;
+    if (sizeRunEnabled && sizeRunSequence.length > 0) {
       if (lastSavedColour) setColourUuid(lastSavedColour);
-      if (lastSavedSize && !sizeRunEnabled) setSizeUuid(lastSavedSize);
-      else if (sizeRunEnabled && sizeRunSequence.length > 0) {
-        setSizeUuid(sizeRunSequence[sizeRunIndex % sizeRunSequence.length]);
-      }
+      setSizeUuid(sizeRunSequence[sizeRunIndex % sizeRunSequence.length]);
     }
-  }, [state, lastSavedColour, lastSavedSize, sizeRunEnabled, sizeRunSequence, sizeRunIndex]);
+  }, [state, lastSavedColour, sizeRunEnabled, sizeRunSequence, sizeRunIndex]);
 
-  // UX-H5: auto commit-repeat. As soon as the decoded unit has a colour AND a
-  // size (either from prefill or the worker's picks), the save fires without a
-  // tap. The loop is broken by refusals (keeps DECODED), inline save errors
-  // (keeps DECODED + retry), or a completed stock (STOCK_FULL).
+  // Auto commit-repeat. Once the decoded unit has BOTH a colour and a size the
+  // save fires without an extra tap. In normal mode both fields are blank on
+  // each decode, so this only fires after the operator deliberately picks both
+  // (picking the second field is the commit) — changing one alone never
+  // submits. In size-run mode the pre-fill supplies both. The loop is broken by
+  // refusals (keeps DECODED), inline save errors (keeps DECODED + retry), or a
+  // completed stock (STOCK_FULL).
   useEffect(() => {
     if (state !== STATES.DECODED) return;
     if (refusalInfo || saveError || !scannedBarcode) return;
     if (!colourUuid || !sizeUuid) return;
-    if (!pickedSinceDecodeRef.current && !sizeRunEnabled) return;
     if (savingRef.current) return;
     handleSave();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,7 +185,9 @@ export function StockIntake() {
     setRefusalInfo(null);
     setSaveError('');
     setConfirmCancel(false);
-    pickedSinceDecodeRef.current = false;
+    // Each unit starts blank; size-run prefill (if any) refills after decode.
+    setColourUuid('');
+    setSizeUuid('');
     setState(STATES.DECODED);
     // Haptic pulse
     try { navigator.vibrate?.(100); } catch {}
@@ -202,7 +200,9 @@ export function StockIntake() {
     setScannedBarcode(value);
     setRefusalInfo(null);
     setSaveError('');
-    pickedSinceDecodeRef.current = false;
+    // Each unit starts blank; size-run prefill (if any) refills after decode.
+    setColourUuid('');
+    setSizeUuid('');
     setState(STATES.DECODED);
     setShowManual(false);
     setManualBarcode('');
@@ -484,7 +484,7 @@ export function StockIntake() {
                   <SearchableSelect
                     label="Colour"
                     value={colourUuid}
-                    onChange={(v) => { pickedSinceDecodeRef.current = true; setColourUuid(v); }}
+                    onChange={setColourUuid}
                     placeholder="Select colour…"
                     searchPlaceholder="Search colours…"
                     emptyMessage="No colours."
@@ -496,7 +496,7 @@ export function StockIntake() {
                   <SearchableSelect
                     label="Size"
                     value={sizeUuid}
-                    onChange={(v) => { pickedSinceDecodeRef.current = true; setSizeUuid(v); }}
+                    onChange={setSizeUuid}
                     placeholder="Select size…"
                     searchPlaceholder="Search sizes…"
                     emptyMessage="No sizes."
