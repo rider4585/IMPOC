@@ -1,7 +1,7 @@
 ﻿import React, { forwardRef } from 'react';
 
 /**
- * Input â€” shadcn-style base text field primitive (light mode, Tailwind).
+ * Input - shadcn-style base text field primitive (light mode, Tailwind).
  * Supports size variants and an optional `label`, `error`, and `hint`.
  */
 const fieldCls =

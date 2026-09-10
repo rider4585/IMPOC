@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
 /**
- * Dialog â€” shadcn-style base modal primitive (light mode, Tailwind).
+ * Dialog - shadcn-style base modal primitive (light mode, Tailwind).
  *
  * Props:
  * - open: boolean

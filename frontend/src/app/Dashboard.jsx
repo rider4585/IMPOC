@@ -96,7 +96,7 @@ function SalesTable({ data }) {
           <TableRow key={r.uuid}>
             <TableCell className="font-semibold">{r.saleNumber}</TableCell>
             <TableCell>{r.soldAt}</TableCell>
-            <TableCell>{r.customerName || 'â€”'}</TableCell>
+            <TableCell>{r.customerName || '—'}</TableCell>
             <TableCell>
               <Badge variant={r.status === 'completed' ? 'success' : 'neutral'}>{r.status}</Badge>
             </TableCell>
@@ -131,7 +131,7 @@ function RentalsTable({ data }) {
         {data.rows.map((r) => (
           <TableRow key={r.uuid}>
             <TableCell className="font-semibold">{r.agreementNumber}</TableCell>
-            <TableCell>{r.customerName || 'â€”'}</TableCell>
+            <TableCell>{r.customerName || '—'}</TableCell>
             <TableCell>{r.startDate}</TableCell>
             <TableCell>{r.dueDate}</TableCell>
             <TableCell>
@@ -173,7 +173,7 @@ function ExpensesTable({ data }) {
           <TableRow key={r.uuid}>
             <TableCell>{r.expenseDate}</TableCell>
             <TableCell className="font-semibold">{r.category}</TableCell>
-            <TableCell>{r.purpose || 'â€”'}</TableCell>
+            <TableCell>{r.purpose || '—'}</TableCell>
             <TableCell>
               <Badge variant={r.status === 'completed' ? 'success' : 'neutral'}>{r.status}</Badge>
             </TableCell>
@@ -373,7 +373,7 @@ export function Dashboard() {
               className="w-[150px]"
               aria-label="From date"
             />
-            <span className="text-[var(--ink-muted)]">â†’</span>
+            <span className="text-[var(--ink-muted)]">&rarr;</span>
             <Input
               type="date"
               value={to}
@@ -412,11 +412,11 @@ export function Dashboard() {
         <div className="flex flex-wrap items-center gap-4 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-sm">
           <span className="font-semibold">Inventory:</span>
           <span>{inventoryData.total} total</span>
-          <span className="text-[var(--ink-muted)]">Â·</span>
+          <span className="text-[var(--ink-muted)]">&middot;</span>
           <span>{inventoryData.retailInStock} retail in stock</span>
           {Object.entries(inventoryData.byChannel || {}).map(([ch, n]) => (
             <span key={ch} className="text-[var(--ink-muted)]">
-              Â· {ch}: {n}
+              &middot; {ch}: {n}
             </span>
           ))}
         </div>

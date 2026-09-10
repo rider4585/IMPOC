@@ -14,7 +14,7 @@ const variantStyles = {
 };
 
 /**
- * ToastProvider â€” wraps the app and exposes `useToast()`.
+ * ToastProvider - wraps the app and exposes `useToast()`.
  * toast.push({ title?, description?, variant })
  * variant: 'success' | 'error' | 'info' | 'warning' (default 'info')
  */

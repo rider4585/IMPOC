@@ -444,7 +444,7 @@ export function POSScreen() {
                   <li key={line.uuid} className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm">
                     <span className="font-semibold">{line.barcode}</span>
                     <span className="text-[var(--ink-muted)]">
-                      {formatPaise(Number(line.rentPerDayPaise))}/day Â· deposit {formatPaise(Number(line.depositPaise))}
+                      {formatPaise(Number(line.rentPerDayPaise))}/day &middot; deposit {formatPaise(Number(line.depositPaise))}
                     </span>
                   </li>
                 ))}
