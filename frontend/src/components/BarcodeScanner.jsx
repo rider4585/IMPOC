@@ -967,7 +967,10 @@ function BarcodeScanner({ onDetected, onError }) {
                             try {
                                 const source = new HTMLCanvasElementLuminanceSource(captureCanvas);
                                 const binary = new BinaryBitmap(new HybridBinarizer(source));
-                                const result = multiReader.decode(binary);
+                                // decodeWithState keeps the CODE_128 hints set above.
+                                // multiReader.decode(image) resets hints each call and
+                                // would scan every format (QR, etc.) — slow and noisy.
+                                const result = multiReader.decodeWithState(binary);
                                 const value = result && result.getText();
 
                                 if (value && !cancelled && !pausedRef.current) {
