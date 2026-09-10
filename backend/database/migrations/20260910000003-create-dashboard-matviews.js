@@ -25,7 +25,7 @@
  * REFRESH MATERIALIZED VIEW CONCURRENTLY can be used. mv_inventory_snapshot is
  * a single row with no natural unique key, so it uses a plain REFRESH.
  */
-module.exports = {
+const migration = {
     // [name, uniqueIndexName?, createSql]
     MATVIEWS: [
         {
@@ -128,3 +128,6 @@ WHERE u.deleted_at IS NULL`,
         }
     },
 };
+
+export const up = migration.up.bind(migration);
+export const down = migration.down.bind(migration);

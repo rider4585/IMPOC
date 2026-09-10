@@ -16,7 +16,7 @@
  * column's type (e.g. sold_at date -> text), so each view is dropped first
  * when a previous shape exists; DROP VIEW IF EXISTS keeps re-runs safe.
  */
-module.exports = {
+const migration = {
     VIEWS: [
         // ---------------------------------------------------------------- sales
         {
@@ -305,3 +305,6 @@ WHERE st.deleted_at IS NULL`,
         }
     },
 };
+
+export const up = migration.up.bind(migration);
+export const down = migration.down.bind(migration);

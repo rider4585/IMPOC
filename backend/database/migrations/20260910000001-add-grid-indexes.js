@@ -14,7 +14,7 @@
  * a partial unique index with a WHERE clause does not serve a plain
  * b-tree lookup on the same column).
  */
-module.exports = {
+const migration = {
     // [name, table, columns[], whereClause?]
     // whereClause uses column names wrapped in double quotes by the builder.
     INDEXES: [
@@ -81,3 +81,6 @@ module.exports = {
         }
     },
 };
+
+export const up = migration.up.bind(migration);
+export const down = migration.down.bind(migration);
