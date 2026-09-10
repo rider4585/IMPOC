@@ -137,7 +137,7 @@ export function ExpensesScreen() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1100px] flex-col gap-5 p-6 overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="typography-heading mb-1">Expenses</h1>
@@ -164,6 +164,7 @@ export function ExpensesScreen() {
         </div>
       )}
 
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <Card>
         <CardHeader>
           <CardTitle>Expense list</CardTitle>
@@ -248,6 +249,7 @@ export function ExpensesScreen() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {formOpen && (
         <ExpenseFormDialog

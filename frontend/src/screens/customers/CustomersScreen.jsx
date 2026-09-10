@@ -201,7 +201,7 @@ export function CustomersScreen() {
   ], [canUpdate, consentBusy]);
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1100px] flex-col gap-5 p-6 overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="typography-heading mb-1">Customers</h1>
@@ -226,7 +226,7 @@ export function CustomersScreen() {
         <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
       )}
 
-      <div className="flex flex-col gap-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
         <div className="max-w-[360px]">
           <Input
             type="search"
@@ -245,6 +245,7 @@ export function CustomersScreen() {
             isEmpty={customers.length === 0}
             emptyMessage="No customers found."
             loadingMessage="Loading customers…"
+            className="flex-1"
           />
         </div>
       </div>
