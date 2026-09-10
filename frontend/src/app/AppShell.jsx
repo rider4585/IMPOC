@@ -31,8 +31,9 @@ import {
   ChevronDown,
 } from 'lucide-react';
 
-// localStorage key for remembering which desktop nav sections are collapsed.
+// localStorage keys for remembering which desktop nav sections and rail are collapsed.
 const NAV_COLLAPSED_KEY = 'appshell:nav-collapsed';
+const RAIL_COLLAPSED_KEY = 'appshell:rail-collapsed';
 
 function loadCollapsedSections() {
   try {
@@ -41,6 +42,15 @@ function loadCollapsedSections() {
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
+  }
+}
+
+function loadRailCollapsed() {
+  try {
+    const raw = localStorage.getItem(RAIL_COLLAPSED_KEY);
+    return raw === 'true';
+  } catch {
+    return false;
   }
 }
 
@@ -113,6 +123,8 @@ export function AppShell({ children }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Which desktop nav sections are collapsed, remembered across reloads.
   const [collapsedSections, setCollapsedSections] = useState(loadCollapsedSections);
+  // Whether desktop rail is in icon-only mode.
+  const [railCollapsed, setRailCollapsed] = useState(loadRailCollapsed);
   const resizeObserverRef = useRef(null);
 
   const toggleSection = (key) => {
@@ -122,6 +134,18 @@ export function AppShell({ children }) {
         localStorage.setItem(NAV_COLLAPSED_KEY, JSON.stringify(next));
       } catch {
         // Storage unavailable (private mode / blocked) — collapse still works for the session.
+      }
+      return next;
+    });
+  };
+
+  const toggleRailCollapse = () => {
+    setRailCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(RAIL_COLLAPSED_KEY, String(next));
+      } catch {
+        // Storage unavailable — collapse still works for the session.
       }
       return next;
     });
@@ -209,24 +233,35 @@ export function AppShell({ children }) {
     <NavItem
       key={entry.path}
       active={isActive(entry.path)}
-      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm ${
+      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors ${
         isActive(entry.path)
           ? 'bg-primary text-primary-foreground'
           : 'text-[var(--ink-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)]'
-      }`}
+      } ${railCollapsed ? 'justify-center' : ''}`}
       onClick={() => handleNavigation(entry.path)}
+      title={railCollapsed ? entry.label : undefined}
+      aria-label={railCollapsed ? entry.label : undefined}
       role="menuitem"
     >
       <span className={isActive(entry.path) ? 'text-primary-foreground' : 'text-[var(--ink-faint)]'}>
         {iconFor(itemIcon[entry.path])}
       </span>
-      {entry.label}
+      {!railCollapsed && entry.label}
     </NavItem>
   );
 
   const railSection = (section) => {
     const isCollapsed = Boolean(collapsedSections[section.key]);
     const bodyId = `nav-section-${section.key}`;
+    if (railCollapsed) {
+      return (
+        <div key={section.key} className="mb-3">
+          <div className="flex flex-col items-center gap-2">
+            {section.items.map(railItem)}
+          </div>
+        </div>
+      );
+    }
     return (
       <div key={section.key} className="mb-5">
         <button
@@ -285,11 +320,11 @@ export function AppShell({ children }) {
       {/* Desktop left sidebar */}
       {isDesktop && (
         <nav
-          className="flex w-60 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface-raised)]"
+          className={`flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface-raised)] transition-all ${railCollapsed ? 'w-16' : 'w-60'}`}
           aria-label="Main Navigation"
         >
-          <div className="flex h-16 shrink-0 items-center border-b border-[var(--border)] px-4">
-            <ShopLogo size={{ logo: 32, text: 'text-lg' }} />
+          <div className={`flex h-16 shrink-0 items-center border-b border-[var(--border)] ${railCollapsed ? 'justify-center px-2' : 'px-4'}`}>
+            <ShopLogo size={railCollapsed ? { logo: 24, text: 'hidden' } : { logo: 32, text: 'text-lg' }} />
           </div>
           <div className="flex flex-1 flex-col overflow-y-auto p-3">
             {accessibleSections.length > 0 ? (
@@ -303,13 +338,24 @@ export function AppShell({ children }) {
           <div className="border-t border-[var(--border)] p-3">
             <button
               type="button"
-              className="flex min-h-[44px] w-full items-center justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-3 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--border-strong)] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
+              className={`flex items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-3 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--border-strong)] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 ${railCollapsed ? 'h-9 w-9 justify-center' : 'min-h-[44px] w-full justify-center'}`}
               onClick={handleSignOut}
               disabled={isSigningOut}
               aria-busy={isSigningOut}
               title={isSigningOut ? 'Signing out...' : 'Sign Out'}
+              aria-label={railCollapsed ? 'Sign out' : undefined}
             >
-              {isSigningOut ? 'Signing out...' : 'Sign Out'}
+              {!railCollapsed && (isSigningOut ? 'Signing out...' : 'Sign Out')}
+              {railCollapsed && '→'}
+            </button>
+            <button
+              type="button"
+              className={`mt-2 flex items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-3 py-2 transition-colors hover:bg-[var(--border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 ${railCollapsed ? 'h-9 w-9 justify-center' : 'min-h-[44px] w-full justify-center'}`}
+              onClick={toggleRailCollapse}
+              aria-label={railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={railCollapsed ? 'Expand' : 'Collapse'}
+            >
+              {railCollapsed ? '→' : '←'}
             </button>
           </div>
         </nav>
