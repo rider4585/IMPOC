@@ -6,6 +6,7 @@
 
 import apiClient from '../platform/apiClient.js';
 import { SALES_ROUTES } from '../platform/routes.js';
+import { createRequestKey } from '../platform/requestKey.js';
 
 function buildError(error, fallback) {
   if (error.response?.data?.message) {
@@ -37,13 +38,17 @@ export async function listSales() {
 
 /**
  * POST /sales - Checkout a RETAIL sale
- * @param {{customerName?, customerUuid?, soldAt?, notes?, items: Array<{unitUuid?|barcode?}>}} payload
+ * @param {{customerName?, customerUuid?, soldAt?, notes?, items: Array<{unitUuid?|barcode?}>, requestUuid?}} payload
  * customerUuid (Schema V2) links a customers entity; customerName free text stays supported.
+ * requestUuid (SEC-M-3 idempotency): pass to reuse across retries of the same intent; the service mints one when absent.
  * @returns {Promise<Object>} sale DTO with lines[] and optional customer object
  */
 export async function createSale(payload) {
   try {
-    const response = await apiClient.post(SALES_ROUTES.CREATE, payload);
+    const response = await apiClient.post(SALES_ROUTES.CREATE, {
+      ...payload,
+      requestUuid: payload?.requestUuid || createRequestKey(),
+    });
     if (response.data?.success) {
       return response.data.data;
     }
@@ -74,11 +79,13 @@ export async function getSale(uuid) {
  * POST /sales/:uuid/cancel
  * @param {string} uuid
  * @param {{reason?}} payload
+ * @param {{requestUuid?}} options - pass to reuse across retries of the same intent; the service mints one when absent.
  */
-export async function cancelSale(uuid, reason) {
+export async function cancelSale(uuid, reason, options = {}) {
   try {
     const response = await apiClient.post(SALES_ROUTES.CANCEL(uuid), {
       reason: reason || undefined,
+      requestUuid: options.requestUuid || createRequestKey(),
     });
     if (response.data?.success) {
       return response.data.data;
@@ -93,11 +100,13 @@ export async function cancelSale(uuid, reason) {
  * POST /sales/:uuid/refund
  * @param {string} uuid
  * @param {{reason?}} payload
+ * @param {{requestUuid?}} options - pass to reuse across retries of the same intent; the service mints one when absent.
  */
-export async function refundSale(uuid, reason) {
+export async function refundSale(uuid, reason, options = {}) {
   try {
     const response = await apiClient.post(SALES_ROUTES.REFUND(uuid), {
       reason: reason || undefined,
+      requestUuid: options.requestUuid || createRequestKey(),
     });
     if (response.data?.success) {
       return response.data.data;

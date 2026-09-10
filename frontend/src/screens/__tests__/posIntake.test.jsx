@@ -47,6 +47,8 @@ vi.mock('../../components/BarcodeScanner.jsx', () => ({
 import { POSScreen } from '../pos/POSScreen.jsx';
 import { TripsScreen } from '../inventory/TripsScreen.jsx';
 
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const FULL = {
   INVENTORY: { VIEW: 'inventory.view', CREATE: 'inventory.create', UPDATE: 'inventory.update' },
   SALES: { VIEW: 'sales.view', CREATE: 'sales.create', CANCEL: 'sales.cancel', REFUND: 'sales.refund' },
@@ -153,12 +155,15 @@ describe('POSScreen (T-09)', () => {
     await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('pos-checkout'));
     await waitFor(() => {
-      expect(salesService.createSale).toHaveBeenCalledWith({
-        customerName: undefined,
-        customerUuid: undefined,
-        paymentMethod: 'Cash',
-        items: [{ unitUuid: 'u1' }],
-      });
+      expect(salesService.createSale).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customerName: undefined,
+          customerUuid: undefined,
+          paymentMethod: 'Cash',
+          items: [{ unitUuid: 'u1' }],
+          requestUuid: expect.stringMatching(UUID_V4_REGEX),
+        })
+      );
       expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
     });
   });
@@ -210,12 +215,15 @@ describe('POSScreen (T-09)', () => {
 
     fireEvent.click(screen.getByTestId('pos-checkout'));
     await waitFor(() => {
-      expect(salesService.createSale).toHaveBeenCalledWith({
-        customerName: 'Priya Sharma',
-        customerUuid: 'cust-1',
-        paymentMethod: 'Cash',
-        items: [{ unitUuid: 'u1' }],
-      });
+      expect(salesService.createSale).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customerName: 'Priya Sharma',
+          customerUuid: 'cust-1',
+          paymentMethod: 'Cash',
+          items: [{ unitUuid: 'u1' }],
+          requestUuid: expect.stringMatching(UUID_V4_REGEX),
+        })
+      );
       expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
     });
   });
@@ -281,13 +289,16 @@ describe('POS scanner feature', () => {
 
     fireEvent.click(screen.getByTestId('pos-checkout'));
     await waitFor(() => {
-      expect(salesService.createSale).toHaveBeenCalledWith({
-        customerName: undefined,
-        customerUuid: undefined,
-        paymentMethod: 'Cash',
-        customerSource: 'Instagram',
-        items: [{ unitUuid: 'u1' }],
-      });
+      expect(salesService.createSale).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customerName: undefined,
+          customerUuid: undefined,
+          paymentMethod: 'Cash',
+          customerSource: 'Instagram',
+          items: [{ unitUuid: 'u1' }],
+          requestUuid: expect.stringMatching(UUID_V4_REGEX),
+        })
+      );
     });
   });
 });

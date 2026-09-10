@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Card,
   CardHeader,
@@ -20,6 +20,7 @@ import {
   cancelExpense,
 } from '../../services/expensesApi.js';
 import { formatPaise } from '../../platform/money.js';
+import { createRequestKey } from '../../platform/requestKey.js';
 import { ExpenseFormDialog } from './ExpenseFormDialog.jsx';
 
 const STATUS_FILTERS = ['all', 'completed', 'cancelled'];
@@ -45,6 +46,11 @@ export function ExpensesScreen() {
   const [cancelling, setCancelling] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // SEC-M-3 idempotency: one key per action intent (create / cancel), reused across retries
+  // of the same intent until it succeeds or its dialog is closed (fresh key on a new intent).
+  const saveKeyRef = useRef(null);
+  const cancelKeyRef = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,9 +96,10 @@ export function ExpensesScreen() {
         });
         toast.success({ title: 'Expense updated' });
       } else {
-        await createExpense(payload);
+        await createExpense({ ...payload, requestUuid: saveKeyRef.current });
         toast.success({ title: 'Expense recorded' });
       }
+      saveKeyRef.current = null;
       setFormOpen(false);
       setEditing(null);
       await load();
@@ -106,8 +113,11 @@ export function ExpensesScreen() {
   const handleCancel = async () => {
     setSaving(true);
     try {
-      await cancelExpense(cancelling.uuid, cancelReason.trim() || undefined);
+      await cancelExpense(cancelling.uuid, cancelReason.trim() || undefined, {
+        requestUuid: cancelKeyRef.current,
+      });
       toast.success({ title: 'Expense cancelled' });
+      cancelKeyRef.current = null;
       setCancelling(null);
       setCancelReason('');
       await load();
@@ -136,7 +146,10 @@ export function ExpensesScreen() {
           </p>
         </div>
         {canCreate && (
-          <Button onClick={() => { setEditing(null); setFormOpen(true); }} data-testid="expenses-create">
+          <Button
+            onClick={() => { saveKeyRef.current = createRequestKey(); setEditing(null); setFormOpen(true); }}
+            data-testid="expenses-create"
+          >
             Record expense
           </Button>
         )}
@@ -212,7 +225,7 @@ export function ExpensesScreen() {
                         <Button variant="outline" size="sm" onClick={() => { setEditing(e); setFormOpen(true); }}>
                           Edit
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => { setCancelling(e); setCancelReason(''); }}>
+                        <Button variant="ghost" size="sm" onClick={() => { cancelKeyRef.current = createRequestKey(); setCancelling(e); setCancelReason(''); }}>
                           Cancel
                         </Button>
                       </>
@@ -228,7 +241,7 @@ export function ExpensesScreen() {
       {formOpen && (
         <ExpenseFormDialog
           open={formOpen}
-          onClose={() => { setFormOpen(false); setEditing(null); }}
+          onClose={() => { saveKeyRef.current = null; setFormOpen(false); setEditing(null); }}
           onSave={handleSave}
           saving={saving}
           expense={editing}
@@ -238,11 +251,11 @@ export function ExpensesScreen() {
       {cancelling && (
         <Dialog
           open={Boolean(cancelling)}
-          onClose={() => setCancelling(null)}
+          onClose={() => { cancelKeyRef.current = null; setCancelling(null); }}
           title="Cancel expense"
           footer={
             <>
-              <Button variant="outline" onClick={() => setCancelling(null)} disabled={saving}>
+              <Button variant="outline" onClick={() => { cancelKeyRef.current = null; setCancelling(null); }} disabled={saving}>
                 Keep
               </Button>
               <Button variant="danger" onClick={handleCancel} loading={saving}>
