@@ -4,7 +4,9 @@
  * Keyed by a short per-terminal display code. NOT backed by a database —
  * losing this on process restart is fine, the state is a live payment-step
  * mirror, never a record of anything. Kept minimal on purpose: status,
- * method, amountPaise, upiUri only — no customer PII, no cart lines.
+ * method, amountPaise, upiUri, and (R-42c, user-approved) an optional
+ * customerFirstName — first name ONLY, for the spoken thank-you. No other
+ * customer PII, no cart lines.
  */
 
 export const IDLE_STATE = Object.freeze({
@@ -12,6 +14,7 @@ export const IDLE_STATE = Object.freeze({
     method: null,
     amountPaise: null,
     upiUri: null,
+    customerFirstName: null,
 });
 
 // After a payment is marked received, auto-reset the channel to idle so a

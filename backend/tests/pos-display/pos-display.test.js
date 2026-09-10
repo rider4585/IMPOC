@@ -141,7 +141,43 @@ describe('POST /api/pos-display/:code (publish)', () => {
       method: 'UPI',
       amountPaise: 25000,
       upiUri: 'upi://pay?pa=shop@bank&am=250.00',
+      customerFirstName: null,
     });
+  });
+
+  it('publishes a received state with an optional customerFirstName and round-trips it', async () => {
+    const res = await request(app)
+      .post('/api/pos-display/PUBTEST5')
+      .set('Authorization', `Bearer ${salesToken}`)
+      .send({ status: 'received', customerFirstName: 'Asha' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data).toEqual({
+      status: 'received',
+      method: null,
+      amountPaise: null,
+      upiUri: null,
+      customerFirstName: 'Asha',
+    });
+  });
+
+  it('rejects a multi-token customerFirstName', async () => {
+    const res = await request(app)
+      .post('/api/pos-display/PUBTEST6')
+      .set('Authorization', `Bearer ${salesToken}`)
+      .send({ status: 'received', customerFirstName: 'Asha Patel' });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('strips unknown fields instead of storing them', async () => {
+    const res = await request(app)
+      .post('/api/pos-display/PUBTEST7')
+      .set('Authorization', `Bearer ${salesToken}`)
+      .send({ status: 'idle', hackerField: 'nope' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data).not.toHaveProperty('hackerField');
   });
 
   it('rejects an invalid display code', async () => {

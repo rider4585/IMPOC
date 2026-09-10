@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PaymentDialog } from '../PaymentDialog.jsx';
+import { LOGO_SRC } from '../../../platform/qrLogo.js';
 
 const UPI_ACCOUNTS = [
   { uuid: 'upi-1', label: 'Shop UPI', vpa: 'shop@okbank', isActive: true },
@@ -46,6 +47,28 @@ describe('PaymentDialog (R-35)', () => {
     expect(screen.getByTestId('payment-upi-qr')).toBeInTheDocument();
     expect(screen.getByText(/scan to pay/i)).toBeInTheDocument();
     expect(screen.getByText('₹250.00')).toBeInTheDocument();
+  });
+
+  it('UPI: the payment QR has a center logo (R-42a), the small display-link QR does not', () => {
+    renderDialog({
+      paymentMethod: 'UPI',
+      upiAccounts: UPI_ACCOUNTS,
+      selectedUpiAccountUuid: 'upi-1',
+      upiUri: 'upi://pay?pa=shop%40okbank&pn=Shop&am=250.00&cu=INR&tn=note&tr=ref-1',
+      displayCode: 'ABC123',
+      displayUrl: 'https://example.test/display/ABC123',
+    });
+    const paymentQr = screen.getByTestId('payment-upi-qr');
+    const logo = paymentQr.querySelector('image');
+    expect(logo).toBeInTheDocument();
+    expect(logo.getAttribute('href')).toBe(LOGO_SRC);
+    // value is intact — the QR still renders its foreground path data.
+    expect(paymentQr.querySelectorAll('path').length).toBeGreaterThan(0);
+
+    // The tiny 56px display-link QR (R-42 boundary: leave it alone) has no logo.
+    const displayLinkQr = document.querySelector('svg[width="56"]');
+    expect(displayLinkQr).toBeTruthy();
+    expect(displayLinkQr.querySelector('image')).not.toBeInTheDocument();
   });
 
   it('UPI with several active accounts: shows an account selector', () => {
