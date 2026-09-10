@@ -1,9 +1,13 @@
 import {
     BrowserMultiFormatReader,
+    HTMLCanvasElementLuminanceSource,
 } from '@zxing/browser';
 import {
     BarcodeFormat,
     DecodeHintType,
+    MultiFormatReader,
+    BinaryBitmap,
+    HybridBinarizer,
 } from '@zxing/library';
 import {
     useEffect,
@@ -896,47 +900,107 @@ function BarcodeScanner({ onDetected, onError }) {
                 return;
             }
 
+            /*
+             * Manual capture + decode loop.
+             *
+             * We deliberately do NOT use reader.decodeFromVideoElement(): it
+             * draws the <video> to a 2D canvas via drawImage(video), which
+             * returns a BLACK frame on Windows Chrome with hardware-accelerated
+             * video decode — the preview looks fine but every capture is blank,
+             * so nothing ever decodes. Instead we pull CPU-side frames with
+             * ImageCapture.grabFrame() (fallback createImageBitmap(video)), draw
+             * those onto our own canvas, and decode with @zxing/library. This
+             * path works on iOS, macOS and Windows.
+             */
+            const hints = new Map();
+            hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128]);
+            const multiReader = new MultiFormatReader();
+            multiReader.setHints(hints);
+
+            const captureCanvas = document.createElement('canvas');
+
+            let imageCapture = null;
             try {
-                const controls =
-                    await reader.decodeFromVideoElement(
-                        video,
-                        (result) => {
-                            if (
-                                cancelled ||
-                                pausedRef.current
-                            ) {
-                                return;
-                            }
+                const track = streamRef.current?.getVideoTracks?.()[0];
+                if (track && typeof window !== 'undefined' && 'ImageCapture' in window) {
+                    imageCapture = new window.ImageCapture(track);
+                }
+            } catch {
+                imageCapture = null;
+            }
 
-                            if (result) {
-                                const value =
-                                    result.getText();
+            const grabBitmap = async () => {
+                if (imageCapture) {
+                    try {
+                        return await imageCapture.grabFrame();
+                    } catch {
+                        // grabFrame can throw if the track is not ready — fall
+                        // back to createImageBitmap for the rest of the session.
+                        imageCapture = null;
+                    }
+                }
+                return await createImageBitmap(video);
+            };
 
-                                if (value) {
-                                    handleBarcodeDetected(
-                                        value
-                                    );
+            const decodeLoop = async () => {
+                if (cancelled) return;
+
+                if (
+                    !pausedRef.current &&
+                    video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+                ) {
+                    try {
+                        const bitmap = await grabBitmap();
+                        const w = bitmap.width;
+                        const h = bitmap.height;
+
+                        if (w && h) {
+                            if (captureCanvas.width !== w) captureCanvas.width = w;
+                            if (captureCanvas.height !== h) captureCanvas.height = h;
+
+                            const ctx = captureCanvas.getContext('2d', {
+                                willReadFrequently: true,
+                            });
+                            ctx.drawImage(bitmap, 0, 0, w, h);
+                            if (bitmap.close) bitmap.close();
+
+                            try {
+                                const source = new HTMLCanvasElementLuminanceSource(captureCanvas);
+                                const binary = new BinaryBitmap(new HybridBinarizer(source));
+                                const result = multiReader.decode(binary);
+                                const value = result && result.getText();
+
+                                if (value && !cancelled && !pausedRef.current) {
+                                    handleBarcodeDetected(value);
                                 }
+                            } catch {
+                                // NotFoundException — no barcode in this frame.
+                            } finally {
+                                multiReader.reset();
                             }
                         }
-                    );
-
-                if (cancelled) {
-                    controls?.stop?.();
-
-                    return;
+                    } catch {
+                        // Frame grab failed this tick — retry next frame.
+                    }
                 }
 
-                zxingControlsRef.current =
-                    controls;
-            } catch (zxingError) {
                 if (!cancelled) {
-                    console.error(
-                        'ZXing scanner failed:',
-                        zxingError
-                    );
+                    animationFrameRef.current = requestAnimationFrame(() => {
+                        decodeLoop();
+                    });
                 }
-            }
+            };
+
+            zxingControlsRef.current = {
+                stop: () => {
+                    if (animationFrameRef.current) {
+                        cancelAnimationFrame(animationFrameRef.current);
+                        animationFrameRef.current = null;
+                    }
+                },
+            };
+
+            decodeLoop();
         };
 
         startZXing();
