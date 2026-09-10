@@ -19,6 +19,7 @@ import { formatPaise } from '../../platform/money.js';
 import { createRequestKey } from '../../platform/requestKey.js';
 import { RentalCreateDialog } from './RentalCreateDialog.jsx';
 import { ReturnUnitsDialog } from './ReturnUnitsDialog.jsx';
+import { unitStatusBadgeVariant } from './rentalStatus.js';
 import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
 
 function statusBadgeVariant(status) {
@@ -266,7 +267,7 @@ export function RentalsScreen() {
                         <div className="flex items-center gap-3">
                           {late && <Badge variant="danger">Late</Badge>}
                           <Badge variant={statusBadgeVariant(r.status)}>{r.status}</Badge>
-                          <strong>{formatPaise(Number(r.depositRefundablePaise))}</strong>
+                          <strong className="typography-money-sm">{formatPaise(Number(r.depositRefundablePaise))}</strong>
                           <Button variant="outline" size="sm" onClick={() => openDetail(r)}>
                             View
                           </Button>
@@ -345,8 +346,8 @@ export function RentalsScreen() {
               {activeRental.notes && <p className="mb-2 text-sm text-[var(--ink-muted)]">{activeRental.notes}</p>}
               <div className="mt-2 flex flex-col gap-1">
                 <div className="flex items-center justify-between border-b border-[var(--border)] py-2 text-sm last:border-b-0">
-                  <span>Total deposit collected</span>
-                  <strong>{formatPaise(Number(activeRental.depositRefundablePaise))}</strong>
+                  <span className="text-[var(--ink-muted)]">Total deposit collected</span>
+                  <strong className="typography-money">{formatPaise(Number(activeRental.depositRefundablePaise))}</strong>
                 </div>
               </div>
             </CardContent>
@@ -365,12 +366,13 @@ export function RentalsScreen() {
                   >
                     <div>
                       <div className="font-semibold">
-                        {line.barcode} · {formatPaise(Number(line.rentPerDayPaise))}/day
+                        {line.barcode} ·{' '}
+                        <span className="typography-money-sm">{formatPaise(Number(line.rentPerDayPaise))}/day</span>
                       </div>
                       <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                        Deposit {formatPaise(Number(line.depositPaise))} · overdue{' '}
-                        {formatPaise(Number(line.overduePerDayPaise))}/day · status:{' '}
-                        <Badge variant="neutral">{line.unitStatus}</Badge>
+                        Deposit <span className="typography-money-sm">{formatPaise(Number(line.depositPaise))}</span> · overdue{' '}
+                        <span className="typography-money-sm">{formatPaise(Number(line.overduePerDayPaise))}/day</span> · status:{' '}
+                        <Badge variant={unitStatusBadgeVariant(line.unitStatus)}>{line.unitStatus}</Badge>
                       </div>
                     </div>
                   </li>
@@ -407,9 +409,9 @@ export function RentalsScreen() {
                         {ret.damageGradeName ? `Grade: ${ret.damageGradeName}` : 'No damage grade'}
                         {ret.damageGradeOutcome ? ` · ${ret.damageGradeOutcome}` : ''}
                         {' · '}late {ret.lateDays} day(s)
-                        {' · '}overdue {formatPaise(Number(ret.overdueChargePaise))}
-                        {' · '}damage {formatPaise(Number(ret.damageChargePaise))}
-                        {' · '}refunded {formatPaise(Number(ret.depositRefundedPaise))}
+                        {' · '}overdue <span className="typography-money-sm">{formatPaise(Number(ret.overdueChargePaise))}</span>
+                        {' · '}damage <span className="typography-money-sm">{formatPaise(Number(ret.damageChargePaise))}</span>
+                        {' · '}refunded <span className="typography-money-sm">{formatPaise(Number(ret.depositRefundedPaise))}</span>
                       </div>
                     </li>
                   ))}
@@ -432,7 +434,7 @@ export function RentalsScreen() {
                     >
                       <div className="font-semibold">{rev.reversalType}</div>
                       <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
-                        {formatPaise(Number(rev.amountPaise))}
+                        <span className="typography-money-sm">{formatPaise(Number(rev.amountPaise))}</span>
                         {rev.reason ? ` · ${rev.reason}` : ''}
                       </div>
                     </li>

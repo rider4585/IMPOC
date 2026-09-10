@@ -19,4 +19,6 @@ export {
   TableCell,
 } from './Table.jsx';
 export { default as Badge } from './Badge.jsx';
+export { default as Tab, Tabs } from './Tab.jsx';
+export { default as NavItem } from './NavItem.jsx';
 export { default as ToastProvider, useToast } from './Toast.jsx';

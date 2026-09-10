@@ -19,6 +19,7 @@ import { createRental } from '../../services/rentalsApi.js';
 import { getPaymentMethods, getCustomerSources } from '../../services/picklistsApi.js';
 import BarcodeScanner from '../../components/BarcodeScanner.jsx';
 import { formatPaise } from '../../platform/money.js';
+import { formatPaiseForInput, parseRupeesToPaise } from '../../platform/moneyInput.js';
 import { createRequestKey } from '../../platform/requestKey.js';
 import { CustomerPicker } from '../../components/customers/CustomerPicker.jsx';
 import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
@@ -40,6 +41,71 @@ function itemDetail(item) {
   return bits.length > 0 ? bits.join(' · ') : null;
 }
 
+/**
+ * SalePriceInput (R-30) — inline money editor for a cart line. Editing the
+ * selling price re-renders the line so the till total updates live. A price
+ * below the unit's floor price is refused inline and surfaced again at
+ * checkout. Edits are not committed until the typed amount parses to a valid,
+ * floor-legal rupee value, so a bad keystroke can never change the cart total.
+ */
+function SalePriceInput({ valuePaise, floorPaise, onChange, name }) {
+  const [raw, setRaw] = useState(() => formatPaiseForInput(valuePaise));
+
+  const commitParsed = (text) => {
+    const parsed = parseRupeesToPaise(text);
+    if (Number.isNaN(parsed)) {
+      return { ok: false, message: 'Enter a valid rupee amount.' };
+    }
+    const floor = Number(floorPaise) || 0;
+    if (parsed < floor) {
+      return { ok: false, message: 'Price cannot be below floor price' };
+    }
+    return { ok: true, parsed };
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key !== 'Enter') return;
+    const result = commitParsed(raw);
+    if (result.ok) onChange(result.parsed);
+  };
+
+  const handleBlur = () => {
+    const result = commitParsed(raw);
+    if (result.ok) onChange(result.parsed);
+    setRaw(formatPaiseForInput(valuePaise));
+  };
+
+  const result = commitParsed(raw);
+  const showError = !result.ok && raw.trim() !== '';
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <input
+        type="text"
+        inputMode="decimal"
+        value={raw}
+        onChange={(e) => setRaw(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        aria-label={
+          showError
+            ? `Selling price for ${name}. ${result.message}`
+            : `Selling price for ${name}`
+        }
+        aria-invalid={showError || undefined}
+        className={`w-28 rounded-md border bg-[var(--surface-sunken)] px-2 py-1 text-right font-semibold text-[var(--ink)] ${
+          showError
+            ? 'border-[var(--danger)] text-[var(--danger)]'
+            : 'border-[var(--border-strong)] hover:border-[var(--ink-faint)]'
+        } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]`}
+      />
+      {showError && (
+        <span role="alert" className="text-xs font-medium text-[var(--danger)]">{result.message}</span>
+      )}
+    </div>
+  );
+}
+
 export function POSScreen() {
   const { permissions } = useAuth();
   const toast = useToast();
@@ -55,9 +121,11 @@ export function POSScreen() {
 
   const [customerSources, setCustomerSources] = useState([]);
   const [customerSource, setCustomerSource] = useState('');
+  const [picklistsError, setPicklistsError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
+    setPicklistsError('');
     getPaymentMethods()
       .then((methods) => {
         if (cancelled) return;
@@ -66,18 +134,38 @@ export function POSScreen() {
           setPaymentMethod(methods[0].name);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        if (!cancelled) setPicklistsError(err.message || 'Failed to load payment methods.');
+      });
     getCustomerSources()
       .then((sources) => {
         if (cancelled) return;
         setCustomerSources(sources);
       })
-      .catch(() => {});
+      .catch((err) => {
+        if (!cancelled) setPicklistsError(err.message || 'Failed to load customer sources.');
+      });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // UX-H7: manual Retry for a failed picklists fetch (surfaced via banner).
+  const loadPicklists = useCallback(() => {
+    setPicklistsError('');
+    getPaymentMethods()
+      .then((methods) => {
+        setPaymentMethods(methods);
+        if (methods.length > 0 && !methods.some((m) => m.name === paymentMethod)) {
+          setPaymentMethod(methods[0].name);
+        }
+      })
+      .catch((err) => setPicklistsError(err.message || 'Failed to load payment methods.'));
+    getCustomerSources()
+      .then((sources) => setCustomerSources(sources))
+      .catch((err) => setPicklistsError(err.message || 'Failed to load customer sources.'));
+  }, [paymentMethod]);
 
   const [barcode, setBarcode] = useState('');
   const [cart, setCart] = useState([]);
@@ -85,6 +173,9 @@ export function POSScreen() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [lookupError, setLookupError] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const confirmClearTimerRef = useRef(null);
 
   const [scannerOpen, setScannerOpen] = useState(false);
 
@@ -109,6 +200,7 @@ export function POSScreen() {
       if (!b) return;
       setLookupError('');
       setBarcode('');
+      setLookupLoading(true);
       try {
         const unit = await getUnitByBarcode(b);
         if (!unit) {
@@ -138,6 +230,7 @@ export function POSScreen() {
               colourName: unit.colourName || null,
               sizeName: unit.sizeName || null,
               sellingPricePaise: Number(unit.sellingPricePaise),
+              floorPricePaise: Number(unit.floorPricePaise) || 0,
             },
           ]);
         } else {
@@ -170,6 +263,8 @@ export function POSScreen() {
       } catch (err) {
         setLookupError(err.message || 'Lookup failed');
         toast.error({ title: 'Lookup failed', description: err.message });
+      } finally {
+        setLookupLoading(false);
       }
     },
     [cart, mode, toast]
@@ -187,7 +282,17 @@ export function POSScreen() {
     setCart((prev) => prev.filter((item) => item.uuid !== uuid));
   };
 
+  // R-30: reflect an edited per-unit selling price immediately in the total.
+  const updateItemPrice = (uuid, paise) => {
+    setCart((prev) =>
+      prev.map((item) => (item.uuid === uuid ? { ...item, sellingPricePaise: paise } : item))
+    );
+  };
+
   const clearCart = () => {
+    if (confirmClearTimerRef.current) clearTimeout(confirmClearTimerRef.current);
+    confirmClearTimerRef.current = null;
+    setConfirmClear(false);
     setCart([]);
     setCustomer(null);
     setBarcode('');
@@ -205,6 +310,21 @@ export function POSScreen() {
     }
   };
 
+  // UX-M5: destructive Clear needs a lightweight 3s re-tap confirm.
+  const handleClearClick = () => {
+    if (cart.length === 0) {
+      setConfirmClear(false);
+      return;
+    }
+    if (!confirmClear) {
+      setConfirmClear(true);
+      if (confirmClearTimerRef.current) clearTimeout(confirmClearTimerRef.current);
+      confirmClearTimerRef.current = setTimeout(() => setConfirmClear(false), 3000);
+      return;
+    }
+    clearCart();
+  };
+
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     setCheckingOut(true);
@@ -219,10 +339,24 @@ export function POSScreen() {
         customerSource: customerSource || undefined,
       };
       if (mode === 'sale') {
+        const belowFloor = cart.find(
+          (item) => item.sellingPricePaise < item.floorPricePaise
+        );
+        if (belowFloor) {
+          toast.error({
+            title: 'Price below floor',
+            description: `Price cannot be below floor price for ${belowFloor.barcode}.`,
+          });
+          setCheckingOut(false);
+          return;
+        }
         const sale = await createSale({
           ...customerPayload,
           requestUuid: checkoutKeyRef.current,
-          items: cart.map((item) => ({ unitUuid: item.uuid })),
+          items: cart.map((item) => ({
+            unitUuid: item.uuid,
+            sellingPricePaise: item.sellingPricePaise,
+          })),
         });
         setReceipt(sale);
       } else {
@@ -272,6 +406,12 @@ export function POSScreen() {
   if (receipt) {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+        {/* UX-M5: sticky "New transaction" so a fresh sale is always one tap away. */}
+        <div className="sticky top-0 z-10 -mx-6 -mt-1 mb-1 flex justify-end bg-[var(--surface-base)] px-6 pb-2 pt-3">
+          <Button onClick={() => setReceipt(null)} data-testid="pos-new-transaction">
+            New transaction
+          </Button>
+        </div>
         {mode === 'sale' ? (
           <SaleReceipt sale={receipt} />
         ) : (
@@ -311,7 +451,7 @@ export function POSScreen() {
               </ul>
               <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3 text-lg">
                 <span>Deposit collected</span>
-                <strong>{formatPaise(Number(receipt.depositRefundablePaise))}</strong>
+                <strong className="typography-money">{formatPaise(Number(receipt.depositRefundablePaise))}</strong>
               </div>
             </CardContent>
           </Card>
@@ -370,6 +510,15 @@ export function POSScreen() {
         <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{lookupError}</div>
       )}
 
+      {picklistsError && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">
+          <span>{picklistsError} Payment method and source may be incomplete.</span>
+          <Button variant="outline" size="sm" onClick={loadPicklists}>
+            Retry
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px] items-start">
         <div className="flex flex-col gap-5">
           <Card>
@@ -385,7 +534,14 @@ export function POSScreen() {
                 placeholder="Scan barcode, then press Enter"
                 autoFocus
                 maxLength={12}
+                disabled={lookupLoading}
               />
+              {lookupLoading && (
+                <p className="mt-2 flex items-center gap-2 text-sm text-[var(--ink-muted)]" role="status">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-[var(--primary)]" aria-hidden="true" />
+                  Looking up barcode…
+                </p>
+              )}
               <Button
                 variant="outline"
                 className="mt-3 w-full"
@@ -439,10 +595,19 @@ export function POSScreen() {
                           {itemDetail(item) && <span> · {itemDetail(item)}</span>}
                         </span>
                       </div>
-                      <span className="ml-auto whitespace-nowrap text-[var(--ink-muted)]">
-                        {mode === 'sale'
-                          ? formatPaise(item.sellingPricePaise)
-                          : `${formatPaise(item.rentPerDayPaise)}/day · deposit ${formatPaise(item.depositPaise)}`}
+                      <span className="ml-auto whitespace-nowrap">
+                        {mode === 'sale' ? (
+                          <SalePriceInput
+                            valuePaise={item.sellingPricePaise}
+                            floorPaise={item.floorPricePaise}
+                            name={item.barcode}
+                            onChange={(paise) => updateItemPrice(item.uuid, paise)}
+                          />
+                        ) : (
+                          <span className="typography-money-sm text-right text-[var(--ink-muted)]">
+                            {formatPaise(item.rentPerDayPaise)}/day · deposit {formatPaise(item.depositPaise)}
+                          </span>
+                        )}
                       </span>
                       <Button variant="ghost" size="sm" onClick={() => removeItem(item.uuid)} aria-label={`Remove ${item.barcode}`}>
                         Remove
@@ -507,18 +672,23 @@ export function POSScreen() {
                   />
                 </>
               )}
-              <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3 text-lg">
-                <span>Total</span>
-                <strong data-testid="pos-total">
+              <div className="mt-4 flex items-end justify-between border-t border-[var(--border)] pt-3">
+                <span className="text-sm text-[var(--ink-muted)]">Total</span>
+                <span className="typography-money-lg" data-testid="pos-total">
                   {mode === 'sale'
                     ? formatPaise(totalPaise)
                     : `${formatPaise(totalPaise)} (${rentalDays || 0} days)`}
-                </strong>
+                </span>
               </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2 border-t border-[var(--border)] px-4 py-3">
-              <Button variant="outline" onClick={clearCart} disabled={cart.length === 0}>
-                Clear
+              <Button
+                variant={confirmClear ? 'danger' : 'outline'}
+                onClick={handleClearClick}
+                disabled={cart.length === 0}
+                data-testid="pos-clear"
+              >
+                {confirmClear ? 'Confirm clear?' : 'Clear'}
               </Button>
               <Button
                 onClick={handleCheckout}

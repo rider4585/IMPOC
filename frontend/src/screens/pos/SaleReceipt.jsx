@@ -37,22 +37,22 @@ export function SaleReceipt({ sale }) {
           )}
           <Table>
             <TableHead>
-              <TableRow className="hover:bg-transparent">
+              <TableRow noHover>
                 <TableHeaderCell>Barcode</TableHeaderCell>
                 <TableHeaderCell>Price</TableHeaderCell>
                 <TableHeaderCell>Unit status</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {sale.lines.map((line) => (
-                <TableRow key={line.uuid}>
+              {(sale.lines || []).map((line) => (
+                <TableRow key={line.uuid} noHover>
                   <TableCell>{line.barcode}</TableCell>
                   <TableCell>{formatPaise(Number(line.sellingPricePaise))}</TableCell>
                   <TableCell><Badge variant="neutral">{line.unitStatus}</Badge></TableCell>
                 </TableRow>
               ))}
-              {sale.lines.length === 0 && (
-                <TableRow><TableCell colSpan={3} className="text-sm text-[var(--ink-muted)]">No lines.</TableCell></TableRow>
+              {(!sale.lines || sale.lines.length === 0) && (
+                <TableRow noHover><TableCell colSpan={3} className="text-sm text-[var(--ink-muted)]">No lines.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

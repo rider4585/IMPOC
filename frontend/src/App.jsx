@@ -3,6 +3,7 @@ import './App.css';
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider';
+import { useAuth } from './auth/useAuth';
 import { RouteGuard } from './app/RouteGuard';
 import { AppShell } from './app/AppShell';
 import { navigationRegistry } from './app/navigation';
@@ -33,10 +34,33 @@ import UnitsScreen from './screens/inventory/UnitsScreen';
  */
 function RouteLoadingFallback() {
   return (
-    <div style={{ padding: '40px', textAlign: 'center' }}>
+    <div className="p-10 text-center">
       <p>Loading...</p>
     </div>
   );
+}
+
+/**
+ * LandingRedirect (UX-C1) — post-login landing. `/` falls through to the
+ * user's first permitted screen (computed from permissions against
+ * navigationRegistry, absent-not-disabled), so sign-in/sign-out never dump
+ * the operator on the "Nothing here yet" catch-all.
+ */
+function LandingRedirect() {
+  const { permissions } = useAuth();
+  const perms = permissions ?? [];
+  const firstAccessiblePath = navigationRegistry.find(
+    (entry) => entry && entry.path && entry.permission && perms.includes(entry.permission)
+  )?.path;
+  if (!firstAccessiblePath) {
+    return (
+      <div className="p-10 text-center">
+        <h2>Nothing here yet</h2>
+        <p>You don't have access to any screens in this version of the app.</p>
+      </div>
+    );
+  }
+  return <Navigate to={firstAccessiblePath} replace />;
 }
 
 function App() {
@@ -88,11 +112,14 @@ function App() {
                 {/* Nested vendor detail route */}
                 <Route path="/vendors/:uuid" element={<VendorDetail />} />
 
+                {/* UX-C1: post-login landing — redirect `/` to the first permitted screen */}
+                <Route path="/" element={<LandingRedirect />} />
+
                 {/* Fallback: if user has no accessible routes, show "nothing here yet" */}
                 <Route
                   path="*"
                   element={
-                    <div style={{ padding: '40px', textAlign: 'center' }}>
+                    <div className="p-10 text-center">
                       <h2>Nothing here yet</h2>
                       <p>You don't have access to any screens in this version of the app.</p>
                     </div>

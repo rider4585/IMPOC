@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Input, SearchableSelect } from '../../components/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Input,
+  SearchableSelect,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableHeaderCell,
+  TableCell,
+} from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { listAllUnits } from '../../services/unitsApi.js';
@@ -130,13 +144,7 @@ export function UnitsScreen() {
         <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">
           <div className="flex items-center justify-between gap-3">
             <span>{error}</span>
-            <button
-              type="button"
-              className="rounded-md border border-[var(--border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--ink)] hover:bg-[var(--surface-sunken)]"
-              onClick={load}
-            >
-              Retry
-            </button>
+            <Button variant="outline" size="sm" onClick={load}>Retry</Button>
           </div>
         </div>
       )}
@@ -199,38 +207,48 @@ export function UnitsScreen() {
           ) : units.length === 0 ? (
             <p className="text-sm text-[var(--ink-muted)]">No units.{stockUuid ? ' This stock has no scanned units yet.' : ''}</p>
           ) : (
-            <ul className="flex flex-col gap-2">
-              {units.map((unit) => {
-                const meta = STATUS_META[unit.status] || { label: unit.status || 'Unknown', cls: 'bg-[var(--surface-sunken)] text-[var(--ink-muted)]' };
-                return (
-                  <li
-                    key={unit.uuid}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
-                    data-testid="unit-row"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-2 py-0.5 font-mono text-xs font-semibold tracking-[0.08em] text-[var(--ink)]">
-                        {unit.barcode}
-                      </span>
-                      <span className={`${badgeBase} ${meta.cls}`} data-testid={`unit-status-${unit.status}`}>
-                        {meta.label}
-                      </span>
-                    </div>
-                    <div className="min-w-0 flex-1 text-[13px]">
-                      <div className="font-semibold">{unit.stockName || 'Stock'}</div>
-                      <div className="mt-0.5 text-[var(--ink-muted)]">
-                        {unit.vendorName || 'Vendor'}
-                        {unit.colourName && <span> &middot; {unit.colourName}</span>}
-                        {unit.sizeName && <span> ({unit.sizeName})</span>}
-                      </div>
-                    </div>
-                    <div className="text-[13px] text-[var(--ink-muted)]">
-                      Buy {formatPaise(Number(unit.buyingPricePaise))}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHead sticky>
+                  <TableRow>
+                    <TableHeaderCell frozen>Barcode</TableHeaderCell>
+                    <TableHeaderCell>Status</TableHeaderCell>
+                    <TableHeaderCell>Stock / Vendor</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Buy (₹)</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {units.map((unit) => {
+                    const meta = STATUS_META[unit.status] || { label: unit.status || 'Unknown', cls: 'bg-[var(--surface-sunken)] text-[var(--ink-muted)]' };
+                    return (
+                      <TableRow key={unit.uuid} data-testid="unit-row">
+                        <TableCell frozen>
+                          <span className="inline-flex rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-2 py-0.5 font-mono text-xs font-semibold tracking-[0.08em] text-[var(--ink)]">
+                            {unit.barcode}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`${badgeBase} ${meta.cls}`} data-testid={`unit-status-${unit.status}`}>
+                            {meta.label}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-semibold">{unit.stockName || 'Stock'}</div>
+                          <div className="typography-body-sm text-[var(--ink-muted)]">
+                            {unit.vendorName || 'Vendor'}
+                            {unit.colourName && <span> &middot; {unit.colourName}</span>}
+                            {unit.sizeName && <span> ({unit.sizeName})</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="typography-money-sm text-[var(--ink)]">Buy {formatPaise(Number(unit.buyingPricePaise))}</span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

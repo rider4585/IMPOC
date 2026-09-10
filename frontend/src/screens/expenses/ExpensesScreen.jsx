@@ -155,7 +155,14 @@ export function ExpensesScreen() {
         )}
       </div>
 
-      {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
+      {error && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={() => load()} disabled={loading}>
+            Retry
+          </Button>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -195,7 +202,11 @@ export function ExpensesScreen() {
           </div>
 
           {loading ? (
-            <p className="text-sm text-[var(--ink-muted)]">Loading expenses…</p>
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-16 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
+              ))}
+            </div>
           ) : filtered.length === 0 ? (
             <p className="text-sm text-[var(--ink-muted)]">No expenses match this view.</p>
           ) : (

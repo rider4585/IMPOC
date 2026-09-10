@@ -47,6 +47,24 @@ export function StockIntake() {
   const [decodeFailHint, setDecodeFailHint] = useState(false);
   const decodeTimerRef = useRef(null);
 
+  // UX-M1: inline save-failure — the worker keeps the decoded barcode + picks
+  // and can retry from the panel instead of being dumped back to IDLE.
+  const [saveError, setSaveError] = useState('');
+
+  // UX-L4: cancelling the armed camera wipes prefilled state, so the stop
+  // affordance asks "Confirm stop?" before actually tearing down.
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const confirmTimerRef = useRef(null);
+
+  // UX-M9: camera errors are surfaced by BarcodeScanner via onError; we show
+  // an accessible Retry (remounts the scanner) + Stop affordance.
+  const [scannerError, setScannerError] = useState(false);
+  const [scannerKey, setScannerKey] = useState(0);
+
+  // UX-H5: guards the auto commit-repeat loop from double-firing while a save
+  // is already in flight (e.g. colour/size change mid-save).
+  const savingRef = useRef(false);
+
   const scannedCount = stock?.unitsScannedCount ?? 0;
   const quantity = stock ? Number(stock.quantity) : 0;
   const isFull = scannedCount >= quantity;
@@ -95,11 +113,28 @@ export function StockIntake() {
     }
   }, [state, lastSavedColour, lastSavedSize, sizeRunEnabled, sizeRunSequence, sizeRunIndex]);
 
+  // UX-H5: auto commit-repeat. As soon as the decoded unit has a colour AND a
+  // size (either from prefill or the worker's picks), the save fires without a
+  // tap. The loop is broken by refusals (keeps DECODED), inline save errors
+  // (keeps DECODED + retry), or a completed stock (STOCK_FULL).
+  useEffect(() => {
+    if (state !== STATES.DECODED) return;
+    if (refusalInfo || saveError || !scannedBarcode) return;
+    if (!colourUuid || !sizeUuid) return;
+    if (savingRef.current) return;
+    handleSave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, refusalInfo, saveError, colourUuid, sizeUuid, scannedBarcode]);
+
   const armCamera = () => {
+    clearTimeout(confirmTimerRef.current);
     setScannedBarcode('');
     setColourUuid('');
     setSizeUuid('');
     setRefusalInfo(null);
+    setSaveError('');
+    setScannerError(false);
+    setConfirmCancel(false);
     setShowManual(false);
     setDecodeFailHint(false);
     setState(STATES.ARMED);
@@ -107,20 +142,45 @@ export function StockIntake() {
 
   const cancelScan = () => {
     clearTimeout(decodeTimerRef.current);
+    clearTimeout(confirmTimerRef.current);
     setState(STATES.IDLE);
     setScannedBarcode('');
     setColourUuid('');
     setSizeUuid('');
     setRefusalInfo(null);
+    setSaveError('');
+    setScannerError(false);
+    setConfirmCancel(false);
     setShowManual(false);
     setDecodeFailHint(false);
+  };
+
+  // UX-L4: lightweight two-tap guard — first tap arms "Confirm stop?", a
+  // second tap (or a new decode) actually tears the camera down. Resets after
+  // 3s so a mis-tap can't wipe the prefilled loop later.
+  const handleCancelClick = () => {
+    if (confirmCancel) {
+      cancelScan();
+      return;
+    }
+    setConfirmCancel(true);
+    clearTimeout(confirmTimerRef.current);
+    confirmTimerRef.current = setTimeout(() => setConfirmCancel(false), 3000);
+  };
+
+  const handleRetryCamera = () => {
+    setScannerError(false);
+    setScannerKey((k) => k + 1);
   };
 
   const handleDetected = (barcode) => {
     if (state !== STATES.ARMED) return;
     clearTimeout(decodeTimerRef.current);
+    clearTimeout(confirmTimerRef.current);
     setScannedBarcode(barcode);
     setRefusalInfo(null);
+    setSaveError('');
+    setConfirmCancel(false);
     setState(STATES.DECODED);
     // Haptic pulse
     try { navigator.vibrate?.(100); } catch {}
@@ -132,6 +192,7 @@ export function StockIntake() {
     clearTimeout(decodeTimerRef.current);
     setScannedBarcode(value);
     setRefusalInfo(null);
+    setSaveError('');
     setState(STATES.DECODED);
     setShowManual(false);
     setManualBarcode('');
@@ -139,6 +200,9 @@ export function StockIntake() {
 
   const handleSave = async () => {
     if (!scannedBarcode || !colourUuid || !sizeUuid) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaveError('');
     setState(STATES.SAVING);
     setWaking(false);
 
@@ -171,12 +235,13 @@ export function StockIntake() {
       try { navigator.vibrate?.(100); } catch {}
       setWaking(false);
 
-      // Check if stock is now full
+      // UX-H5: auto re-arm the camera for the next unit — no "Scan next unit"
+      // tap between units. STOCK_FULL still stops the loop.
       const newCount = updated?.unitsScannedCount ?? (scannedCount + 1);
       if (quantity > 0 && newCount >= quantity) {
         setState(STATES.STOCK_FULL);
       } else {
-        setState(STATES.IDLE);
+        setState(STATES.ARMED);
       }
     } catch (err) {
       const msg = err.message || 'Scan failed';
@@ -189,10 +254,15 @@ export function StockIntake() {
         setState(STATES.DECODED);
         try { navigator.vibrate?.([100, 50, 100]); } catch {}
       } else {
-        toast.error({ title: 'Save failed', description: msg });
-        setState(STATES.IDLE);
+        // UX-M1: keep the decoded barcode + colour/size picks with an inline
+        // retry instead of dumping the worker back to IDLE.
+        setSaveError(msg);
+        setState(STATES.DECODED);
+        try { navigator.vibrate?.([100, 50, 100]); } catch {}
       }
       setWaking(false);
+    } finally {
+      savingRef.current = false;
     }
   };
 
@@ -225,7 +295,7 @@ export function StockIntake() {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/trips/${tripUuid}`)}>&larr; Back to trip</Button>
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Stock not found'}</div>
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Stock not found'}</div>
       </div>
     );
   }
@@ -233,6 +303,19 @@ export function StockIntake() {
   const nextSizeLabel = sizeRunEnabled && sizeRunSequence.length > 0
     ? sizes.find((s) => s.uuid === sizeRunSequence[sizeRunIndex % sizeRunSequence.length])?.name || '?'
     : null;
+
+  // UX-L2: single STOCK_FULL panel shared by the post-save completion state and
+  // the already-full-on-load case.
+  const stockFullPanel = (
+    <div className="w-full max-w-md text-center">
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg">
+        <p className="text-lg font-semibold text-[var(--success)]">{quantity} of {quantity} — stock complete</p>
+        <Button onClick={closeStock} className="mt-4 w-full" data-testid="close-stock">
+          Close stock
+        </Button>
+      </div>
+    </div>
+  );
 
   const stockTypeName = stock?.productType?.name
     || productTypes.find((t) => t.uuid === stock?.productTypeUuid)?.name
@@ -301,34 +384,56 @@ export function StockIntake() {
         {state === STATES.ARMED && (
           <div className="w-full max-w-md">
             <div className="relative overflow-hidden rounded-lg" style={{ aspectRatio: '3/4', maxHeight: '60vh' }}>
-              <BarcodeScanner onDetected={handleDetected} />
-              {/* Glass overlay — Cancel */}
+              {scannerError ? (
+                /* UX-M9: accessible camera-error card with real Retry + Stop. */
+                <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-lg bg-[var(--surface-sunken)] px-6 text-center">
+                  <p className="text-sm font-semibold text-[var(--ink)]">Camera unavailable</p>
+                  <p className="text-xs text-[var(--ink-muted)]">
+                    Grant camera permission or make sure no other app is using the camera, then retry.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={cancelScan}>Stop</Button>
+                    <Button size="sm" onClick={handleRetryCamera} data-testid="retry-camera">Retry camera</Button>
+                  </div>
+                </div>
+              ) : (
+                <BarcodeScanner
+                  key={scannerKey}
+                  onDetected={handleDetected}
+                  onError={() => setScannerError(true)}
+                />
+              )}
+              {/* Glass overlay — stop with a two-tap confirm (UX-L4) */}
               <div className="absolute bottom-4 left-0 right-0 flex justify-center">
                 <button
                   type="button"
-                  className="rounded-full bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-black/80"
-                  onClick={cancelScan}
+                  className={
+                    confirmCancel
+                      ? 'rounded-full bg-[var(--danger)] px-4 py-2 text-sm font-medium text-white'
+                      : 'rounded-full bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-black/80'
+                  }
+                  onClick={handleCancelClick}
                 >
-                  Cancel
+                  {confirmCancel ? 'Confirm stop?' : 'Stop camera'}
                 </button>
               </div>
             </div>
-            {decodeFailHint && (
-              <div className="mt-3 text-center">
+            <div className="mt-3 text-center">
+              {!scannerError && decodeFailHint && (
                 <p className="text-xs text-white/40">Hold the label flat, about 15cm from the camera</p>
-                <button
-                  type="button"
-                  className="mt-2 text-xs text-white/40 underline hover:text-white/60"
-                  onClick={() => { setShowManual(true); cancelScan(); }}
-                >
-                  Type the number instead
-                </button>
-              </div>
-            )}
+              )}
+              <button
+                type="button"
+                className="mt-2 text-xs text-white/40 underline hover:text-white/60"
+                onClick={() => { cancelScan(); setShowManual(true); }}
+              >
+                Type the number instead
+              </button>
+            </div>
           </div>
         )}
 
-        {state === STATES.DECODED && (
+        {(state === STATES.DECODED || state === STATES.SAVING) && (
           <div className="w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-5 shadow-lg">
             {refusalInfo ? (
               /* Refusal state */
@@ -397,6 +502,17 @@ export function StockIntake() {
                   </div>
                 )}
 
+                {saveError && (
+                  <div className="mt-3 rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">
+                    <p className="font-medium">Save failed</p>
+                    <p className="mt-0.5">{saveError}</p>
+                    <div className="mt-3 flex gap-2">
+                      <Button variant="outline" size="sm" onClick={armCamera}>New barcode</Button>
+                      <Button size="sm" onClick={handleSave} data-testid="retry-save">Retry save</Button>
+                    </div>
+                  </div>
+                )}
+
                 <Button
                   onClick={handleSave}
                   loading={state === STATES.SAVING}
@@ -404,34 +520,14 @@ export function StockIntake() {
                   className="mt-4 w-full"
                   data-testid="save-unit"
                 >
-                  Save unit
+                  {saveError ? 'Retry save' : 'Save unit'}
                 </Button>
               </>
             )}
           </div>
         )}
 
-        {state === STATES.STOCK_FULL && (
-          <div className="w-full max-w-md text-center">
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg">
-              <p className="text-lg font-semibold text-[var(--success)]">{quantity} of {quantity} — stock complete</p>
-              <Button onClick={closeStock} className="mt-4 w-full" data-testid="close-stock">
-                Close stock
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {isFull && state === STATES.IDLE && (
-          <div className="w-full max-w-md text-center">
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg">
-              <p className="text-lg font-semibold text-[var(--success)]">{quantity} of {quantity} — stock complete</p>
-              <Button onClick={closeStock} className="mt-4 w-full" data-testid="close-stock">
-                Close stock
-              </Button>
-            </div>
-          </div>
-        )}
+        {(state === STATES.STOCK_FULL || (isFull && state === STATES.IDLE)) && stockFullPanel}
       </div>
 
       {/* Manual barcode entry overlay */}

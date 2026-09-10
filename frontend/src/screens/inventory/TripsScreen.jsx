@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Dialog, useToast } from '../../components/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Input,
+  Dialog,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableHeaderCell,
+  TableCell,
+  useToast,
+} from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrips, createTrip } from '../../services/tripsApi.js';
@@ -12,6 +27,14 @@ function todayISO() {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+// UX-H4: variance is never colour alone — a sign glyph + explicit label rides
+// alongside the money token.
+function varianceGlyph(paise) {
+  if (paise < 0) return { glyph: '↓', label: 'Var. loss', cls: 'text-[var(--money-out)]' };
+  if (paise > 0) return { glyph: '↑', label: 'Var. gain', cls: 'text-[var(--money-in)]' };
+  return { glyph: '±', label: 'Variance', cls: 'text-[var(--ink-muted)]' };
 }
 
 export function TripsScreen() {
@@ -158,31 +181,54 @@ export function TripsScreen() {
             <p className="text-sm text-[var(--ink-muted)]">No trips yet. Create your first trip to get started.</p>
           ) : (
             <>
-              <ul className="flex flex-col gap-2">
-                {trips.slice((page - 1) * pageSize, page * pageSize).map((t) => (
-                  <li
-                    key={t.uuid}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
-                  >
-                    <button
-                      type="button"
-                      className="border-none bg-transparent p-0 text-left font-semibold text-primary hover:underline"
-                      onClick={() => navigate(`/trips/${t.uuid}`)}
-                      data-testid="trip-row"
-                    >
-                      {tripLabel(t)} &middot; {new Date(t.purchasedOn).toLocaleDateString()}
-                    </button>
-                    <span className="text-[var(--ink-muted)]">
-                      Paid {formatPaise(Number(t.totalPaidPaise))}
-                      {t.variancePaise != null && (
-                        <span className={Number(t.variancePaise) < 0 ? ' text-[var(--money-out)]' : Number(t.variancePaise) > 0 ? ' text-[var(--money-in)]' : ''}>
-                          {' '}&middot; Variance {formatPaise(Number(t.variancePaise))}
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHead sticky>
+                    <TableRow>
+                      <TableHeaderCell frozen>Trip</TableHeaderCell>
+                      <TableHeaderCell className="text-right">Paid</TableHeaderCell>
+                      <TableHeaderCell className="text-right">Variance</TableHeaderCell>
+                      <TableHeaderCell className="text-right">Open</TableHeaderCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {trips.slice((page - 1) * pageSize, page * pageSize).map((t) => {
+                      const variance = Number(t.variancePaise) || 0;
+                      const vg = varianceGlyph(variance);
+                      return (
+                        <TableRow key={t.uuid}>
+                          <TableCell frozen>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="px-0 text-left"
+                              onClick={() => navigate(`/trips/${t.uuid}`)}
+                              data-testid="trip-row"
+                            >
+                              {tripLabel(t)} &middot; {new Date(t.purchasedOn).toLocaleDateString()}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="typography-money-sm text-[var(--ink)]">{formatPaise(Number(t.totalPaidPaise))}</span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className={vg.cls}>
+                              <span aria-hidden="true">{vg.glyph}</span>
+                              <span className="sr-only">{vg.label}:</span>{' '}
+                              <span className="typography-money-sm">{formatPaise(variance)}</span>
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="outline" size="sm" onClick={() => navigate(`/trips/${t.uuid}`)}>
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
               {total > pageSize && (
                 <div className="mt-3 flex items-center justify-between text-xs text-[var(--ink-muted)]">
                   <span>Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}</span>

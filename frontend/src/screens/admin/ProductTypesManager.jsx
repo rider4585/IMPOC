@@ -23,7 +23,7 @@ import { buildProductTypeTree, collectDescendantUuids } from '../../platform/adm
 
 function Tree({ nodes, onEdit, onDeactivate, canUpdate, depth = 0 }) {
   return (
-    <ul className="list-none m-0 p-0" style={depth > 0 ? { paddingLeft: '1.5rem' } : undefined} role="tree">
+    <ul className={`list-none m-0 p-0 ${depth > 0 ? 'pl-6' : ''}`} role="tree">
       {nodes.map((node) => (
         <li key={node.uuid} className="py-1" role="treeitem" aria-expanded={node.children.length > 0}>
           <div className="flex flex-wrap items-center gap-2">
@@ -60,6 +60,11 @@ export function ProductTypesManager() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // UX-M4: destructive deactivation goes through an app Dialog, never a native
+  // window.confirm (consistent styling + focus handling).
+  const [confirmNode, setConfirmNode] = useState(null);
+  const [deactivating, setDeactivating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,14 +106,19 @@ export function ProductTypesManager() {
     }
   };
 
-  const handleDeactivate = async (node) => {
-    if (!window.confirm(`Deactivate product type "${node.name}"?`)) return;
+  const handleDeactivate = async () => {
+    const node = confirmNode;
+    if (!node) return;
+    setDeactivating(true);
     try {
       await deactivateProductType(node.uuid);
       toast.success({ title: 'Product type deactivated' });
+      setConfirmNode(null);
       await load();
     } catch (err) {
       toast.error({ title: 'Deactivate failed', description: err.message });
+    } finally {
+      setDeactivating(false);
     }
   };
 
@@ -140,7 +150,7 @@ export function ProductTypesManager() {
           <Tree
             nodes={tree}
             onEdit={(node) => { setEditing(node); setFormOpen(true); }}
-            onDeactivate={handleDeactivate}
+            onDeactivate={(node) => setConfirmNode(node)}
             canUpdate={canUpdate}
           />
         )}
@@ -156,6 +166,28 @@ export function ProductTypesManager() {
           allTypes={types}
         />
       )}
+
+      <Dialog
+        open={!!confirmNode}
+        onClose={() => setConfirmNode(null)}
+        title="Deactivate product type?"
+        role="alertdialog"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmNode(null)} disabled={deactivating}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDeactivate} loading={deactivating} data-testid="confirm-deactivate">
+              Deactivate
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm">
+          Deactivate <span className="font-semibold">{confirmNode?.name || ''}</span>? Existing
+          references keep working; it will no longer appear when creating new stock.
+        </p>
+      </Dialog>
     </Card>
   );
 }

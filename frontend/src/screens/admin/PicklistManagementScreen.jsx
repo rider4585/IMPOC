@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
+import { Tabs, Tab } from '../../components/ui';
 import { ProductTypesManager } from './ProductTypesManager.jsx';
 import {
   FlatPicklistManager,
@@ -67,22 +68,19 @@ export function PicklistManagementScreen() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-2" role="tablist">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            role="tab"
-            aria-selected={active === tab.key}
-            className={`rounded-[var(--rounded-md)] border px-4 py-2 text-[14px] font-semibold text-[var(--ink-muted)] cursor-pointer ${
-              active === tab.key
-                ? 'border-[var(--border)] bg-[var(--surface-raised)] text-[var(--primary)]'
-                : 'border-transparent bg-transparent hover:bg-[var(--surface-sunken)]'
-            }`}
-            onClick={() => setActive(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="border-b border-[var(--border)] pb-2">
+        <Tabs aria-label="Picklist types">
+          {TABS.map((tab) => (
+            <Tab
+              key={tab.key}
+              id={`picklist-tab-${tab.key}`}
+              active={active === tab.key}
+              onClick={() => setActive(tab.key)}
+            >
+              {tab.label}
+            </Tab>
+          ))}
+        </Tabs>
       </div>
 
       {active === 'product-types' && <ProductTypesManager />}

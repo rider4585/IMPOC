@@ -7,6 +7,8 @@ import {
   Button,
   Input,
   Badge,
+  Tabs,
+  Tab,
   Table,
   TableHead,
   TableBody,
@@ -384,7 +386,7 @@ export function Dashboard() {
       </Card>
 
       {error && (
-        <div className="rounded-md bg-[rgba(179,38,30,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">
           {error}
         </div>
       )}
@@ -423,21 +425,20 @@ export function Dashboard() {
       {/* Sub-report tabs */}
       <Card>
         <CardContent className="p-0">
-          <div className="flex border-b border-[var(--border)]">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                className={`px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === t.key
-                    ? 'border-b-2 border-[var(--color-primary)] text-[var(--ink)]'
-                    : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
-                }`}
-                onClick={() => setActiveTab(t.key)}
-              >
-                {t.label}
-              </button>
-            ))}
+          {/* Sub-report tabs */}
+          <div className="border-b border-[var(--border)] px-4 pt-3 pb-0">
+            <Tabs aria-label="Report sections">
+              {TABS.map((t) => (
+                <Tab
+                  key={t.key}
+                  id={`dashboard-tab-${t.key}`}
+                  active={activeTab === t.key}
+                  onClick={() => setActiveTab(t.key)}
+                >
+                  {t.label}
+                </Tab>
+              ))}
+            </Tabs>
           </div>
           <div className="p-4">
             {tabLoading ? (

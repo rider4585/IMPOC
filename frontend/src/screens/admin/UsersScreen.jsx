@@ -60,6 +60,9 @@ export function UsersScreen() {
   const [editingUser, setEditingUser] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   const [rolesOpen, setRolesOpen] = useState(false);
   const [rolesTarget, setRolesTarget] = useState(null);
   const [assignedRoles, setAssignedRoles] = useState([]);
@@ -125,15 +128,24 @@ export function UsersScreen() {
     }
   };
 
-  const handleDelete = async (user) => {
+  const requestDelete = (user) => {
     if (!canDelete) return;
-    if (!window.confirm(`Delete user ${user.username}?`)) return;
+    setConfirmDelete(user);
+  };
+
+  const handleDelete = async () => {
+    const user = confirmDelete;
+    if (!user) return;
+    setDeleting(true);
     try {
       await deleteUser(user.uuid);
       toast.success({ title: 'User deleted' });
+      setConfirmDelete(null);
       await load();
     } catch (err) {
       toast.error({ title: 'Delete failed', description: err.message });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -282,7 +294,7 @@ export function UsersScreen() {
                             </Button>
                           )}
                           {canDelete && (
-                            <Button variant="danger" size="sm" onClick={() => handleDelete(user)}>
+                            <Button variant="danger" size="sm" onClick={() => requestDelete(user)}>
                               Delete
                             </Button>
                           )}
@@ -377,6 +389,29 @@ export function UsersScreen() {
           </Card>
         </Dialog>
       )}
+
+      <Dialog
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title="Delete user?"
+        role="alertdialog"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmDelete(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDelete} loading={deleting}>
+              Delete user
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm">
+          Delete user{' '}
+          <span className="font-semibold">{confirmDelete?.username || ''}</span>? This permanently
+          removes the account and cannot be undone.
+        </p>
+      </Dialog>
     </div>
   );
 }
