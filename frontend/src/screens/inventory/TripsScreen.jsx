@@ -73,13 +73,10 @@ export function TripsScreen() {
       const response = await getTrips();
       if (Array.isArray(response)) {
         setTrips(response);
-        setTotal(response.length);
       } else if (response && typeof response === 'object' && 'items' in response) {
         setTrips(response.items);
-        setTotal(response.total);
       } else {
         setTrips([]);
-        setTotal(0);
       }
     } catch (err) {
       setError(err.message || 'Failed to load trips');
