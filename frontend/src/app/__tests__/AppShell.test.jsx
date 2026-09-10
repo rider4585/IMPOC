@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppShell } from '../AppShell';
 import { ThemeProvider } from '../../theme/index.js';
@@ -59,6 +59,12 @@ describe('AppShell — grouped, role-gated navigation chrome', () => {
       configurable: true,
       value: 1200,
     });
+    // Collapse state persists in localStorage; clear it so tests start expanded.
+    try {
+      localStorage.clear();
+    } catch {
+      /* ignore */
+    }
   });
 
   it('renders labelled grouped sections for a full-access admin', () => {
@@ -102,6 +108,22 @@ describe('AppShell — grouped, role-gated navigation chrome', () => {
     expect(screen.queryByText('Users')).toBeNull();
     expect(screen.queryByText('Trips')).toBeNull();
     expect(screen.queryByText('Expenses')).toBeNull();
+  });
+
+  it('collapses and re-expands a nav section when its header is clicked', () => {
+    renderShell(FULL_ADMIN);
+    expect(screen.getByText('Trips')).toBeInTheDocument();
+
+    const header = screen.getByRole('button', { name: /Inventory/i });
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(header);
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Trips')).toBeNull();
+
+    fireEvent.click(header);
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Trips')).toBeInTheDocument();
   });
 
   it('renders a no-access message when the user holds no nav permissions', () => {

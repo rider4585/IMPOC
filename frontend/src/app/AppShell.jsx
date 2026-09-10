@@ -28,7 +28,21 @@ import {
   Layers,
   Package,
   Tags,
+  ChevronDown,
 } from 'lucide-react';
+
+// localStorage key for remembering which desktop nav sections are collapsed.
+const NAV_COLLAPSED_KEY = 'appshell:nav-collapsed';
+
+function loadCollapsedSections() {
+  try {
+    const raw = localStorage.getItem(NAV_COLLAPSED_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 
 const iconClass = 'h-4 w-4';
 const iconProps = { className: iconClass, 'aria-hidden': true };
@@ -97,7 +111,21 @@ export function AppShell({ children }) {
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= DESKTOP_BREAKPOINT);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Which desktop nav sections are collapsed, remembered across reloads.
+  const [collapsedSections, setCollapsedSections] = useState(loadCollapsedSections);
   const resizeObserverRef = useRef(null);
+
+  const toggleSection = (key) => {
+    setCollapsedSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem(NAV_COLLAPSED_KEY, JSON.stringify(next));
+      } catch {
+        // Storage unavailable (private mode / blocked) — collapse still works for the session.
+      }
+      return next;
+    });
+  };
 
   const perms = permissions ?? [];
   const sections = navigationSections ?? [];
@@ -196,15 +224,33 @@ export function AppShell({ children }) {
     </NavItem>
   );
 
-  const railSection = (section) => (
-    <div key={section.key} className="mb-5">
-      <div className="mb-1.5 flex items-center gap-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">
-        <span className="text-[var(--ink-faint)]">{iconFor(section.icon)}</span>
-        {section.label}
+  const railSection = (section) => {
+    const isCollapsed = Boolean(collapsedSections[section.key]);
+    const bodyId = `nav-section-${section.key}`;
+    return (
+      <div key={section.key} className="mb-5">
+        <button
+          type="button"
+          className="mb-1.5 flex w-full items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-faint)] transition-colors hover:text-[var(--ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+          aria-expanded={!isCollapsed}
+          aria-controls={bodyId}
+          onClick={() => toggleSection(section.key)}
+        >
+          <span className="text-[var(--ink-faint)]">{iconFor(section.icon)}</span>
+          <span className="flex-1 text-left">{section.label}</span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+            aria-hidden
+          />
+        </button>
+        {!isCollapsed && (
+          <div id={bodyId} className="space-y-0.5">
+            {section.items.map(railItem)}
+          </div>
+        )}
       </div>
-      <div className="space-y-0.5">{section.items.map(railItem)}</div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className={`flex h-dvh w-full ${isDesktop ? '' : 'flex-col'}`}>
