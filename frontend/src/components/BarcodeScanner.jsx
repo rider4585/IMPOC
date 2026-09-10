@@ -143,10 +143,15 @@ function BarcodeScanner({ onDetected, onError }) {
             [BarcodeFormat.CODE_128]
         );
 
-        hints.set(
-            DecodeHintType.TRY_HARDER,
-            true
-        );
+        /*
+         * NOTE: we deliberately do NOT set DecodeHintType.TRY_HARDER.
+         * TRY_HARDER makes ZXing's 1D reader rotate each frame 90°
+         * (HTMLCanvasElementLuminanceSource.rotate), and that canvas-rotate
+         * path throws "Could not create a Canvas element" on Windows Chrome
+         * with @zxing/browser 0.2.1 (works on macOS/iOS). Code 128 is a
+         * horizontal barcode, so the rotated pass isn't needed — dropping the
+         * hint fixes Windows scanning and makes each frame faster.
+         */
 
         return new BrowserMultiFormatReader(
             hints
