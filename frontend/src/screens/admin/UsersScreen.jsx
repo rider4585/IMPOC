@@ -1,22 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card,
-  CardHeader,
-  CardTitle,
   CardContent,
   Button,
   Input,
   SearchableSelect,
   Dialog,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
   Badge,
   useToast,
 } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import {
@@ -204,6 +197,100 @@ export function UsersScreen() {
     (r) => !assignedRoles.some((a) => a.uuid === r.uuid)
   );
 
+  const dgColumns = useMemo(() => [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      size: 160,
+      filter: { type: 'text' },
+      cell: (info) => {
+        const user = info.row.original;
+        return [user.firstName, user.lastName].filter(Boolean).join(' ') || '—';
+      },
+    },
+    {
+      accessorKey: 'username',
+      header: 'Username',
+      size: 140,
+      filter: { type: 'text' },
+    },
+    {
+      accessorKey: 'email',
+      header: 'Email',
+      size: 180,
+      filter: { type: 'text' },
+      cell: (info) => info.getValue() || '—',
+    },
+    {
+      accessorKey: 'phone',
+      header: 'Phone',
+      size: 140,
+      filter: { type: 'text' },
+      cell: (info) => info.getValue() || '—',
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      size: 120,
+      filter: { type: 'picklist', options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+        { value: 'suspended', label: 'Suspended' },
+      ]},
+      cell: (info) => (
+        <Badge variant={USER_STATUS_BADGE[info.getValue()] || 'neutral'}>
+          {info.getValue()}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'lastLoginAt',
+      header: 'Last login',
+      size: 140,
+      cell: (info) => {
+        const val = info.getValue();
+        return val ? new Date(val).toLocaleDateString() : 'Never';
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      size: 240,
+      cell: (info) => {
+        const user = info.row.original;
+        return (
+          <div className="flex flex-wrap gap-2">
+            {canUpdate && (
+              <Button variant="outline" size="sm" onClick={() => openEdit(user)}>
+                Edit
+              </Button>
+            )}
+            {canUpdate && (
+              <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)}>
+                Roles
+              </Button>
+            )}
+            {canUpdate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleStatusToggle(user)}
+              >
+                {user.status === 'active' ? 'Deactivate' : 'Activate'}
+              </Button>
+            )}
+            {canDelete && (
+              <Button variant="danger" size="sm" onClick={() => requestDelete(user)}>
+                Delete
+              </Button>
+            )}
+          </div>
+        );
+      },
+      enableSorting: false,
+    },
+  ], [canUpdate, canDelete]);
+
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -223,97 +310,28 @@ export function UsersScreen() {
       {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.USERS.VIEW) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>All users</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="mb-4 max-w-[360px]">
-              <Input
-                type="search"
-                placeholder="Search by name, username, email…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search users"
-              />
-            </div>
+        <div className="flex flex-col gap-4">
+          <div className="max-w-[360px]">
+            <Input
+              type="search"
+              placeholder="Search by name, username, email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search users"
+            />
+          </div>
 
-            {loading ? (
-              <p className="text-sm text-[var(--ink-muted)]">Loading users…</p>
-            ) : (
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHeaderCell>Name</TableHeaderCell>
-                    <TableHeaderCell>Username</TableHeaderCell>
-                    <TableHeaderCell>Email</TableHeaderCell>
-                    <TableHeaderCell>Phone</TableHeaderCell>
-                    <TableHeaderCell>Status</TableHeaderCell>
-                    <TableHeaderCell>Last login</TableHeaderCell>
-                    <TableHeaderCell>Actions</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.uuid}>
-                      <TableCell>
-                        {[user.firstName, user.lastName].filter(Boolean).join(' ') || '—'}
-                      </TableCell>
-                      <TableCell>{user.username}</TableCell>
-                      <TableCell>{user.email || '—'}</TableCell>
-                      <TableCell>{user.phone || '—'}</TableCell>
-                      <TableCell>
-                        <Badge variant={USER_STATUS_BADGE[user.status] || 'neutral'}>
-                          {user.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.lastLoginAt
-                          ? new Date(user.lastLoginAt).toLocaleDateString()
-                          : 'Never'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {canUpdate && (
-                            <Button variant="outline" size="sm" onClick={() => openEdit(user)}>
-                              Edit
-                            </Button>
-                          )}
-                          {canUpdate && (
-                            <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)}>
-                              Roles
-                            </Button>
-                          )}
-                          {canUpdate && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleStatusToggle(user)}
-                            >
-                              {user.status === 'active' ? 'Deactivate' : 'Activate'}
-                            </Button>
-                          )}
-                          {canDelete && (
-                            <Button variant="danger" size="sm" onClick={() => requestDelete(user)}>
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredUsers.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-sm text-[var(--ink-muted)]">
-                        No users found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+          <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+            <DataGrid
+              data={filteredUsers}
+              columns={dgColumns}
+              isLoading={loading}
+              isEmpty={filteredUsers.length === 0}
+              emptyMessage="No users found."
+              loadingMessage="Loading users…"
+            />
+          </div>
+        </div>
       )}
 
       {formOpen && (

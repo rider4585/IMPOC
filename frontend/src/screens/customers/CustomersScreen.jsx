@@ -1,20 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
   Button,
   Input,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
   Badge,
   useToast,
 } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import {
@@ -121,6 +112,94 @@ export function CustomersScreen() {
     );
   }
 
+  const dgColumns = useMemo(() => [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      size: 160,
+      filter: { type: 'text' },
+      cell: (info) => <span className="font-medium">{info.getValue()}</span>,
+    },
+    {
+      accessorKey: 'phone',
+      header: 'Phone',
+      size: 140,
+      filter: { type: 'text' },
+      cell: (info) => info.getValue() || '—',
+    },
+    {
+      accessorKey: 'email',
+      header: 'Email',
+      size: 180,
+      filter: { type: 'text' },
+      cell: (info) => info.getValue() || '—',
+    },
+    {
+      id: 'consent',
+      header: 'Consent',
+      size: 180,
+      cell: (info) => {
+        const c = info.row.original;
+        return (
+          <div className="flex flex-wrap gap-1">
+            {CONSENT_CHANNELS.map((cc) => {
+              const active = Boolean(c[cc.key]);
+              return (
+                <button
+                  key={cc.channel}
+                  type="button"
+                  title={`${cc.label} consent: ${active ? 'on' : 'off'} (click to toggle)`}
+                  disabled={!canUpdate || consentBusy}
+                  onClick={() => handleToggleConsent(c, cc)}
+                  className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 ${
+                    active
+                      ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                      : 'bg-[var(--surface-sunken)] text-[var(--ink-faint)]'
+                  } ${canUpdate && !consentBusy ? 'hover:brightness-95' : 'cursor-not-allowed opacity-70'}`}
+                >
+                  {cc.short}
+                </button>
+              );
+            })}
+          </div>
+        );
+      },
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'customerCount',
+      header: 'Purchases',
+      size: 110,
+      cell: (info) => {
+        const count = info.getValue();
+        return typeof count === 'number'
+          ? <Badge variant="neutral">{count}</Badge>
+          : <span className="text-[var(--ink-faint)]">—</span>;
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      size: 120,
+      cell: (info) => {
+        const c = info.row.original;
+        return canUpdate ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setEditing(c);
+              setFormOpen(true);
+            }}
+          >
+            Edit
+          </Button>
+        ) : null;
+      },
+      enableSorting: false,
+    },
+  ], [canUpdate, consentBusy]);
+
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -147,96 +226,28 @@ export function CustomersScreen() {
         <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Customers</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          <div className="mb-4 max-w-[360px]">
-            <Input
-              type="search"
-              placeholder="Search by name or phone…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search customers"
-            />
-          </div>
+      <div className="flex flex-col gap-4">
+        <div className="max-w-[360px]">
+          <Input
+            type="search"
+            placeholder="Search by name, phone, or email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search customers"
+          />
+        </div>
 
-          {loading ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-16 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
-              ))}
-            </div>
-          ) : customers.length === 0 ? (
-            <p className="text-sm text-[var(--ink-muted)]">No customers found.</p>
-          ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell>Name</TableHeaderCell>
-                  <TableHeaderCell>Phone</TableHeaderCell>
-                  <TableHeaderCell>Email</TableHeaderCell>
-                  <TableHeaderCell>Consent</TableHeaderCell>
-                  <TableHeaderCell>Purchases</TableHeaderCell>
-                  <TableHeaderCell>Actions</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {customers.map((c) => (
-                  <TableRow key={c.uuid}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell>{c.phone || '—'}</TableCell>
-                    <TableCell>{c.email || '—'}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {CONSENT_CHANNELS.map((cc) => {
-                          const active = Boolean(c[cc.key]);
-                          return (
-                            <button
-                              key={cc.channel}
-                              type="button"
-                              title={`${cc.label} consent: ${active ? 'on' : 'off'} (click to toggle)`}
-                              disabled={!canUpdate || consentBusy}
-                              onClick={() => handleToggleConsent(c, cc)}
-                              className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 ${
-                                active
-                                  ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
-                                  : 'bg-[var(--surface-sunken)] text-[var(--ink-faint)]'
-                              } ${canUpdate && !consentBusy ? 'hover:brightness-95' : 'cursor-not-allowed opacity-70'}`}
-                            >
-                              {cc.short}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {typeof c.customerCount === 'number'
-                        ? <Badge variant="neutral">{c.customerCount}</Badge>
-                        : <span className="text-[var(--ink-faint)]">—</span>}
-                    </TableCell>
-                    <TableCell>
-                      {canUpdate && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditing(c);
-                            setFormOpen(true);
-                          }}
-                        >
-                          Edit
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+          <DataGrid
+            data={customers}
+            columns={dgColumns}
+            isLoading={loading}
+            isEmpty={customers.length === 0}
+            emptyMessage="No customers found."
+            loadingMessage="Loading customers…"
+          />
+        </div>
+      </div>
 
       {formOpen && (
         <CustomerFormDialog

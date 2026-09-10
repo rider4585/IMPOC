@@ -9,14 +9,9 @@ import {
   Input,
   Dialog,
   SearchableSelect,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
   useToast,
 } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrip, getStocks, cloneLastStock, addTripVendor } from '../../services/tripsApi.js';
@@ -300,6 +295,76 @@ export function TripDetailScreen() {
 
   const stocksByVendor = stockByVendorGroups;
 
+  const vendorColumns = useMemo(() => [
+    {
+      accessorKey: 'vendorName',
+      header: 'Vendor',
+      size: 160,
+      filter: { type: 'text' },
+      cell: (info) => <div className="font-semibold">{info.getValue()}</div>,
+    },
+    {
+      accessorKey: 'billRef',
+      header: 'Bill reference',
+      size: 160,
+      filter: { type: 'text' },
+      cell: (info) => info.getValue() ? `Bill ${info.getValue()}` : <span className="text-[var(--ink-muted)]">No bill reference</span>,
+    },
+    {
+      accessorKey: 'paid',
+      header: 'Paid (₹)',
+      size: 140,
+      cell: (info) => info.getValue() != null ? (
+        <span className="typography-money-sm text-[var(--ink)]">{formatPaise(Number(info.getValue()))}</span>
+      ) : (
+        <span className="text-[var(--ink-muted)]">—</span>
+      ),
+    },
+    {
+      accessorKey: 'receipt',
+      header: 'Receipt',
+      size: 80,
+      cell: (info) => {
+        const receipt = info.getValue();
+        const tv = info.row.original;
+        return receipt ? (
+          <button
+            type="button"
+            onClick={() => setReceiptView({ src: receipt, name: tv.vendorName })}
+            data-testid="view-receipt"
+            className="inline-block h-11 w-11 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] transition-opacity hover:opacity-80"
+            title={`View receipt — ${tv.vendorName}`}
+            aria-label={`View receipt for ${tv.vendorName}`}
+          >
+            <img src={receipt} alt="" className="h-full w-full object-cover" />
+          </button>
+        ) : (
+          <span className="text-[var(--ink-muted)]">—</span>
+        );
+      },
+      enableSorting: false,
+    },
+    {
+      id: 'actions',
+      header: 'View',
+      size: 140,
+      cell: (info) => {
+        const tv = info.row.original;
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/vendors/${tv.vendor?.uuid || tv.vendorUuid}`)}
+            disabled={!tv.vendor?.uuid && !tv.vendorUuid}
+          >
+            View vendor
+          </Button>
+        );
+      },
+      enableSorting: false,
+    },
+  ], [vendorName]);
+
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -362,83 +427,33 @@ export function TripDetailScreen() {
       </div>
 
       {/* Per-vendor bills */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Vendors ({tripVendors.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          {tripVendors.length === 0 ? (
+      <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+        <div className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-3">
+          <h2 className="text-sm font-semibold text-[var(--ink)]">Vendors ({tripVendors.length})</h2>
+        </div>
+        {tripVendors.length === 0 ? (
+          <div className="flex items-center justify-center p-8">
             <p className="text-sm text-[var(--ink-muted)]">
               No vendors on this trip yet. Add one to start buying stock.
             </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHead sticky>
-                  <TableRow>
-                    <TableHeaderCell frozen>Vendor</TableHeaderCell>
-                    <TableHeaderCell>Bill reference</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Paid (₹)</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Receipt</TableHeaderCell>
-                    <TableHeaderCell className="text-right">View</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {tripVendors.map((tv, idx) => {
-                    const name = tv.vendor?.name || vendorName(tv.vendorUuid);
-                    const billRef = tv.bill_reference ?? tv.billReference;
-                    const paid = tv.total_paid ?? tv.totalPaidPaise;
-                    const receipt = tv.receiptImage ?? tv.receipt_image ?? null;
-                    return (
-                      <TableRow key={tv.uuid || tv.vendor?.uuid || tv.vendorUuid || idx}>
-                        <TableCell frozen>
-                          <div className="font-semibold">{name}</div>
-                        </TableCell>
-                        <TableCell>
-                          {billRef ? `Bill ${billRef}` : <span className="text-[var(--ink-muted)]">No bill reference</span>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {paid != null ? (
-                            <span className="typography-money-sm text-[var(--ink)]">{formatPaise(Number(paid))}</span>
-                          ) : (
-                            <span className="text-[var(--ink-muted)]">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {receipt ? (
-                            <button
-                              type="button"
-                              onClick={() => setReceiptView({ src: receipt, name })}
-                              data-testid="view-receipt"
-                              className="inline-block h-11 w-11 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] transition-opacity hover:opacity-80"
-                              title={`View receipt — ${name}`}
-                              aria-label={`View receipt for ${name}`}
-                            >
-                              <img src={receipt} alt="" className="h-full w-full object-cover" />
-                            </button>
-                          ) : (
-                            <span className="text-[var(--ink-muted)]">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/vendors/${tv.vendor?.uuid || tv.vendorUuid}`)}
-                            disabled={!tv.vendor?.uuid && !tv.vendorUuid}
-                          >
-                            View vendor
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        ) : (
+          <DataGrid
+            data={tripVendors.map((tv, idx) => ({
+              ...tv,
+              id: tv.uuid || tv.vendor?.uuid || tv.vendorUuid || idx,
+              vendorName: tv.vendor?.name || vendorName(tv.vendorUuid),
+              billRef: tv.bill_reference ?? tv.billReference,
+              paid: tv.total_paid ?? tv.totalPaidPaise,
+              receipt: tv.receiptImage ?? tv.receipt_image ?? null,
+            }))}
+            columns={vendorColumns}
+            isLoading={false}
+            isEmpty={tripVendors.length === 0}
+            emptyMessage="No vendors found."
+          />
+        )}
+      </div>
 
       {/* Stocks grouped by vendor */}
       {stocksByVendor.map((group) => (
