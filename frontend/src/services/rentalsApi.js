@@ -6,6 +6,7 @@
 
 import apiClient from '../platform/apiClient.js';
 import { RENTAL_ROUTES } from '../platform/routes.js';
+import { createRequestKey } from '../platform/requestKey.js';
 
 function buildError(error, fallback) {
   if (error.response?.data?.message) {
@@ -37,13 +38,17 @@ export async function listRentals() {
 
 /**
  * POST /rentals - Create / check out a rental agreement
- * @param {{customerName?, customerUuid?, startDate?, rentalDays?, notes?, items: Array<{unitUuid?|barcode?}>}} payload
+ * @param {{customerName?, customerUuid?, startDate?, rentalDays?, notes?, items: Array<{unitUuid?|barcode?}>, requestUuid?}} payload
  * customerUuid (Schema V2) links a customers entity; customerName free text stays supported.
+ * requestUuid (SEC-M-3 idempotency): pass to reuse across retries of the same intent; the service mints one when absent.
  * @returns {Promise<Object>} agreement DTO
  */
 export async function createRental(payload) {
   try {
-    const response = await apiClient.post(RENTAL_ROUTES.CREATE, payload);
+    const response = await apiClient.post(RENTAL_ROUTES.CREATE, {
+      ...payload,
+      requestUuid: payload?.requestUuid || createRequestKey(),
+    });
     if (response.data?.success) {
       return response.data.data;
     }
@@ -73,12 +78,16 @@ export async function getRental(uuid) {
 /**
  * POST /rentals/:uuid/return - Process a return of one or more units
  * @param {string} uuid
- * @param {{actualReturnDate?, items: Array<{unitUuid?|barcode?, gradeUuid?, damageChargePaise?, notes?}>}} payload
+ * @param {{actualReturnDate?, items: Array<{unitUuid?|barcode?, gradeUuid?, damageChargePaise?, notes?}>, requestUuid?}} payload
+ * requestUuid (SEC-M-3 idempotency): pass to reuse across retries of the same intent; the service mints one when absent.
  * @returns {Promise<Object>} updated agreement DTO
  */
 export async function processRentalReturn(uuid, payload) {
   try {
-    const response = await apiClient.post(RENTAL_ROUTES.RETURN(uuid), payload);
+    const response = await apiClient.post(RENTAL_ROUTES.RETURN(uuid), {
+      ...payload,
+      requestUuid: payload?.requestUuid || createRequestKey(),
+    });
     if (response.data?.success) {
       return response.data.data;
     }
@@ -92,12 +101,14 @@ export async function processRentalReturn(uuid, payload) {
  * POST /rentals/:uuid/cancel - Cancel an active agreement
  * @param {string} uuid
  * @param {{reason?}} payload
+ * @param {{requestUuid?}} options - pass to reuse across retries of the same intent; the service mints one when absent.
  * @returns {Promise<Object>} updated agreement DTO
  */
-export async function cancelRental(uuid, reason) {
+export async function cancelRental(uuid, reason, options = {}) {
   try {
     const response = await apiClient.post(RENTAL_ROUTES.CANCEL(uuid), {
       reason: reason || undefined,
+      requestUuid: options.requestUuid || createRequestKey(),
     });
     if (response.data?.success) {
       return response.data.data;

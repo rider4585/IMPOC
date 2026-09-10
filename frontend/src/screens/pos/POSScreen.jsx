@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useMemo, useEffect } from 'react';
+﻿import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Card,
   CardHeader,
@@ -19,6 +19,7 @@ import { createRental } from '../../services/rentalsApi.js';
 import { getPaymentMethods, getCustomerSources } from '../../services/picklistsApi.js';
 import BarcodeScanner from '../../components/BarcodeScanner.jsx';
 import { formatPaise } from '../../platform/money.js';
+import { createRequestKey } from '../../platform/requestKey.js';
 import { CustomerPicker } from '../../components/customers/CustomerPicker.jsx';
 import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
 import { SaleReceipt } from './SaleReceipt.jsx';
@@ -90,6 +91,10 @@ export function POSScreen() {
   const [startDate, setStartDate] = useState(todayISO);
   const [rentalDays, setRentalDays] = useState('3');
   const [rentalNotes, setRentalNotes] = useState('');
+
+  // SEC-M-3 idempotency: one key per checkout intent, reused across retries of the same
+  // intent (fresh key once the checkout succeeds or the cart is cleared).
+  const checkoutKeyRef = useRef(null);
 
   const totalPaise = useMemo(() => {
     if (mode === 'sale') {
@@ -192,6 +197,7 @@ export function POSScreen() {
     setRentalDays('3');
     setRentalNotes('');
     setCustomerSource('');
+    checkoutKeyRef.current = null;
     if (paymentMethods.length > 0 && !paymentMethods.some((m) => m.name === 'Cash')) {
       setPaymentMethod(paymentMethods[0].name);
     } else {
@@ -202,6 +208,9 @@ export function POSScreen() {
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     setCheckingOut(true);
+    if (!checkoutKeyRef.current) {
+      checkoutKeyRef.current = createRequestKey();
+    }
     try {
       const customerPayload = {
         customerName: customer?.name || undefined,
@@ -212,6 +221,7 @@ export function POSScreen() {
       if (mode === 'sale') {
         const sale = await createSale({
           ...customerPayload,
+          requestUuid: checkoutKeyRef.current,
           items: cart.map((item) => ({ unitUuid: item.uuid })),
         });
         setReceipt(sale);
@@ -224,6 +234,7 @@ export function POSScreen() {
         }
         const agreement = await createRental({
           ...customerPayload,
+          requestUuid: checkoutKeyRef.current,
           startDate: startDate || undefined,
           rentalDays: days,
           notes: rentalNotes.trim() || undefined,
@@ -238,6 +249,7 @@ export function POSScreen() {
       setRentalDays('3');
       setRentalNotes('');
       setCustomerSource('');
+      checkoutKeyRef.current = null;
       if (paymentMethods.length > 0 && !paymentMethods.some((m) => m.name === 'Cash')) {
         setPaymentMethod(paymentMethods[0].name);
       } else {

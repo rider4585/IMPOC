@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Card,
   CardHeader,
@@ -16,6 +16,7 @@ import { PERMISSIONS } from '../../constants/permissions.js';
 import { listRentals, getRental, createRental, processRentalReturn, cancelRental } from '../../services/rentalsApi.js';
 import { getDamageGrades } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
+import { createRequestKey } from '../../platform/requestKey.js';
 import { RentalCreateDialog } from './RentalCreateDialog.jsx';
 import { ReturnUnitsDialog } from './ReturnUnitsDialog.jsx';
 import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
@@ -65,6 +66,12 @@ export function RentalsScreen() {
   const [cancelReason, setCancelReason] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // SEC-M-3 idempotency: one key per action intent, reused across retries of the same
+  // intent until the action succeeds or its dialog is closed (fresh key on a new intent).
+  const createKeyRef = useRef(null);
+  const returnKeyRef = useRef(null);
+  const cancelKeyRef = useRef(null);
+
   const loadRentals = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -111,8 +118,9 @@ export function RentalsScreen() {
   const handleCreate = async (payload) => {
     setSaving(true);
     try {
-      const agreement = await createRental(payload);
+      const agreement = await createRental({ ...payload, requestUuid: createKeyRef.current });
       toast.success({ title: `Agreement ${agreement.agreementNumber} created` });
+      createKeyRef.current = null;
       setCreateOpen(false);
       await loadRentals();
     } catch (err) {
@@ -134,8 +142,9 @@ export function RentalsScreen() {
   const handleReturn = async (payload) => {
     setSaving(true);
     try {
-      await processRentalReturn(activeRental.uuid, payload);
+      await processRentalReturn(activeRental.uuid, { ...payload, requestUuid: returnKeyRef.current });
       toast.success({ title: 'Return processed' });
+      returnKeyRef.current = null;
       setReturnOpen(false);
       await refreshActive();
     } catch (err) {
@@ -148,8 +157,11 @@ export function RentalsScreen() {
   const handleCancel = async () => {
     setSaving(true);
     try {
-      await cancelRental(activeRental.uuid, cancelReason.trim() || undefined);
+      await cancelRental(activeRental.uuid, cancelReason.trim() || undefined, {
+        requestUuid: cancelKeyRef.current,
+      });
       toast.success({ title: 'Agreement cancelled' });
+      cancelKeyRef.current = null;
       setCancelOpen(false);
       setCancelReason('');
       await refreshActive();
@@ -180,7 +192,13 @@ export function RentalsScreen() {
               </p>
             </div>
             {canCreate && (
-              <Button onClick={() => setCreateOpen(true)} data-testid="rentals-create">
+              <Button
+                onClick={() => {
+                  createKeyRef.current = createRequestKey();
+                  setCreateOpen(true);
+                }}
+                data-testid="rentals-create"
+              >
                 New agreement
               </Button>
             )}
@@ -284,10 +302,25 @@ export function RentalsScreen() {
             {activeRental.status === 'active' && (
               <div className="flex flex-wrap gap-2">
                 {canReturn && (
-                  <Button onClick={() => setReturnOpen(true)}>Process return</Button>
+                  <Button
+                    onClick={() => {
+                      returnKeyRef.current = createRequestKey();
+                      setReturnOpen(true);
+                    }}
+                  >
+                    Process return
+                  </Button>
                 )}
                 {canCancel && (
-                  <Button variant="danger" onClick={() => setCancelOpen(true)}>Cancel agreement</Button>
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      cancelKeyRef.current = createRequestKey();
+                      setCancelOpen(true);
+                    }}
+                  >
+                    Cancel agreement
+                  </Button>
                 )}
               </div>
             )}
@@ -414,7 +447,7 @@ export function RentalsScreen() {
       {createOpen && (
         <RentalCreateDialog
           open={createOpen}
-          onClose={() => setCreateOpen(false)}
+          onClose={() => { createKeyRef.current = null; setCreateOpen(false); }}
           onSave={handleCreate}
           saving={saving}
         />
@@ -423,7 +456,7 @@ export function RentalsScreen() {
       {returnOpen && activeRental && (
         <ReturnUnitsDialog
           open={returnOpen}
-          onClose={() => setReturnOpen(false)}
+          onClose={() => { returnKeyRef.current = null; setReturnOpen(false); }}
           onSave={handleReturn}
           saving={saving}
           agreement={activeRental}
@@ -434,11 +467,11 @@ export function RentalsScreen() {
       {cancelOpen && (
         <Dialog
           open={cancelOpen}
-          onClose={() => setCancelOpen(false)}
+          onClose={() => { cancelKeyRef.current = null; setCancelOpen(false); }}
           title="Cancel agreement"
           footer={
             <>
-              <Button variant="outline" onClick={() => setCancelOpen(false)} disabled={saving}>
+              <Button variant="outline" onClick={() => { cancelKeyRef.current = null; setCancelOpen(false); }} disabled={saving}>
                 Keep
               </Button>
               <Button variant="danger" onClick={handleCancel} loading={saving}>
