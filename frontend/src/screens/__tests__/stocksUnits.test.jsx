@@ -317,24 +317,19 @@ describe('UnitsScreen (R-12)', () => {
     await screen.findAllByTestId('unit-row');
 
     await waitFor(() => {
-      expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: '', status: '', stockUuid: 'su1' });
-    });
-
-    await selectCombo('Status', /Sold/, 'Sold');
-    await waitFor(() => {
-      expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: '', status: 'sold', stockUuid: 'su1' });
+      expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: '', stockUuid: 'su1' });
     });
 
     fireEvent.change(screen.getByLabelText(/search units/i), { target: { value: 'Banarasi' } });
     await waitFor(() => {
-      expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: 'Banarasi', status: 'sold', stockUuid: 'su1' });
+      expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: 'Banarasi', stockUuid: 'su1' });
     });
 
     expect(screen.getByLabelText(/^Stock$/)).toHaveTextContent('Sari (Paithani)');
 
     await selectCombo('Stock', /Saree \(Banarasi\)/, 'Saree');
     await waitFor(() => {
-      expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: 'Banarasi', status: 'sold', stockUuid: 'su2' });
+      expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: 'Banarasi', stockUuid: 'su2' });
     });
   });
 

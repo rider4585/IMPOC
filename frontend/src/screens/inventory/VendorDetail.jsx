@@ -1,11 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '../../components/ui';
+import { Button, Badge, Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, Dialog, useToast } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getVendorHistory } from '../../services/vendorsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { unitStatusBadgeVariant } from '../rentals/rentalStatus.js';
+
+function varianceGlyph(paise) {
+  if (paise < 0) return { glyph: '↓', label: 'Var. loss', cls: 'text-[var(--money-out)]' };
+  if (paise > 0) return { glyph: '↑', label: 'Var. gain', cls: 'text-[var(--money-in)]' };
+  return { glyph: '±', label: 'Variance', cls: 'text-[var(--ink-muted)]' };
+}
 
 function StockBlock({ stock }) {
   const units = stock.units || [];
@@ -63,8 +70,7 @@ export function VendorDetail() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [page, setPage] = useState(1);
-  const pageSize = 50;
+  const [detailTrip, setDetailTrip] = useState(null);
 
   const loadHistory = useCallback(async () => {
     if (!uuid) return;
@@ -112,14 +118,12 @@ export function VendorDetail() {
 
   const vendor = data.vendor || data;
   const trips = data.trips || [];
-  const paginatedTrips = trips.slice((page - 1) * pageSize, page * pageSize);
 
   const tripStocks = (trip) => {
     const tripVendors = Array.isArray(trip.trip_vendors) ? trip.trip_vendors : [];
     if (tripVendors.length > 0) {
       return tripVendors.flatMap((tv) => (Array.isArray(tv.stocks) ? tv.stocks : []));
     }
-    // Legacy / mid-migration response shape: flat lines on the trip.
     return trip.lines || [];
   };
 
@@ -134,8 +138,75 @@ export function VendorDetail() {
     }));
   };
 
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'purchasedOn',
+      header: 'Date',
+      size: 140,
+      cell: (info) => {
+        const date = info.getValue();
+        return (
+          <span className="text-sm font-medium text-[var(--ink)]">
+            {new Date(date).toLocaleDateString()}
+          </span>
+        );
+      },
+      filter: { type: 'date' },
+    },
+    {
+      accessorKey: 'totalPaidPaise',
+      header: 'Paid',
+      size: 140,
+      cell: (info) => (
+        <span className="text-right text-xs font-medium text-[var(--ink)] typography-money-sm">
+          {formatPaise(Number(info.getValue()) || 0)}
+        </span>
+      ),
+      filter: { type: 'number' },
+    },
+    {
+      accessorKey: 'variancePaise',
+      header: 'Variance',
+      size: 150,
+      cell: (info) => {
+        const paise = Number(info.getValue()) || 0;
+        const vg = varianceGlyph(paise);
+        return (
+          <span className={`text-right text-xs font-medium ${vg.cls}`}>
+            <span aria-hidden="true">{vg.glyph}</span>
+            <span className="sr-only">{vg.label}:</span>{' '}
+            {formatPaise(paise)}
+          </span>
+        );
+      },
+      filter: { type: 'number' },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      size: 140,
+      cell: (info) => {
+        const trip = info.row.original;
+        const stocks = tripStocks(trip);
+        return (
+          <div className="text-right">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDetailTrip(trip)}
+              disabled={stocks.length === 0}
+            >
+              View {stocks.length} stock{stocks.length !== 1 ? 's' : ''}
+            </Button>
+          </div>
+        );
+      },
+      enableSorting: false,
+    },
+  ], []);
+
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6 overflow-hidden">
       <div>
         <Button variant="ghost" size="sm" onClick={() => navigate('/vendors')}>&larr; Vendors</Button>
         <h1 className="typography-heading mb-1 mt-1">{vendor.name}</h1>
@@ -160,70 +231,60 @@ export function VendorDetail() {
           <p className="text-sm text-[var(--ink-muted)]">Empty — no trips recorded for this vendor yet.</p>
         </div>
       ) : (
-        <>
-          {paginatedTrips.map((trip) => {
-            const stocks = tripStocks(trip);
-            const summaries = tripVendorSummary(trip);
-            return (
-              <Card key={trip.uuid}>
-                <CardHeader>
-                  <CardTitle className="flex items-baseline justify-between gap-2">
-                    <span>Trip — {new Date(trip.purchasedOn).toLocaleDateString()}</span>
-                    <span className="text-sm font-normal text-[var(--ink-muted)]">
-                      <span className="typography-money-sm text-[var(--ink)]">Paid {formatPaise(Number(trip.totalPaidPaise))}</span>
-                      {trip.variancePaise != null && Number(trip.variancePaise) !== 0 && (
-                        <span className={Number(trip.variancePaise) < 0 ? 'text-[var(--money-out)]' : 'text-[var(--money-in)]'}>
-                          {' '}&middot; <span aria-hidden="true">{Number(trip.variancePaise) < 0 ? '↓' : '↑'}</span>{' '}
-                          <span className="sr-only">Variance:</span>
-                          <span className="typography-money-sm">{formatPaise(Number(trip.variancePaise))}</span>
-                        </span>
-                      )}
-                      {trip.variancePaise != null && Number(trip.variancePaise) === 0 && (
-                        <span className="text-[var(--ink-muted)]">
-                          {' '}&middot; Variance <span className="typography-money-sm">{formatPaise(Number(trip.variancePaise))}</span>
-                        </span>
-                      )}
+        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+          <DataGrid
+            data={trips}
+            columns={columns}
+            isLoading={loading}
+            isEmpty={trips.length === 0}
+            emptyMessage="No trips."
+            getRowTestId={() => 'vendor-detail-trip'}
+            className="flex-1"
+          />
+        </div>
+      )}
+
+      {detailTrip && (
+        <Dialog open={!!detailTrip} onOpenChange={() => setDetailTrip(null)}>
+          <div className="flex flex-col gap-4 p-6 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold">
+              Trip — {new Date(detailTrip.purchasedOn).toLocaleDateString()}
+            </h3>
+
+            {tripVendorSummary(detailTrip) && (
+              <div>
+                <div className="mb-2 text-xs font-semibold text-[var(--ink-muted)] uppercase tracking-wide">Vendors</div>
+                <div className="flex flex-wrap gap-2">
+                  {tripVendorSummary(detailTrip).map((s) => (
+                    <span
+                      key={s.key}
+                      className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-1 text-sm text-[var(--ink)]"
+                    >
+                      {s.name}
+                      {s.billReference ? ` · ${s.billReference}` : ''}
+                      {s.totalPaid != null && <span className="typography-money-sm"> · {formatPaise(Number(s.totalPaid))}</span>}
                     </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                  {summaries && (
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {summaries.map((s) => (
-                        <span
-                          key={s.key}
-                          className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1 text-sm text-[var(--ink)]"
-                        >
-                          {s.name}
-                          {s.billReference ? ` · ${s.billReference}` : ''}
-                          {s.totalPaid != null && <span className="typography-money-sm"> · {formatPaise(Number(s.totalPaid))}</span>}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {stocks.length === 0 ? (
-                    <p className="text-sm text-[var(--ink-muted)]">No stocks in this trip.</p>
-                  ) : (
-                    <div className="flex flex-col gap-3">
-                      {stocks.map((stock) => (
-                        <StockBlock key={stock.uuid} stock={stock} />
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-          {trips.length > pageSize && (
-            <div className="flex items-center justify-between text-xs text-[var(--ink-muted)]">
-              <span>Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, trips.length)} of {trips.length}</span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</Button>
-                <Button variant="outline" size="sm" disabled={page * pageSize >= trips.length} onClick={() => setPage((p) => p + 1)}>Next</Button>
+                  ))}
+                </div>
               </div>
+            )}
+
+            <div>
+              <div className="mb-2 text-xs font-semibold text-[var(--ink-muted)] uppercase tracking-wide">Stocks</div>
+              {tripStocks(detailTrip).length === 0 ? (
+                <p className="text-sm text-[var(--ink-muted)]">No stocks in this trip.</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {tripStocks(detailTrip).map((stock) => (
+                    <StockBlock key={stock.uuid} stock={stock} />
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </>
+
+            <Button variant="outline" onClick={() => setDetailTrip(null)}>Close</Button>
+          </div>
+        </Dialog>
       )}
     </div>
   );

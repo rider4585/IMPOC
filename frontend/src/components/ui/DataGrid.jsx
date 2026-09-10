@@ -1,64 +1,140 @@
+/**
+ * DataGrid — a filterable, sortable table wrapper around @tanstack/react-table.
+ *
+ * ## How to add a grid
+ *
+ * 1. Define columns in a `useMemo`:
+ *    ```jsx
+ *    const columns = useMemo(() => [
+ *      {
+ *        accessorKey: 'name',      // data key
+ *        header: 'Name',           // column title
+ *        size: 200,                // width in px
+ *        cell: (info) => <span>{info.getValue()}</span>,  // optional custom renderer
+ *        filter: { type: 'text' }, // optional filter: 'text' | 'number' | 'date' | 'picklist'
+ *      },
+ *      // ... more columns
+ *    ], []);
+ *    ```
+ *
+ * 2. Render the grid:
+ *    ```jsx
+ *    <DataGrid
+ *      data={rows}
+ *      columns={columns}
+ *      isLoading={loading}
+ *      isEmpty={rows.length === 0}
+ *      emptyMessage="No rows."
+ *      getRowTestId={() => 'my-row'}
+ *    />
+ *    ```
+ *
+ * ## Filter types
+ *
+ * - `{ type: 'text' }` — substring match input
+ * - `{ type: 'number' }` — numeric input (greater-than comparison)
+ * - `{ type: 'date' }` — date input (ISO format)
+ * - `{ type: 'picklist', options: [{value, label}, ...] }` — select dropdown
+ *   - If options are omitted, DataGrid derives them from the column's distinct row values
+ *
+ * ## GENERIC RULE
+ *
+ * Any column that contains an enum, status, role, or category value MUST use:
+ *   filter: { type: 'picklist' }
+ *
+ * NOT using a picklist filter on such a column means no filter is shown (a silent bug).
+ * See UnitsScreen.jsx (status column) or TripsScreen.jsx (examples of correct usage).
+ */
+
 import React, { useMemo, useState } from 'react';
 import { useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, flexRender } from '@tanstack/react-table';
 import { ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
 
-function renderFilterControl(header, filterType, filterOptions) {
-  const value = header.column.getFilterValue() ?? '';
-
-  if (filterType === 'number') {
-    return (
+// Filter registry: map filterType -> { renderControl, filterFn }
+// To add a new filter type, add an entry here and export it if needed by external code.
+const FILTER_REGISTRY = {
+  text: {
+    renderControl: (value, onChange) => (
+      <input
+        type="text"
+        placeholder="Filter…"
+        value={value}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        className="h-7 w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-faint)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
+        onClick={(e) => e.stopPropagation()}
+      />
+    ),
+  },
+  number: {
+    renderControl: (value, onChange) => (
       <input
         type="number"
         placeholder="Filter…"
         value={value}
-        onChange={(e) => header.column.setFilterValue(e.target.value || undefined)}
+        onChange={(e) => onChange(e.target.value || undefined)}
         className="h-7 w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-faint)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
         onClick={(e) => e.stopPropagation()}
       />
-    );
-  }
-
-  if (filterType === 'date') {
-    return (
+    ),
+  },
+  date: {
+    renderControl: (value, onChange) => (
       <input
         type="date"
         value={value}
-        onChange={(e) => header.column.setFilterValue(e.target.value || undefined)}
+        onChange={(e) => onChange(e.target.value || undefined)}
         className="h-7 w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
         onClick={(e) => e.stopPropagation()}
       />
-    );
-  }
-
-  if (filterType === 'picklist' && Array.isArray(filterOptions)) {
-    return (
+    ),
+  },
+  picklist: {
+    renderControl: (value, onChange, options) => (
       <select
         value={value}
-        onChange={(e) => header.column.setFilterValue(e.target.value || undefined)}
+        onChange={(e) => onChange(e.target.value || undefined)}
         className="h-7 w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
         onClick={(e) => e.stopPropagation()}
       >
         <option value="">All</option>
-        {filterOptions.map((opt) => (
+        {(options || []).map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>
         ))}
       </select>
-    );
+    ),
+  },
+};
+
+function derivePicklistOptions(data, accessorKey) {
+  if (!Array.isArray(data) || !accessorKey) return [];
+  const values = new Set();
+  data.forEach((row) => {
+    const value = row[accessorKey];
+    if (value != null) values.add(value);
+  });
+  return Array.from(values)
+    .sort()
+    .map((v) => ({ value: String(v), label: String(v) }));
+}
+
+function renderFilterControl(header, filterType, filterOptions, data, accessorKey) {
+  const value = header.column.getFilterValue() ?? '';
+  const registry = FILTER_REGISTRY[filterType];
+
+  if (!registry) {
+    // Default to text if type not in registry
+    return FILTER_REGISTRY.text.renderControl(value, (v) => header.column.setFilterValue(v));
   }
 
-  // Default to text
-  return (
-    <input
-      type="text"
-      placeholder="Filter…"
-      value={value}
-      onChange={(e) => header.column.setFilterValue(e.target.value || undefined)}
-      className="h-7 w-full rounded border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-faint)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--focus-ring)]"
-      onClick={(e) => e.stopPropagation()}
-    />
-  );
+  // Auto-derive picklist options if not provided
+  let options = filterOptions;
+  if (filterType === 'picklist' && (!options || options.length === 0)) {
+    options = derivePicklistOptions(data, accessorKey);
+  }
+
+  return registry.renderControl(value, (v) => header.column.setFilterValue(v), options);
 }
 
 export function DataGrid({
@@ -132,7 +208,13 @@ export function DataGrid({
                               </div>
                             </div>
                             {hasFilter && (
-                              renderFilterControl(header, filterDef.type, filterDef.options)
+                              renderFilterControl(
+                                header,
+                                filterDef.type,
+                                filterDef.options,
+                                data,
+                                header.column.columnDef.accessorKey
+                              )
                             )}
                           </div>
                           {header.column.getFilterValue() && (

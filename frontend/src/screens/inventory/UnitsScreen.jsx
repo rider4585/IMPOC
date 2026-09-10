@@ -55,7 +55,6 @@ export function UnitsScreen() {
   const [error, setError] = useState('');
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
   const [stockUuid, setStockUuid] = useState(() => readStockUuid(location.search));
 
   const [stocks, setStocks] = useState([]);
@@ -85,14 +84,14 @@ export function UnitsScreen() {
     setLoading(true);
     setError('');
     try {
-      const data = await listAllUnits({ search, status, stockUuid });
+      const data = await listAllUnits({ search, stockUuid });
       setUnits(Array.isArray(data) ? data : data?.items || []);
     } catch (err) {
       setError(err.message || 'Failed to load units');
     } finally {
       setLoading(false);
     }
-  }, [search, status, stockUuid]);
+  }, [search, stockUuid]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,6 +147,7 @@ export function UnitsScreen() {
           </span>
         );
       },
+      filter: { type: 'picklist', options: UNIT_STATUSES.map(s => ({ value: s.value, label: s.label })) },
     },
     {
       accessorKey: 'stockName',
@@ -192,7 +192,7 @@ export function UnitsScreen() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Input
           type="search"
           label="Search"
@@ -200,17 +200,6 @@ export function UnitsScreen() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search units"
-        />
-        <SearchableSelect
-          label="Status"
-          value={status}
-          onChange={setStatus}
-          searchPlaceholder="Search statuses…"
-          emptyMessage="No matching statuses."
-          options={[
-            { value: '', label: 'All statuses' },
-            ...UNIT_STATUSES.map((s) => ({ value: s.value, label: s.label })),
-          ]}
         />
         {stockUuid && (
           <SearchableSelect
