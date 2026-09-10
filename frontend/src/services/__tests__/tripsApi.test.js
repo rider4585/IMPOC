@@ -47,7 +47,7 @@ describe('tripsApi.createStock', () => {
     expect(result.uuid).toBe('e1d2c3b4-a5b6-47a8-8b7c-6d5e4f3a2b1c');
   });
 
-  it('propagates a server error as an Error with statusCode', async () => {
+  it('masks an opaque server error string to the caller fallback (SEC-L-7)', async () => {
     const tripUuid = '6082e02e-e0ec-4e8c-8821-70c8a35cc7f8';
     apiClient.post.mockRejectedValueOnce({
       response: {
@@ -56,9 +56,7 @@ describe('tripsApi.createStock', () => {
       },
     });
 
-    await expect(createStock(tripUuid, { quantity: 1 })).rejects.toThrow(
-      'Invalid input: expected string, received undefined'
-    );
+    await expect(createStock(tripUuid, { quantity: 1 })).rejects.toThrow('Failed to create stock');
     expect(apiClient.post).toHaveBeenCalledWith(
       `/trips/${tripUuid}/stocks`,
       expect.objectContaining({ tripUuid })

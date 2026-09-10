@@ -5,6 +5,7 @@
  */
 
 import apiClient from '../platform/apiClient.js';
+import buildError from '../platform/buildError.js';
 
 /**
  * POST /auth/login
@@ -25,13 +26,7 @@ export async function login(username, password) {
 
     throw new Error(response.data?.message || 'Login failed');
   } catch (error) {
-    // Extract server message if available, otherwise use error message
-    if (error.response?.data?.message) {
-      const err = new Error(error.response.data.message);
-      err.statusCode = error.response.status;
-      throw err;
-    }
-    throw error;
+    throw buildError(error, 'Login failed');
   }
 }
 
@@ -54,12 +49,7 @@ export async function refresh() {
 
     throw new Error(response.data?.message || 'Refresh failed');
   } catch (error) {
-    if (error.response?.data?.message) {
-      const err = new Error(error.response.data.message);
-      err.statusCode = error.response.status;
-      throw err;
-    }
-    throw error;
+    throw buildError(error, 'Refresh failed');
   }
 }
 
@@ -77,12 +67,7 @@ export async function logout() {
 
     throw new Error(response.data?.message || 'Logout failed');
   } catch (error) {
-    if (error.response?.data?.message) {
-      const err = new Error(error.response.data.message);
-      err.statusCode = error.response.status;
-      throw err;
-    }
-    throw error;
+    throw buildError(error, 'Logout failed');
   }
 }
 
@@ -101,11 +86,6 @@ export async function getCurrentUser() {
 
     throw new Error(response.data?.message || 'Failed to get current user');
   } catch (error) {
-    if (error.response?.data?.message) {
-      const err = new Error(error.response.data.message);
-      err.statusCode = error.response.status;
-      throw err;
-    }
-    throw error;
+    throw buildError(error, 'Failed to get current user');
   }
 }

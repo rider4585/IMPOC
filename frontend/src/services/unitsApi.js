@@ -6,17 +6,7 @@
 
 import apiClient from '../platform/apiClient.js';
 import { UNIT_ROUTES } from '../platform/routes.js';
-
-function buildError(error, fallback) {
-  if (error.response?.data?.message) {
-    const err = new Error(error.response.data.message);
-    err.statusCode = error.response.status;
-    return err;
-  }
-  const err = new Error(error?.message || fallback);
-  err.statusCode = error?.statusCode;
-  return err;
-}
+import buildError from '../platform/buildError.js';
 
 /**
  * GET /units (bare list-all)
