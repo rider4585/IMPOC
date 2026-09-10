@@ -29,6 +29,9 @@ import {
   Package,
   Tags,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
 } from 'lucide-react';
 
 // localStorage keys for remembering which desktop nav sections and rail are collapsed.
@@ -320,7 +323,7 @@ export function AppShell({ children }) {
       {/* Desktop left sidebar */}
       {isDesktop && (
         <nav
-          className={`flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface-raised)] transition-all ${railCollapsed ? 'w-16' : 'w-60'}`}
+          className={`relative flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface-raised)] transition-all ${railCollapsed ? 'w-16' : 'w-60'}`}
           aria-label="Main Navigation"
         >
           <div className={`flex h-16 shrink-0 items-center border-b border-[var(--border)] ${railCollapsed ? 'justify-center px-2' : 'px-4'}`}>
@@ -346,18 +349,22 @@ export function AppShell({ children }) {
               aria-label={railCollapsed ? 'Sign out' : undefined}
             >
               {!railCollapsed && (isSigningOut ? 'Signing out...' : 'Sign Out')}
-              {railCollapsed && '→'}
-            </button>
-            <button
-              type="button"
-              className={`mt-2 flex items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-3 py-2 transition-colors hover:bg-[var(--border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 ${railCollapsed ? 'h-9 w-9 justify-center' : 'min-h-[44px] w-full justify-center'}`}
-              onClick={toggleRailCollapse}
-              aria-label={railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={railCollapsed ? 'Expand' : 'Collapse'}
-            >
-              {railCollapsed ? '→' : '←'}
+              {railCollapsed && <LogOut className="h-5 w-5" aria-hidden />}
             </button>
           </div>
+          <button
+            type="button"
+            className="absolute -right-3 top-7 grid h-6 w-6 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface-raised)] shadow-sm transition-colors hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+            onClick={toggleRailCollapse}
+            aria-label={railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={railCollapsed ? 'Expand' : 'Collapse'}
+          >
+            {railCollapsed ? (
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            ) : (
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            )}
+          </button>
         </nav>
       )}
 
