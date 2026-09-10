@@ -165,7 +165,7 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
     expect(screen.queryByTestId('save-unit')).not.toBeInTheDocument();
   });
 
-  it('pre-fills colour + size from the previously saved unit and auto-commits the next scan (UX-H5)', async () => {
+  it('pre-fills colour + size from the previous unit but shows the form and does NOT auto-commit until Save (or a fresh pick)', async () => {
     setup();
     renderIntake();
     await waitFor(() => expect(screen.getByText(/0 of 3/)).toBeInTheDocument());
@@ -175,9 +175,14 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
     await pickColourSize('Red', 'M');
     await waitFor(() => expect(screen.getByText(/1 of 3/)).toBeInTheDocument());
 
-    // Second unit: colour+size pre-fill from the last saved unit and the save
-    // fires immediately — no picking, no extra tap.
+    // Second unit: colour+size pre-fill from the last saved unit, but the form
+    // is shown and NOTHING is auto-saved — the operator must confirm each unit.
     await enterDecodedState('100002');
+    expect(screen.getByText(/1 of 3/)).toBeInTheDocument();
+    expect(tripsService.scanBarcodeIntoStock).toHaveBeenCalledTimes(1);
+
+    // Tapping Save commits with the pre-filled colour/size (no re-pick needed).
+    fireEvent.click(screen.getByTestId('save-unit'));
     await waitFor(() => expect(screen.getByText(/2 of 3/)).toBeInTheDocument());
     expect(tripsService.scanBarcodeIntoStock).toHaveBeenLastCalledWith(
       't1',
