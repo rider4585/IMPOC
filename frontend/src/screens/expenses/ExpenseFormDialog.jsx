@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Dialog, Button, Input, Card, CardContent } from '../../components/ui';
+import React, { useState, useEffect } from 'react';
+import { Dialog, Button, Input, Select, Card, CardContent } from '../../components/ui';
 import { parseRupeesToPaise } from '../../platform/moneyInput.js';
+import { getExpenseTypes } from '../../services/picklistsApi.js';
 
 function todayISO() {
   const d = new Date();
@@ -19,8 +20,25 @@ export function ExpenseFormDialog({ open, onClose, onSave, saving, expense }) {
     notes: expense?.notes || '',
   });
   const [error, setError] = useState('');
+  const [expenseTypes, setExpenseTypes] = useState([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  useEffect(() => {
+    if (open && expenseTypes.length === 0) {
+      setLoadingTypes(true);
+      getExpenseTypes()
+        .then((types) => {
+          const active = types.filter((t) => t.isActive);
+          setExpenseTypes(active.map((t) => ({ value: t.name, label: t.name })));
+        })
+        .catch(() => {
+          setError('Failed to fetch expense types');
+        })
+        .finally(() => setLoadingTypes(false));
+    }
+  }, [open]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -78,12 +96,14 @@ export function ExpenseFormDialog({ open, onClose, onSave, saving, expense }) {
               hint={isEdit ? 'Amount cannot change once recorded.' : undefined}
               required={!isEdit}
             />
-            <Input
+            <Select
               label="Category"
               value={form.category}
-              onChange={set('category')}
-              placeholder="e.g. Rent, Utilities, Repairs"
-              maxLength={100}
+              onChange={(value) => setForm((f) => ({ ...f, category: value }))}
+              options={expenseTypes}
+              placeholder="Select category"
+              searchPlaceholder="Search categories…"
+              disabled={loadingTypes}
               required
             />
             <Input

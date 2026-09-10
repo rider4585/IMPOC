@@ -6,7 +6,7 @@ import { ProductTypesManager } from './ProductTypesManager.jsx';
 import {
   FlatPicklistManager,
 } from './FlatPicklistManager.jsx';
-import { getColours, getSizes, getDamageGrades, getPaymentMethods, getCustomerSources } from '../../services/picklistsApi.js';
+import { getColours, getSizes, getDamageGrades, getPaymentMethods, getCustomerSources, getExpenseTypes } from '../../services/picklistsApi.js';
 import { DAMAGE_GRADE_OUTCOMES } from '../../constants/damageGrades.js';
 
 const TABS = [
@@ -16,6 +16,7 @@ const TABS = [
   { key: 'damage-grades', label: 'Damage grades' },
   { key: 'payment-methods', label: 'Payment methods' },
   { key: 'customer-sources', label: 'Customer sources' },
+  { key: 'expense-types', label: 'Expense types' },
 ];
 
 const COLOUR_COLUMNS = [{ key: 'name', label: 'Name' }];
@@ -43,6 +44,9 @@ const PAYMENT_FIELDS = [{ key: 'name', label: 'Name', required: true }];
 
 const CUSTOMER_SOURCE_COLUMNS = [{ key: 'name', label: 'Name' }];
 const CUSTOMER_SOURCE_FIELDS = [{ key: 'name', label: 'Name', required: true }];
+
+const EXPENSE_TYPE_COLUMNS = [{ key: 'name', label: 'Name' }];
+const EXPENSE_TYPE_FIELDS = [{ key: 'name', label: 'Name', required: true }];
 
 export function PicklistManagementScreen() {
   const { permissions } = useAuth();
@@ -127,6 +131,15 @@ export function PicklistManagementScreen() {
           source={getCustomerSources}
           columns={CUSTOMER_SOURCE_COLUMNS}
           fields={CUSTOMER_SOURCE_FIELDS}
+        />
+      )}
+      {active === 'expense-types' && (
+        <FlatPicklistManager
+          resource="expenseTypes"
+          singular="Expense type"
+          source={getExpenseTypes}
+          columns={EXPENSE_TYPE_COLUMNS}
+          fields={EXPENSE_TYPE_FIELDS}
         />
       )}
     </div>

@@ -15,6 +15,7 @@ const RESOURCE_BASE = {
   damageGrades: '/picklists/damage-grades',
   paymentMethods: '/picklists/payment-methods',
   customerSources: '/picklists/customer-sources',
+  expenseTypes: '/picklists/expense-types',
 };
 
 /**
@@ -146,9 +147,21 @@ export async function getCustomerSources() {
   }
 }
 
+export async function getExpenseTypes() {
+  try {
+    const response = await apiClient.get(RESOURCE_BASE.expenseTypes);
+    if (response.data?.success && response.data?.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to fetch expense types');
+  } catch (error) {
+    throw buildError(error, 'Failed to fetch expense types');
+  }
+}
+
 /**
  * Generic create for flat picklists.
- * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'} resource
+ * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'} resource
  * @param {Object} payload
  */
 export async function createPicklistItem(resource, payload) {
@@ -165,7 +178,7 @@ export async function createPicklistItem(resource, payload) {
 
 /**
  * Generic update for flat picklists.
- * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'} resource
+ * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'} resource
  * @param {string} uuid
  * @param {Object} payload - {name?, isActive?, ...}
  */
