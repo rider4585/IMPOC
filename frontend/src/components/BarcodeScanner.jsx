@@ -919,29 +919,19 @@ function BarcodeScanner({ onDetected, onError }) {
 
             const captureCanvas = document.createElement('canvas');
 
-            let imageCapture = null;
-            try {
-                const track = streamRef.current?.getVideoTracks?.()[0];
-                if (track && typeof window !== 'undefined' && 'ImageCapture' in window) {
-                    imageCapture = new window.ImageCapture(track);
-                }
-            } catch {
-                imageCapture = null;
-            }
-
             /*
-             * Some Windows Chrome + GPU combos hand back a BLACK frame from the
-             * video/GPU pipeline (grabFrame / drawImage(video) / createImageBitmap
-             * (video)) even though the live preview looks fine — so nothing ever
-             * decodes. ImageCapture.takePhoto() uses the camera's still pipeline
-             * and returns real pixels. We start on the fast per-frame path and,
-             * if we detect several all-black captures in a row, switch to a slower
-             * takePhoto loop for the rest of the session.
+             * Capture is a plain ctx.drawImage(video) onto our own canvas — the
+             * same approach working scanner sites use. We deliberately do NOT use
+             * ImageCapture.grabFrame(): on Windows Chrome grabFrame frequently
+             * returns a black frame (while drawImage(video) is fine), which broke
+             * decoding on the Windows laptop while macOS/iOS worked.
+             *
+             * One-time diagnostic (frame size + whether the first captured frame
+             * is all-black) is logged so field issues are self-explaining.
              */
-            let useTakePhoto = false;
-            let blackStreak = 0;
+            let diagnosed = false;
 
-            const canvasIsBlack = (ctx, w, h) => {
+            const centerIsBlack = (ctx, w, h) => {
                 try {
                     const sx = Math.max(0, Math.floor(w / 2) - 16);
                     const sy = Math.max(0, Math.floor(h / 2) - 16);
@@ -955,84 +945,56 @@ function BarcodeScanner({ onDetected, onError }) {
                 }
             };
 
-            const grabBitmap = async () => {
-                if (useTakePhoto && imageCapture) {
-                    const blob = await imageCapture.takePhoto();
-                    return await createImageBitmap(blob);
-                }
-                if (imageCapture) {
-                    try {
-                        return await imageCapture.grabFrame();
-                    } catch {
-                        // grabFrame can throw if the track is not ready — fall
-                        // back to createImageBitmap for the rest of the session.
-                        imageCapture = null;
-                    }
-                }
-                return await createImageBitmap(video);
-            };
-
-            const decodeLoop = async () => {
+            const decodeLoop = () => {
                 if (cancelled) return;
 
                 if (
                     !pausedRef.current &&
                     video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
                 ) {
-                    try {
-                        const bitmap = await grabBitmap();
-                        const w = bitmap.width;
-                        const h = bitmap.height;
+                    const w = video.videoWidth;
+                    const h = video.videoHeight;
 
-                        if (w && h) {
-                            if (captureCanvas.width !== w) captureCanvas.width = w;
-                            if (captureCanvas.height !== h) captureCanvas.height = h;
+                    if (w && h) {
+                        if (captureCanvas.width !== w) captureCanvas.width = w;
+                        if (captureCanvas.height !== h) captureCanvas.height = h;
 
-                            const ctx = captureCanvas.getContext('2d', {
-                                willReadFrequently: true,
-                            });
-                            ctx.drawImage(bitmap, 0, 0, w, h);
-                            if (bitmap.close) bitmap.close();
+                        const ctx = captureCanvas.getContext('2d', {
+                            willReadFrequently: true,
+                        });
+                        ctx.drawImage(video, 0, 0, w, h);
 
-                            // Detect the black-frame GPU bug and switch pipelines.
-                            if (!useTakePhoto && imageCapture) {
-                                if (canvasIsBlack(ctx, w, h)) {
-                                    if (++blackStreak >= 4) useTakePhoto = true;
-                                } else {
-                                    blackStreak = 0;
-                                }
-                            }
-
-                            try {
-                                const source = new HTMLCanvasElementLuminanceSource(captureCanvas);
-                                const binary = new BinaryBitmap(new HybridBinarizer(source));
-                                // decodeWithState keeps the CODE_128 hints set above.
-                                // multiReader.decode(image) resets hints each call and
-                                // would scan every format (QR, etc.) — slow and noisy.
-                                const result = multiReader.decodeWithState(binary);
-                                const value = result && result.getText();
-
-                                if (value && !cancelled && !pausedRef.current) {
-                                    handleBarcodeDetected(value);
-                                }
-                            } catch {
-                                // NotFoundException — no barcode in this frame.
-                            } finally {
-                                multiReader.reset();
-                            }
+                        if (!diagnosed) {
+                            diagnosed = true;
+                            // eslint-disable-next-line no-console
+                            console.info(
+                                `[scanner] capture ${w}x${h}, centerBlack=${centerIsBlack(ctx, w, h)}`
+                            );
                         }
-                    } catch {
-                        // Frame grab failed this tick — retry next frame.
+
+                        try {
+                            const source = new HTMLCanvasElementLuminanceSource(captureCanvas);
+                            const binary = new BinaryBitmap(new HybridBinarizer(source));
+                            // decodeWithState keeps the CODE_128 hints set above;
+                            // decode(image) would reset them and scan every format.
+                            const result = multiReader.decodeWithState(binary);
+                            const value = result && result.getText();
+
+                            if (value && !cancelled && !pausedRef.current) {
+                                handleBarcodeDetected(value);
+                            }
+                        } catch {
+                            // NotFoundException — no barcode in this frame.
+                        } finally {
+                            multiReader.reset();
+                        }
                     }
                 }
 
                 if (!cancelled) {
-                    // Throttle: ~8/s on the fast path, gentler for takePhoto
-                    // (which is heavier). Keeps CPU + log noise down.
-                    const delay = useTakePhoto ? 500 : 120;
-                    animationFrameRef.current = window.setTimeout(() => {
-                        decodeLoop();
-                    }, delay);
+                    // Throttle to ~10/s: enough for scanning, keeps CPU + the
+                    // benign per-frame NotFoundException console noise down.
+                    animationFrameRef.current = window.setTimeout(decodeLoop, 100);
                 }
             };
 
