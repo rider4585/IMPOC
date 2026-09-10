@@ -929,7 +929,37 @@ function BarcodeScanner({ onDetected, onError }) {
                 imageCapture = null;
             }
 
+            /*
+             * Some Windows Chrome + GPU combos hand back a BLACK frame from the
+             * video/GPU pipeline (grabFrame / drawImage(video) / createImageBitmap
+             * (video)) even though the live preview looks fine — so nothing ever
+             * decodes. ImageCapture.takePhoto() uses the camera's still pipeline
+             * and returns real pixels. We start on the fast per-frame path and,
+             * if we detect several all-black captures in a row, switch to a slower
+             * takePhoto loop for the rest of the session.
+             */
+            let useTakePhoto = false;
+            let blackStreak = 0;
+
+            const canvasIsBlack = (ctx, w, h) => {
+                try {
+                    const sx = Math.max(0, Math.floor(w / 2) - 16);
+                    const sy = Math.max(0, Math.floor(h / 2) - 16);
+                    const { data } = ctx.getImageData(sx, sy, 32, 32);
+                    for (let i = 0; i < data.length; i += 4) {
+                        if (data[i] || data[i + 1] || data[i + 2]) return false;
+                    }
+                    return true;
+                } catch {
+                    return false;
+                }
+            };
+
             const grabBitmap = async () => {
+                if (useTakePhoto && imageCapture) {
+                    const blob = await imageCapture.takePhoto();
+                    return await createImageBitmap(blob);
+                }
                 if (imageCapture) {
                     try {
                         return await imageCapture.grabFrame();
@@ -964,6 +994,15 @@ function BarcodeScanner({ onDetected, onError }) {
                             ctx.drawImage(bitmap, 0, 0, w, h);
                             if (bitmap.close) bitmap.close();
 
+                            // Detect the black-frame GPU bug and switch pipelines.
+                            if (!useTakePhoto && imageCapture) {
+                                if (canvasIsBlack(ctx, w, h)) {
+                                    if (++blackStreak >= 4) useTakePhoto = true;
+                                } else {
+                                    blackStreak = 0;
+                                }
+                            }
+
                             try {
                                 const source = new HTMLCanvasElementLuminanceSource(captureCanvas);
                                 const binary = new BinaryBitmap(new HybridBinarizer(source));
@@ -988,16 +1027,19 @@ function BarcodeScanner({ onDetected, onError }) {
                 }
 
                 if (!cancelled) {
-                    animationFrameRef.current = requestAnimationFrame(() => {
+                    // Throttle: ~8/s on the fast path, gentler for takePhoto
+                    // (which is heavier). Keeps CPU + log noise down.
+                    const delay = useTakePhoto ? 500 : 120;
+                    animationFrameRef.current = window.setTimeout(() => {
                         decodeLoop();
-                    });
+                    }, delay);
                 }
             };
 
             zxingControlsRef.current = {
                 stop: () => {
                     if (animationFrameRef.current) {
-                        cancelAnimationFrame(animationFrameRef.current);
+                        clearTimeout(animationFrameRef.current);
                         animationFrameRef.current = null;
                     }
                 },
