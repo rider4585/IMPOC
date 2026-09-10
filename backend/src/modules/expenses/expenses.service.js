@@ -75,16 +75,44 @@ export const createExpense = async ({ amountPaise, category, purpose, expenseDat
  * List expenses, newest first. Unless the caller has a broad read scope
  * (ADMIN/MANAGER), only expenses the caller created are visible (SEC-M-5).
  *
- * @param {Object} [options] - { actorUserId, viewAll }
+ * R-32 Phase A: the page id set (respecting LIMIT/OFFSET) is produced by the
+ * v_expenses_grid read-layer view, then the DTO is hydrated for that page only.
+ *
+ * @param {Object} [options] - { actorUserId, viewAll, limit, offset }
  */
-export const listExpenses = async ({ actorUserId, viewAll } = {}) => {
-    const where = { deletedAt: null };
+export const listExpenses = async ({ actorUserId, viewAll, limit, offset } = {}) => {
+    // v_expenses_grid already excludes soft-deleted expenses, so no outer
+    // deleted_at predicate is needed (and the view does not expose one).
+    const filters = [];
+    const replacements = {};
     if (!viewAll && actorUserId) {
-        where.createdBy = actorUserId;
+        filters.push('e."createdBy" = :createdBy');
+        replacements.createdBy = actorUserId;
+    }
+
+    let sql = `
+        SELECT e.id
+        FROM v_expenses_grid e
+        ${filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : ''}
+        ORDER BY e."createdAt" DESC`;
+
+    if (limit !== undefined && limit !== null) {
+        sql += ' LIMIT :limit';
+        replacements.limit = limit;
+    }
+    if (offset !== undefined && offset !== null) {
+        sql += ' OFFSET :offset';
+        replacements.offset = offset;
+    }
+
+    const rows = await sequelize.query(sql, { replacements, type: sequelize.QueryTypes.SELECT });
+    const ids = rows.map((row) => row.id);
+    if (ids.length === 0) {
+        return [];
     }
 
     const expenses = await Expense.findAll({
-        where,
+        where: { id: ids },
         order: [['createdAt', 'DESC']],
         include: [{ association: 'reversals' }],
     });

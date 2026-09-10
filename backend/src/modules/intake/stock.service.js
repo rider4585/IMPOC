@@ -1,5 +1,4 @@
 import { Stock, Trip, TripVendor, Vendor, ProductType, Unit, Colour, Size, sequelize } from '../../../database/models/index.js';
-import { Sequelize } from 'sequelize';
 import { userHasPermission } from '../auth/permission.service.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { escapeLike } from '../../utils/escapeLike.js';
@@ -649,9 +648,17 @@ async function resolveSubType(subTypeUuid, transaction) {
  * List ALL stocks across trips (bare GET /api/stocks endpoint).
  * Ordered newest first. Optional filters: tripUuid, vendorUuid, search on
  * product type name / subtype name (partial).
+ *
+ * R-32 Phase A: the read layer is now the v_stocks_grid view (trip/vendor/
+ * type context and unitsScannedCount are precomputed in postgres);
+ * LIMIT/OFFSET window the returned page. When no pagination is supplied every
+ * matching stock is returned, preserving the historical response shape.
  */
-export const listAllStocks = async ({ tripUuid, vendorUuid, search } = {}) => {
-    const where = {};
+export const listAllStocks = async ({ tripUuid, vendorUuid, search, limit, offset } = {}) => {
+    // v_stocks_grid already excludes soft-deleted stocks, so no outer
+    // deleted_at predicate is needed (and the view does not expose one).
+    const filters = [];
+    const replacements = {};
 
     if (tripUuid) {
         const trip = await Trip.findOne({ where: { uuid: tripUuid } });
@@ -660,7 +667,8 @@ export const listAllStocks = async ({ tripUuid, vendorUuid, search } = {}) => {
             error.statusCode = 404;
             throw error;
         }
-        where.tripId = trip.id;
+        filters.push(`st."tripUuid" = :tripUuid`);
+        replacements.tripUuid = tripUuid;
     }
 
     if (vendorUuid) {
@@ -670,76 +678,57 @@ export const listAllStocks = async ({ tripUuid, vendorUuid, search } = {}) => {
             error.statusCode = 404;
             throw error;
         }
-        where.vendorId = vendor.id;
+        filters.push(`st."vendorUuid" = :vendorUuid`);
+        replacements.vendorUuid = vendorUuid;
     }
 
     if (search) {
         // SEC-L-5: escape LIKE wildcards so a literal "%" / "_" search term is
         // matched literally instead of acting as a wildcard.
-        const like = `%${escapeLike(search)}%`;
-        where[Sequelize.Op.or] = [
-            { '$productType.name$': { [Sequelize.Op.like]: like } },
-            { '$subType.name$': { [Sequelize.Op.like]: like } },
-        ];
+        replacements.search = `%${escapeLike(search)}%`;
+        filters.push(`(st."productTypeName" LIKE :search OR st."subTypeName" LIKE :search)`);
     }
 
-    const stocks = await Stock.findAll({
-        where,
-        attributes: [
-            'id',
-            'uuid',
-            'tripVendorId',
-            'vendorId',
-            'productTypeId',
-            'quantity',
-            'buyingPricePaise',
-            'wholeBuyingPricePaise',
-            'sellingPricePaise',
-            'floorPricePaise',
-            'channel',
-            'createdAt',
-        ],
-        include: [
-            ...STOCK_INCLUDES,
-            {
-                model: Trip,
-                as: 'trip',
-                attributes: ['uuid'],
-            },
-            {
-                model: Unit,
-                as: 'units',
-                where: { deletedAt: null },
-                required: false,
-                attributes: ['id'],
-            },
-        ],
-        order: [['createdAt', 'DESC']],
-    });
+    let sql = `
+        SELECT *
+        FROM v_stocks_grid st
+        ${filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : ''}
+        ORDER BY st."createdAt" DESC`;
 
-    return stocks.map(mapListAllStocksDTO);
+    if (limit !== undefined && limit !== null) {
+        sql += ' LIMIT :limit';
+        replacements.limit = limit;
+    }
+    if (offset !== undefined && offset !== null) {
+        sql += ' OFFSET :offset';
+        replacements.offset = offset;
+    }
+
+    const rows = await sequelize.query(sql, { replacements, type: sequelize.QueryTypes.SELECT });
+
+    return rows.map(mapListAllStocksDTO);
 };
 
 /**
- * Map Stock to the bare list-all DTO (GET /api/stocks).
+ * Map a v_stocks_grid row to the bare list-all DTO (GET /api/stocks).
  * Paise values returned as STRINGS to preserve BIGINT precision.
  */
-function mapListAllStocksDTO(stock) {
+function mapListAllStocksDTO(row) {
     return {
-        uuid: stock.uuid,
-        tripUuid: stock.trip?.uuid || null,
-        tripVendorUuid: stock.tripVendor?.uuid || null,
-        vendorUuid: stock.vendor?.uuid || null,
-        vendorName: stock.vendor?.name || null,
-        productTypeUuid: stock.productType?.uuid || null,
-        subTypeUuid: stock.subType?.uuid || null,
-        quantity: stock.quantity,
-        buyingPricePaise: String(stock.buyingPricePaise),
-        wholeBuyingPricePaise: stock.wholeBuyingPricePaise != null ? String(stock.wholeBuyingPricePaise) : null,
-        sellingPricePaise: String(stock.sellingPricePaise),
-        floorPricePaise: String(stock.floorPricePaise),
-        channel: stock.channel,
-        unitsScannedCount: (stock.units || []).length,
-        createdAt: stock.createdAt,
+        uuid: row.uuid,
+        tripUuid: row.tripUuid || null,
+        tripVendorUuid: row.tripVendorUuid || null,
+        vendorUuid: row.vendorUuid || null,
+        vendorName: row.vendorName || null,
+        productTypeUuid: row.productTypeUuid || null,
+        subTypeUuid: row.subTypeUuid || null,
+        quantity: row.quantity,
+        buyingPricePaise: String(row.buyingPricePaise),
+        wholeBuyingPricePaise: row.wholeBuyingPricePaise != null ? String(row.wholeBuyingPricePaise) : null,
+        sellingPricePaise: String(row.sellingPricePaise),
+        floorPricePaise: String(row.floorPricePaise),
+        channel: row.channel,
+        unitsScannedCount: Number(row.unitsScannedCount),
+        createdAt: row.createdAt,
     };
 }

@@ -1,18 +1,113 @@
 import {
     Sale,
     SaleLine,
-    SaleReversal,
     RentalAgreement,
     RentalLine,
     RentalReturn,
-    RentalReversal,
     Expense,
     Unit,
     Stock,
     Trip,
     Vendor,
     Sequelize,
+    sequelize,
 } from '../../../database/models/index.js';
+
+/*
+ * R-32 Phase B: dashboard KPIs and the inventory snapshot read from the
+ * reporting materialized views (mv_dashboard_sales / _expenses / _rentals and
+ * mv_inventory_snapshot, defined in migration 20260910000003) instead of
+ * recomputing aggregate scans on every request.
+ *
+ * Freshness strategy:
+ *  - Matviews are REFRESHed from the money ledger at most once per
+ *    REFRESH_COOLDOWN_MS (60s), on demand, the first time a report is read.
+ *  - REFRESH_CONCURRENTLY is used for the date-grouped matviews (their UNIQUE
+ *    index on metric_date keeps the view readable while it refreshes); the
+ *    single-row inventory snapshot uses a plain REFRESH.
+ *  - REFRESH CONCURRENTLY fails if another refresh is already running (e.g. a
+ *    concurrent request hit the cooldown boundary); we swallow that and serve
+ *    the existing data rather than failing the report read.
+ *  - If any matview is empty (fresh DB, or a force-sync recreated the objects
+ *    but not the data) the cooldown is ignored and a refresh is triggered so
+ *    report reads always reflect committed rows.
+ *  - REFRESH cannot run inside a transaction, so the raw queries here never
+ *    use one.
+ */
+const REFRESH_COOLDOWN_MS = 60_000;
+const DASHBOARD_GROUPED_MATVIEWS = ['mv_dashboard_sales', 'mv_dashboard_expenses', 'mv_dashboard_rentals'];
+const INVENTORY_MATVIEW = 'mv_inventory_snapshot';
+let lastMatviewRefreshAtMs = 0;
+
+async function anyReportingMatviewEmpty() {
+    const rows = await sequelize.query(
+        `SELECT
+           (SELECT COUNT(*) FROM ${DASHBOARD_GROUPED_MATVIEWS[0]}) +
+           (SELECT COUNT(*) FROM ${DASHBOARD_GROUPED_MATVIEWS[1]}) +
+           (SELECT COUNT(*) FROM ${DASHBOARD_GROUPED_MATVIEWS[2]}) +
+           (SELECT COUNT(*) FROM ${INVENTORY_MATVIEW}) AS total`,
+        { type: sequelize.QueryTypes.SELECT }
+    );
+    return Number(rows[0].total) === 0;
+}
+
+const refreshReportingMatviewsIfStale = async () => {
+    const now = Date.now();
+    const insideCooldown = now - lastMatviewRefreshAtMs < REFRESH_COOLDOWN_MS;
+    let empty = false;
+    try {
+        empty = await anyReportingMatviewEmpty();
+    } catch (error) {
+        // Objects missing (migrations not applied): surface the real error.
+        throw error;
+    }
+    if (insideCooldown && !empty) {
+        return;
+    }
+
+    lastMatviewRefreshAtMs = now;
+
+    for (const name of DASHBOARD_GROUPED_MATVIEWS) {
+        try {
+            // eslint-disable-next-line no-await-in-loop
+            await sequelize.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${name}`);
+        } catch (error) {
+            // Concurrent refresh already in progress in another request/process:
+            // the matview stays readable, so serve the existing snapshot.
+            const detail = (error && (error.parent && error.parent.message)) || (error && error.message) || '';
+            if (/already in progress|concurrently/i.test(detail)) {
+                continue;
+            }
+            throw error;
+        }
+    }
+
+    await sequelize.query(`REFRESH MATERIALIZED VIEW ${INVENTORY_MATVIEW}`);
+};
+
+function rowToInventorySnapshot(row) {
+    if (!row) {
+        return { total: 0, retailInStock: 0, byChannel: {}, byStatus: {} };
+    }
+
+    const byChannel = {};
+    if (Number(row.channel_retail) > 0) byChannel.RETAIL = Number(row.channel_retail);
+    if (Number(row.channel_rental) > 0) byChannel.RENTAL = Number(row.channel_rental);
+
+    const byStatus = {};
+    const statuses = ['in_stock', 'sold', 'rented', 'in_maintenance', 'retired', 'lost', 'damaged'];
+    for (const status of statuses) {
+        const value = Number(row[`status_${status}`]);
+        if (value > 0) byStatus[status] = value;
+    }
+
+    return {
+        total: Number(row.total_units),
+        retailInStock: Number(row.retail_in_stock),
+        byChannel,
+        byStatus,
+    };
+}
 
 const DAY_MS = 86400000;
 
@@ -52,56 +147,68 @@ function dateWhere(column, from, to) {
 
 /* ------------------------------------------------------------------ *
  * Dashboard KPIs for a period (default: this calendar month)
+ *
+ * Reads the reporting matviews (refreshed on demand, see the header note).
+ * Sales total = completed sales; cancellations come from CANCEL reversals;
+ * count = every sale in the period (incl. later-cancelled), matching the
+ * historical semantics exactly.
  * ------------------------------------------------------------------ */
 export const getDashboard = async ({ from, to }) => {
     const { from: f, to: t } = normalizeRange(from, to);
 
-    const salesWhere = { deletedAt: null, ...dateWhere('soldAt', f, t) };
+    await refreshReportingMatviewsIfStale();
 
-    const [sales, saleReversals, saleLineCount, expenses, rentals, units] = await Promise.all([
-        Sale.findAll({ where: salesWhere, attributes: ['totalPaise', 'status'] }),
-        SaleReversal.findAll({
-            include: [{ association: 'sale', attributes: ['id', 'soldAt'] }],
-            attributes: ['reversalType', 'amountPaise'],
-        }).then((rows) =>
-            rows.filter((r) => r.sale && dateInRange(r.sale.soldAt, f, t))
+    const [salesRow, rentalsRow, expensesRow, invRow] = await Promise.all([
+        sequelize.query(
+            `SELECT
+               COALESCE(SUM(sales_total_paise), 0)::bigint AS sales_total_paise,
+               COALESCE(SUM(refunded_paise), 0)::bigint AS refunded_paise,
+               COALESCE(SUM(cancelled_paise), 0)::bigint AS cancelled_paise,
+               COALESCE(SUM(sale_count), 0)::bigint AS sale_count,
+               COALESCE(SUM(units_sold), 0)::bigint AS units_sold
+             FROM mv_dashboard_sales
+             WHERE metric_date BETWEEN :from AND :to`,
+            { replacements: { from: f, to: t }, type: sequelize.QueryTypes.SELECT }
         ),
-        SaleLine.count({
-            include: [{ association: 'sale', where: salesWhere, attributes: [] }],
-        }),
-        Expense.findAll({
-            where: { deletedAt: null, ...dateWhere('expenseDate', f, t) },
-            attributes: ['amountPaise', 'status'],
-        }),
-        RentalReversal.findAll({
-            include: [{ association: 'agreement', attributes: ['id', 'startDate'] }],
-            attributes: ['reversalType', 'amountPaise'],
-        }).then((rows) =>
-            rows.filter((r) => r.agreement && dateInRange(r.agreement.startDate, f, t))
+        sequelize.query(
+            `SELECT
+               COALESCE(SUM(earned_paise), 0)::bigint AS earned_paise,
+               COALESCE(SUM(overdue_paise), 0)::bigint AS overdue_paise,
+               COALESCE(SUM(damage_paise), 0)::bigint AS damage_paise
+             FROM mv_dashboard_rentals
+             WHERE metric_date BETWEEN :from AND :to`,
+            { replacements: { from: f, to: t }, type: sequelize.QueryTypes.SELECT }
         ),
-        inventorySnapshot(),
+        sequelize.query(
+            `SELECT
+               COALESCE(SUM(total_paise), 0)::bigint AS total_paise,
+               COALESCE(SUM(cancelled_paise), 0)::bigint AS cancelled_paise
+             FROM mv_dashboard_expenses
+             WHERE metric_date BETWEEN :from AND :to`,
+            { replacements: { from: f, to: t }, type: sequelize.QueryTypes.SELECT }
+        ),
+        sequelize.query(
+            `SELECT *
+             FROM mv_inventory_snapshot
+             LIMIT 1`,
+            { type: sequelize.QueryTypes.SELECT }
+        ),
     ]);
 
-    // Sales
-    const completedSales = sales.filter((s) => s.status === 'completed');
-    const salesTotalPaise = completedSales.reduce((sum, s) => sum + BigInt(s.totalPaise), 0n);
-    const salesRefundsPaise = saleReversals
-        .filter((r) => r.reversalType === 'REFUND')
-        .reduce((sum, r) => sum + BigInt(r.amountPaise), 0n);
-    const salesCancellationsPaise = saleReversals
-        .filter((r) => r.reversalType === 'CANCEL')
-        .reduce((sum, r) => sum + BigInt(r.amountPaise), 0n);
+    const sales = salesRow[0];
+    const salesTotalPaise = BigInt(sales.sales_total_paise);
+    const salesRefundsPaise = BigInt(sales.refunded_paise);
+    const salesCancellationsPaise = BigInt(sales.cancelled_paise);
     const netSalesPaise = salesTotalPaise - salesRefundsPaise;
 
-    // Expenses (completed only for P&L; report cancellations separately)
-    const completedExpenses = expenses.filter((e) => e.status === 'completed');
-    const expensesTotalPaise = completedExpenses.reduce((sum, e) => sum + BigInt(e.amountPaise), 0n);
-    const expensesCancelledPaise = expenses
-        .filter((e) => e.status === 'cancelled')
-        .reduce((sum, e) => sum + BigInt(e.amountPaise), 0n);
+    const rentalEarnedPaise =
+        BigInt(rentalsRow[0].earned_paise) +
+        BigInt(rentalsRow[0].overdue_paise) +
+        BigInt(rentalsRow[0].damage_paise);
 
-    // Rental revenue: earned rent for returned lines + overdue + damage, in period
-    const rentalEarnedPaise = await rentalRevenueInPeriod(f, t);
+    const expenses = expensesRow[0];
+    const expensesTotalPaise = BigInt(expenses.total_paise);
+    const expensesCancelledPaise = BigInt(expenses.cancelled_paise);
 
     const netPaise = netSalesPaise + rentalEarnedPaise - expensesTotalPaise;
 
@@ -112,8 +219,8 @@ export const getDashboard = async ({ from, to }) => {
             refundedPaise: String(salesRefundsPaise),
             cancelledPaise: String(salesCancellationsPaise),
             netPaise: String(netSalesPaise),
-            count: sales.length,
-            unitsSold: saleLineCount,
+            count: Number(sales.sale_count),
+            unitsSold: Number(sales.units_sold),
         },
         rentals: {
             earnedPaise: String(rentalEarnedPaise),
@@ -122,7 +229,7 @@ export const getDashboard = async ({ from, to }) => {
             totalPaise: String(expensesTotalPaise),
             cancelledPaise: String(expensesCancelledPaise),
         },
-        inventory: units,
+        inventory: rowToInventorySnapshot(invRow[0]),
         netPaise: String(netPaise),
     };
 };
@@ -283,69 +390,21 @@ export const getExpensesReport = async ({ from, to, category }) => {
  * Inventory snapshot (no period - current state)
  * ------------------------------------------------------------------ */
 export const getInventoryReport = async () => {
-    return inventorySnapshot();
+    await refreshReportingMatviewsIfStale();
+
+    const rows = await sequelize.query(
+        `SELECT *
+         FROM mv_inventory_snapshot
+         LIMIT 1`,
+        { type: sequelize.QueryTypes.SELECT }
+    );
+
+    return rowToInventorySnapshot(rows[0]);
 };
 
 /* ------------------------------------------------------------------ *
  * Helpers
  * ------------------------------------------------------------------ */
-async function inventorySnapshot() {
-    const [total, byChannel, byStatus, retailInStock] = await Promise.all([
-        Unit.count({ where: { deletedAt: null } }),
-        Unit.findAll({
-            where: { deletedAt: null },
-            attributes: ['channel', [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']],
-            group: ['channel'],
-            raw: true,
-        }),
-        Unit.findAll({
-            where: { deletedAt: null },
-            attributes: ['status', [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']],
-            group: ['status'],
-            raw: true,
-        }),
-        Unit.count({ where: { deletedAt: null, channel: 'RETAIL', status: 'in_stock' } }),
-    ]);
-
-    return {
-        total,
-        retailInStock,
-        byChannel: Object.fromEntries(byChannel.map((r) => [r.channel, Number(r.count)])),
-        byStatus: Object.fromEntries(byStatus.map((r) => [r.status, Number(r.count)])),
-    };
-}
-
-function dateInRange(dateStr, from, to) {
-    if (!from && !to) return true;
-    const ts = toUtc(dateStr);
-    if (from && ts < toUtc(from)) return false;
-    if (to && ts > toUtc(to)) return false;
-    return true;
-}
-
-async function rentalRevenueInPeriod(from, to) {
-    const returns = await RentalReturn.findAll({
-        include: [
-            {
-                association: 'line',
-                attributes: ['rentPerDayPaise'],
-                include: [{ association: 'agreement', attributes: ['startDate'] }],
-            },
-        ],
-        attributes: ['actualReturnDate', 'overdueChargePaise', 'damageChargePaise'],
-    });
-
-    let earned = 0n;
-    for (const ret of returns) {
-        const startDate = ret.line && ret.line.agreement ? ret.line.agreement.startDate : null;
-        if (!startDate || !dateInRange(startDate, from, to)) continue;
-        const rentedDays = Math.max(1, daysBetween(startDate, ret.actualReturnDate));
-        earned += BigInt(rentedDays) * BigInt(ret.line.rentPerDayPaise);
-        earned += BigInt(ret.overdueChargePaise);
-        earned += BigInt(ret.damageChargePaise);
-    }
-    return earned;
-}
 
 /* ------------------------------------------------------------------ *
  * Analytics: Trip P&L, per-vendor sell-through, stock levels,

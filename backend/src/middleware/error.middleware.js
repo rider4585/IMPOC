@@ -65,6 +65,7 @@ const SAFE_4XX_MESSAGES = Object.freeze([
     'already exists',
     // Financial modules - generic business rules (no row internals)
     'Floor price cannot exceed selling price',
+    'Price cannot be below floor price',
     'Overdue per day must be greater than rent per day',
     'At least one item is required',
     'At least one item',
@@ -72,6 +73,9 @@ const SAFE_4XX_MESSAGES = Object.freeze([
     'not in the customer sources picklist',
     'references unknown',
     'is not in the picklist',
+    // Grid pagination (R-32 Phase A)
+    'limit must be a positive integer',
+    'offset must be a non-negative integer',
     // Barcode geometry / generation params
     'Pages must be a positive integer',
     'Pages cannot exceed',

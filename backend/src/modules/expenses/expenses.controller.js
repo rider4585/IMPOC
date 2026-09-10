@@ -14,6 +14,7 @@ import {
 import { lookup } from '../idempotency/idempotency.service.js';
 import { GESTURE_TYPES } from '../../constants/gesture-type.js';
 import { userHasBroadReadScope } from '../auth/permission.service.js';
+import { parsePagination } from '../../utils/pagination.js';
 
 /**
  * Return a fresh fetch of the entity a request key points at, so a replayed
@@ -98,10 +99,13 @@ export const createExpense = async (req, res, next) => {
 export const listExpenses = async (req, res, next) => {
     try {
         const viewAll = await userHasBroadReadScope(req.auth.userUuid);
+        const pagination = parsePagination(req.query);
 
         const expenses = await listExpensesService({
             actorUserId: req.user?.id,
             viewAll,
+            limit: pagination.limit,
+            offset: pagination.offset,
         });
 
         return res.status(200).json({
