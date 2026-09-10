@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card,
   CardHeader,
@@ -8,15 +8,10 @@ import {
   Input,
   SearchableSelect,
   Dialog,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
   Badge,
   useToast,
 } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { createPicklistItem, updatePicklistItem } from '../../services/picklistsApi.js';
@@ -99,6 +94,51 @@ export function FlatPicklistManager({
     }
   };
 
+  const dgColumns = useMemo(() => {
+    const cols = columns.map((c) => ({
+      accessorKey: c.key,
+      header: c.label,
+      size: 150,
+      filter: { type: 'text' },
+      cell: (info) => info.getValue() != null ? String(info.getValue()) : '—',
+    }));
+    cols.push({
+      accessorKey: 'isActive',
+      header: 'Status',
+      size: 120,
+      cell: (info) => (
+        <Badge variant={info.getValue() ? 'success' : 'neutral'}>
+          {info.getValue() ? 'active' : 'inactive'}
+        </Badge>
+      ),
+      enableSorting: false,
+    });
+    cols.push({
+      id: 'actions',
+      header: 'Actions',
+      size: 200,
+      cell: (info) => {
+        const item = info.row.original;
+        return (
+          <div className="flex flex-wrap gap-2">
+            {canUpdate && (
+              <Button variant="outline" size="sm" onClick={() => { setEditing(item); setFormOpen(true); }}>
+                Edit
+              </Button>
+            )}
+            {canUpdate && (
+              <Button variant="ghost" size="sm" onClick={() => handleToggleActive(item)}>
+                {item.isActive ? 'Deactivate' : 'Activate'}
+              </Button>
+            )}
+          </div>
+        );
+      },
+      enableSorting: false,
+    });
+    return cols;
+  }, [columns, canUpdate]);
+
   return (
     <Card>
       <CardHeader>
@@ -118,56 +158,16 @@ export function FlatPicklistManager({
 
         {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
-        {loading ? (
-          <p className="text-sm text-[var(--ink-muted)]">Loading {singular.toLowerCase()}s…</p>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                {columns.map((c) => (
-                  <TableHeaderCell key={c.key}>{c.label}</TableHeaderCell>
-                ))}
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Actions</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {items.map((item) => (
-                <TableRow key={item.uuid}>
-                  {columns.map((c) => (
-                    <TableCell key={c.key}>{item[c.key] != null ? String(item[c.key]) : '—'}</TableCell>
-                  ))}
-                  <TableCell>
-                    <Badge variant={item.isActive ? 'success' : 'neutral'}>
-                      {item.isActive ? 'active' : 'inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
-                      {canUpdate && (
-                        <Button variant="outline" size="sm" onClick={() => { setEditing(item); setFormOpen(true); }}>
-                          Edit
-                        </Button>
-                      )}
-                      {canUpdate && (
-                        <Button variant="ghost" size="sm" onClick={() => handleToggleActive(item)}>
-                          {item.isActive ? 'Deactivate' : 'Activate'}
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {items.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={columns.length + 2} className="text-sm text-[var(--ink-muted)]">
-                    No {singular.toLowerCase()}s found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        )}
+        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+          <DataGrid
+            data={items}
+            columns={dgColumns}
+            isLoading={loading}
+            isEmpty={items.length === 0}
+            emptyMessage={`No ${singular.toLowerCase()}s found.`}
+            loadingMessage={`Loading ${singular.toLowerCase()}s…`}
+          />
+        </div>
       </CardContent>
 
       {formOpen && (

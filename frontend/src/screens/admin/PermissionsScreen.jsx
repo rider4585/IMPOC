@@ -1,24 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
-} from '../../components/ui';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getPermissions } from '../../services/permissionsApi.js';
-import { groupPermissionsByModule } from '../../platform/adminHelpers.js';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 
 export function PermissionsScreen() {
   const { permissions } = useAuth();
-  const [groups, setGroups] = useState([]);
+  const [flatPermissions, setFlatPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -30,17 +18,44 @@ export function PermissionsScreen() {
   useEffect(() => {
     if (!canView(PERMISSIONS.ROLES.VIEW)) {
       setLoading(false);
-      setGroups([]);
+      setFlatPermissions([]);
       return;
     }
     getPermissions()
       .then((data) => {
-        setGroups(groupPermissionsByModule(data));
+        setFlatPermissions(data);
         setError('');
       })
       .catch((err) => setError(err.message || 'Failed to load permissions'))
       .finally(() => setLoading(false));
   }, [canView]);
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'module',
+      header: 'Module',
+      size: 180,
+      filter: { type: 'text' },
+    },
+    {
+      accessorKey: 'name',
+      header: 'Permission',
+      size: 200,
+      filter: { type: 'text' },
+      cell: (info) => (
+        <code className="rounded bg-[var(--surface-sunken)] px-1.5 py-0.5 font-[inherit] text-[13px] text-[var(--primary)]">
+          {info.getValue()}
+        </code>
+      ),
+    },
+    {
+      accessorKey: 'description',
+      header: 'Description',
+      size: 400,
+      filter: { type: 'text' },
+      cell: (info) => info.getValue() || '—',
+    },
+  ], []);
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
@@ -56,40 +71,15 @@ export function PermissionsScreen() {
       {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {canView(PERMISSIONS.ROLES.VIEW) && (
-        <div className="flex flex-col gap-5">
-          {loading ? (
-            <p className="text-sm text-[var(--ink-muted)]">Loading permissions…</p>
-          ) : groups.length === 0 ? (
-            <p className="text-sm text-[var(--ink-muted)]">No permissions found.</p>
-          ) : (
-            groups.map((group) => (
-              <Card key={group.module}>
-                <CardHeader>
-                  <CardTitle>{group.module}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableHeaderCell>Permission</TableHeaderCell>
-                        <TableHeaderCell>Description</TableHeaderCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {group.permissions.map((p) => (
-                        <TableRow key={p.uuid}>
-                          <TableCell>
-                            <code className="rounded bg-[var(--surface-sunken)] px-1.5 py-0.5 font-[inherit] text-[13px] text-[var(--primary)]">{p.name}</code>
-                          </TableCell>
-                          <TableCell>{p.description || '—'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            ))
-          )}
+        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+          <DataGrid
+            data={flatPermissions}
+            columns={columns}
+            isLoading={loading}
+            isEmpty={flatPermissions.length === 0}
+            emptyMessage="No permissions found."
+            loadingMessage="Loading permissions…"
+          />
         </div>
       )}
     </div>
