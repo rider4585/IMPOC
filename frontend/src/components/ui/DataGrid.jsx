@@ -11,6 +11,7 @@ export function DataGrid({
   loadingMessage = 'Loading...',
   onRowClick = null,
   className = '',
+  getRowTestId = null,
 }) {
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
@@ -124,6 +125,7 @@ export function DataGrid({
                 displayedRowModel.rows.map((row) => (
                   <tr
                     key={row.id}
+                    data-testid={getRowTestId?.(row.original)}
                     className={`border-b border-[var(--border)] ${onRowClick ? 'cursor-pointer hover:bg-[var(--surface-sunken)]' : ''}`}
                     onClick={() => onRowClick?.(row.original)}
                   >

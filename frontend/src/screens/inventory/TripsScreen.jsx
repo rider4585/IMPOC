@@ -1,21 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
   Button,
   Input,
   Dialog,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
   useToast,
 } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrips, createTrip } from '../../services/tripsApi.js';
@@ -48,9 +39,6 @@ export function TripsScreen() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const pageSize = 50;
 
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -138,7 +126,7 @@ export function TripsScreen() {
 
   if (!can(PERMISSIONS.INVENTORY.VIEW)) {
     return (
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+      <div className="flex flex-col gap-5 p-6">
         <p className="text-sm text-[var(--ink-muted)]">You do not have permission to view trips.</p>
       </div>
     );
@@ -146,8 +134,78 @@ export function TripsScreen() {
 
   const canSubmitCreate = form.name.trim().length > 0 && !!form.purchasedOn;
 
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'name',
+      header: 'Trip',
+      size: 300,
+      cell: (info) => {
+        const t = info.row.original;
+        return (
+          <Button
+            variant="link"
+            size="sm"
+            className="px-0 text-left"
+            onClick={() => navigate(`/trips/${t.uuid}`)}
+            data-testid="trip-row"
+          >
+            {tripLabel(t)} &middot; {new Date(t.purchasedOn).toLocaleDateString()}
+          </Button>
+        );
+      },
+      enableColumnFilter: false,
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'totalPaidPaise',
+      header: 'Paid',
+      size: 120,
+      cell: (info) => (
+        <span className="text-right text-xs font-medium text-[var(--ink)]">
+          {formatPaise(Number(info.getValue()) || 0)}
+        </span>
+      ),
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: 'variancePaise',
+      header: 'Variance',
+      size: 150,
+      cell: (info) => {
+        const paise = Number(info.getValue()) || 0;
+        const vg = varianceGlyph(paise);
+        return (
+          <span className={`text-right text-xs font-medium ${vg.cls}`}>
+            <span aria-hidden="true">{vg.glyph}</span>
+            <span className="sr-only">{vg.label}:</span>{' '}
+            {formatPaise(paise)}
+          </span>
+        );
+      },
+      enableColumnFilter: false,
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      size: 120,
+      cell: (info) => (
+        <div className="text-right">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/trips/${info.row.original.uuid}`)}
+          >
+            View
+          </Button>
+        </div>
+      ),
+      enableColumnFilter: false,
+      enableSorting: false,
+    },
+  ], [navigate, tripLabel]);
+
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-6 overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="typography-heading mb-1">Trips</h1>
@@ -166,82 +224,17 @@ export function TripsScreen() {
         <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All trips</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          {loading ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-16 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
-              ))}
-            </div>
-          ) : trips.length === 0 ? (
-            <p className="text-sm text-[var(--ink-muted)]">No trips yet. Create your first trip to get started.</p>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHead sticky>
-                    <TableRow>
-                      <TableHeaderCell frozen>Trip</TableHeaderCell>
-                      <TableHeaderCell className="text-right">Paid</TableHeaderCell>
-                      <TableHeaderCell className="text-right">Variance</TableHeaderCell>
-                      <TableHeaderCell className="text-right">Open</TableHeaderCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {trips.slice((page - 1) * pageSize, page * pageSize).map((t) => {
-                      const variance = Number(t.variancePaise) || 0;
-                      const vg = varianceGlyph(variance);
-                      return (
-                        <TableRow key={t.uuid}>
-                          <TableCell frozen>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="px-0 text-left"
-                              onClick={() => navigate(`/trips/${t.uuid}`)}
-                              data-testid="trip-row"
-                            >
-                              {tripLabel(t)} &middot; {new Date(t.purchasedOn).toLocaleDateString()}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className="typography-money-sm text-[var(--ink)]">{formatPaise(Number(t.totalPaidPaise))}</span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={vg.cls}>
-                              <span aria-hidden="true">{vg.glyph}</span>
-                              <span className="sr-only">{vg.label}:</span>{' '}
-                              <span className="typography-money-sm">{formatPaise(variance)}</span>
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="outline" size="sm" onClick={() => navigate(`/trips/${t.uuid}`)}>
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-              {total > pageSize && (
-                <div className="mt-3 flex items-center justify-between text-xs text-[var(--ink-muted)]">
-                  <span>Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}</span>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</Button>
-                    <Button variant="outline" size="sm" disabled={page * pageSize >= total} onClick={() => setPage((p) => p + 1)}>Next</Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+      <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+        <DataGrid
+          data={trips}
+          columns={columns}
+          isLoading={loading}
+          isEmpty={trips.length === 0}
+          emptyMessage="No trips yet. Create your first trip to get started."
+          onRowClick={(row) => navigate(`/trips/${row.uuid}`)}
+          className="flex-1"
+        />
+      </div>
 
       <Dialog
         open={formOpen}

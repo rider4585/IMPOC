@@ -1,20 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
   Button,
   Input,
   SearchableSelect,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
 } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { listAllUnits } from '../../services/unitsApi.js';
@@ -125,19 +116,125 @@ export function UnitsScreen() {
 
   if (!can(PERMISSIONS.INVENTORY.VIEW)) {
     return (
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+      <div className="flex flex-col gap-5 p-6">
         <p className="text-sm text-[var(--ink-muted)]">You do not have permission to view units.</p>
       </div>
     );
   }
 
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'barcode',
+      header: 'Barcode',
+      size: 150,
+      cell: (info) => (
+        <span className="inline-flex rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-2 py-0.5 font-mono text-xs font-semibold tracking-[0.08em] text-[var(--ink)]">
+          {info.getValue()}
+        </span>
+      ),
+      enableColumnFilter: false,
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      size: 120,
+      cell: (info) => {
+        const status = info.getValue();
+        const meta = STATUS_META[status] || { label: status || 'Unknown', cls: 'bg-[var(--surface-sunken)] text-[var(--ink-muted)]' };
+        return (
+          <span className={`${badgeBase} ${meta.cls}`} data-testid={`unit-status-${status}`}>
+            {meta.label}
+          </span>
+        );
+      },
+      enableColumnFilter: false,
+    },
+    {
+      accessorKey: 'stockName',
+      header: 'Stock / Vendor',
+      size: 250,
+      cell: (info) => {
+        const unit = info.row.original;
+        return (
+          <div>
+            <div className="font-semibold">{unit.stockName || 'Stock'}</div>
+            <div className="typography-body-sm text-[var(--ink-muted)]">
+              {unit.vendorName || 'Vendor'}
+              {unit.colourName && <span> &middot; {unit.colourName}</span>}
+              {unit.sizeName && <span> ({unit.sizeName})</span>}
+            </div>
+          </div>
+        );
+      },
+      enableColumnFilter: false,
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'buyingPricePaise',
+      header: 'Buy (₹)',
+      size: 120,
+      cell: (info) => (
+        <span className="text-right typography-money-sm text-[var(--ink)]">
+          Buy {formatPaise(Number(info.getValue()))}
+        </span>
+      ),
+      enableColumnFilter: false,
+      enableSorting: false,
+    },
+  ], []);
+
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-6 overflow-hidden">
       <div>
         <h1 className="typography-heading mb-1">Units</h1>
         <p className="typography-body-sm text-[var(--ink-muted)]">
-          Every scanned item across all stocks. Search by barcode, stock, or vendor.
+          Every scanned item across all stocks. Filter by status or stock.
         </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Input
+          type="search"
+          label="Search"
+          placeholder="Search barcode, stock, vendor…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search units"
+        />
+        <SearchableSelect
+          label="Status"
+          value={status}
+          onChange={setStatus}
+          searchPlaceholder="Search statuses…"
+          emptyMessage="No matching statuses."
+          options={[
+            { value: '', label: 'All statuses' },
+            ...UNIT_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+          ]}
+        />
+        {stockUuid && (
+          <SearchableSelect
+            label="Stock"
+            value={stockUuid}
+            onChange={setStockUuid}
+            searchPlaceholder="Search stocks…"
+            emptyMessage="No stocks."
+            options={[
+              { value: '', label: 'All stocks' },
+              ...stocks.map((s) => ({ value: s.uuid, label: stockLabel(s) })),
+            ]}
+          />
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-[11px] text-[var(--ink-muted)]">
+        <span className="font-medium uppercase tracking-wide">Status key:</span>
+        {legend.map((meta) => (
+          <span key={meta.label} className="inline-flex items-center gap-1.5">
+            <span className={`${badgeBase} ${meta.cls}`}>{meta.label}</span>
+          </span>
+        ))}
       </div>
 
       {error && (
@@ -149,109 +246,17 @@ export function UnitsScreen() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All units</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Input
-              type="search"
-              label="Search"
-              placeholder="Search barcode, stock, vendor…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search units"
-            />
-            <SearchableSelect
-              label="Status"
-              value={status}
-              onChange={setStatus}
-              searchPlaceholder="Search statuses…"
-              emptyMessage="No matching statuses."
-              options={[
-                { value: '', label: 'All statuses' },
-                ...UNIT_STATUSES.map((s) => ({ value: s.value, label: s.label })),
-              ]}
-            />
-            {stockUuid && (
-              <SearchableSelect
-                label="Stock"
-                value={stockUuid}
-                onChange={setStockUuid}
-                searchPlaceholder="Search stocks…"
-                emptyMessage="No stocks."
-                options={[
-                  { value: '', label: 'All stocks' },
-                  ...stocks.map((s) => ({ value: s.uuid, label: stockLabel(s) })),
-                ]}
-              />
-            )}
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-3 text-[11px] text-[var(--ink-muted)]">
-            <span className="font-medium uppercase tracking-wide">Status key:</span>
-            {legend.map((meta) => (
-              <span key={meta.label} className="inline-flex items-center gap-1.5">
-                <span className={`${badgeBase} ${meta.cls}`}>{meta.label}</span>
-              </span>
-            ))}
-          </div>
-
-          {loading ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
-              ))}
-            </div>
-          ) : units.length === 0 ? (
-            <p className="text-sm text-[var(--ink-muted)]">No units.{stockUuid ? ' This stock has no scanned units yet.' : ''}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHead sticky>
-                  <TableRow>
-                    <TableHeaderCell frozen>Barcode</TableHeaderCell>
-                    <TableHeaderCell>Status</TableHeaderCell>
-                    <TableHeaderCell>Stock / Vendor</TableHeaderCell>
-                    <TableHeaderCell className="text-right">Buy (₹)</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {units.map((unit) => {
-                    const meta = STATUS_META[unit.status] || { label: unit.status || 'Unknown', cls: 'bg-[var(--surface-sunken)] text-[var(--ink-muted)]' };
-                    return (
-                      <TableRow key={unit.uuid} data-testid="unit-row">
-                        <TableCell frozen>
-                          <span className="inline-flex rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-2 py-0.5 font-mono text-xs font-semibold tracking-[0.08em] text-[var(--ink)]">
-                            {unit.barcode}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`${badgeBase} ${meta.cls}`} data-testid={`unit-status-${unit.status}`}>
-                            {meta.label}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-semibold">{unit.stockName || 'Stock'}</div>
-                          <div className="typography-body-sm text-[var(--ink-muted)]">
-                            {unit.vendorName || 'Vendor'}
-                            {unit.colourName && <span> &middot; {unit.colourName}</span>}
-                            {unit.sizeName && <span> ({unit.sizeName})</span>}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="typography-money-sm text-[var(--ink)]">Buy {formatPaise(Number(unit.buyingPricePaise))}</span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+        <DataGrid
+          data={units}
+          columns={columns}
+          isLoading={loading}
+          isEmpty={units.length === 0}
+          emptyMessage={`No units.${stockUuid ? ' This stock has no scanned units yet.' : ''}`}
+          getRowTestId={() => 'unit-row'}
+          className="flex-1"
+        />
+      </div>
     </div>
   );
 }
