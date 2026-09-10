@@ -22,7 +22,7 @@ export const Input = forwardRef(function Input(
       .join(' ') || undefined;
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       {label && (
         <label className="text-sm font-medium text-[var(--ink)]" htmlFor={inputId}>
           {label}

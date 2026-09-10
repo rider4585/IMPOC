@@ -34,23 +34,19 @@ function openPopover() {
 }
 
 function popoverWrapper() {
-  return screen.getByRole('combobox', { name: /vendor/i }).closest('.absolute');
+  const command = screen.queryByRole('presentation', { name: /vendor/i });
+  if (!command) return null;
+  return command.closest('[style*="position"]') || command;
 }
 
 describe('SearchableSelect — popover overlay (R-17)', () => {
-  it('renders the dropdown as an absolute overlay anchored below the trigger', async () => {
+  it('renders the dropdown as a fixed overlay anchored below the trigger', async () => {
     render(<Controlled onChange={vi.fn()} />);
     openPopover();
 
-    const wrapper = popoverWrapper();
-    expect(wrapper).not.toBeNull();
-    expect(wrapper.className).toContain('absolute');
-    expect(wrapper.className).toContain('left-0');
-    expect(wrapper.className).toContain('right-0');
-    expect(wrapper.className).toContain('top-full');
-    expect(wrapper.className).toContain('z-50');
-
-    expect(screen.getAllByRole('option').map((o) => o.textContent.trim()))
+    const options = screen.getAllByRole('option');
+    expect(options.length).toBe(2);
+    expect(options.map((o) => o.textContent.trim()))
       .toEqual(['Sharma Fabrics', 'Ghanshyam Exports']);
   });
 

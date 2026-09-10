@@ -1,5 +1,7 @@
 ﻿import React, { forwardRef, useCallback, useId, useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from 'cmdk';
+import { usePopoverPosition } from '../../lib/usePopoverPosition.js';
 
 /**
  * Select — THE standard custom dropdown for the app (cmdk combobox, light mode, Tailwind).
@@ -55,7 +57,10 @@ export const Select = forwardRef(function Select(
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const rootRef = useRef(null);
+  const triggerRef = useRef(ref);
+  const popoverRef = useRef(null);
   const triggerId = useId();
+  const popoverRect = usePopoverPosition(triggerRef, open);
 
   const selected = options.find((o) => o.value === value);
 
@@ -67,10 +72,12 @@ export const Select = forwardRef(function Select(
   useEffect(() => {
     if (!open) return undefined;
     const onPointerDown = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) close();
+      const isInsideTrigger = rootRef.current && rootRef.current.contains(e.target);
+      const isInsidePopover = popoverRef.current && popoverRef.current.contains(e.target);
+      if (!isInsideTrigger && !isInsidePopover) close();
     };
     const onKeyDown = (e) => {
-      if (e.key === 'Escape' && rootRef.current && rootRef.current.contains(e.target)) {
+      if (e.key === 'Escape') {
         e.stopPropagation();
         close();
       }
@@ -87,7 +94,7 @@ export const Select = forwardRef(function Select(
   const showCreate = creatable && q.length > 0;
 
   return (
-    <div ref={rootRef} className={['flex flex-col gap-1.5', className].filter(Boolean).join(' ')}>
+    <div ref={rootRef} className={['flex flex-col gap-2', className].filter(Boolean).join(' ')}>
       {label && (
         <label htmlFor={triggerId} className="text-sm font-medium text-[var(--ink)]">
           {label}
@@ -95,7 +102,11 @@ export const Select = forwardRef(function Select(
       )}
       <div className="relative">
         <button
-          ref={ref}
+          ref={(node) => {
+            triggerRef.current = node;
+            if (typeof ref === 'function') ref(node);
+            else if (ref) ref.current = node;
+          }}
           id={triggerId}
           type="button"
           disabled={disabled}
@@ -126,76 +137,86 @@ export const Select = forwardRef(function Select(
           </svg>
         </button>
 
-        {open && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1">
+        {open && popoverRect && createPortal(
+          <div
+            ref={popoverRef}
+            className="fixed z-60"
+            style={{
+              top: `${popoverRect.top}px`,
+              left: `${popoverRect.left}px`,
+              width: `${popoverRect.width}px`,
+              pointerEvents: 'auto',
+            }}
+          >
             <Command label={label} className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)] shadow-lg">
-            <div className="flex items-center gap-2 border-b border-[var(--border)] px-2.5">
-              <svg
-                aria-hidden="true"
-                className="h-4 w-4 shrink-0 text-[var(--ink-muted)]"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-              <CommandInput
-                autoFocus
-                value={query}
-                onValueChange={setQuery}
-                placeholder={searchPlaceholder}
-                aria-label={label || 'Search'}
-                className={inputCls}
-              />
-            </div>
-            <CommandList className="max-h-60 overflow-y-auto p-1">
-              {options.map((o) => (
-                <CommandItem
-                  key={o.value}
-                  value={o.label}
-                  keywords={o.keywords || (o.description ? [o.description] : undefined)}
-                  onSelect={() => {
-                    onChange(o.value);
-                    close();
-                  }}
-                  className={itemCls}
+              <div className="flex items-center gap-2 border-b border-[var(--border)] px-2.5">
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 text-[var(--ink-muted)]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <span className="font-medium">{o.label}</span>
-                  {o.description && (
-                    <span className="text-xs text-[var(--ink-muted)]">{o.description}</span>
-                  )}
-                </CommandItem>
-              ))}
-              <CommandEmpty>
-                {showCreate ? (
-                  <button
-                    type="button"
-                    role="option"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      if (onCreate) onCreate(q);
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <CommandInput
+                  autoFocus
+                  value={query}
+                  onValueChange={setQuery}
+                  placeholder={searchPlaceholder}
+                  aria-label={label || 'Search'}
+                  className={inputCls}
+                />
+              </div>
+              <CommandList className="max-h-60 overflow-y-auto p-1">
+                {options.map((o) => (
+                  <CommandItem
+                    key={o.value}
+                    value={o.label}
+                    keywords={o.keywords || (o.description ? [o.description] : undefined)}
+                    onSelect={() => {
+                      onChange(o.value);
                       close();
                     }}
-                    className={`w-full text-left ${itemCls}`}
+                    className={itemCls}
                   >
-                    <span className="font-medium text-[var(--primary)]">
-                      {createLabel ? createLabel(q) : `+ Create "${q}"`}
-                    </span>
-                  </button>
-                ) : (
-                  <div className="px-2.5 py-6 text-center text-sm text-[var(--ink-muted)]">
-                    {emptyMessage}
-                  </div>
-                )}
-              </CommandEmpty>
-            </CommandList>
-          </Command>
-        </div>
-      )}
+                    <span className="font-medium">{o.label}</span>
+                    {o.description && (
+                      <span className="text-xs text-[var(--ink-muted)]">{o.description}</span>
+                    )}
+                  </CommandItem>
+                ))}
+                <CommandEmpty>
+                  {showCreate ? (
+                    <button
+                      type="button"
+                      role="option"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        if (onCreate) onCreate(q);
+                        close();
+                      }}
+                      className={`w-full text-left ${itemCls}`}
+                    >
+                      <span className="font-medium text-[var(--primary)]">
+                        {createLabel ? createLabel(q) : `+ Create "${q}"`}
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="px-2.5 py-6 text-center text-sm text-[var(--ink-muted)]">
+                      {emptyMessage}
+                    </div>
+                  )}
+                </CommandEmpty>
+              </CommandList>
+            </Command>
+          </div>,
+          document.body
+        )}
       </div>
     </div>
   );
