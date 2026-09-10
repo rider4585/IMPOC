@@ -62,7 +62,7 @@ export function SignIn() {
             />
 
             {error && (
-              <div className="rounded-md bg-[rgba(183,29,54,0.1)] p-3 text-sm text-[var(--danger)]" role="alert">
+              <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">
                 {error}
               </div>
             )}

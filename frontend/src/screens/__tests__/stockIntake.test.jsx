@@ -112,19 +112,20 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
     expect(screen.getByTestId('scan-barcode')).toBeInTheDocument();
   });
 
-  it('does NOT commit on decode alone — counter ticks only after Save unit', async () => {
+  it('does NOT commit on decode alone — commits automatically once colour + size are picked (UX-H5)', async () => {
     setup();
     renderIntake();
     await waitFor(() => expect(screen.getByText(/0 of 3/)).toBeInTheDocument());
 
     await enterDecodedState('100001');
 
-    // Decoded but not yet saved: counter must still read 0 of 3 (nothing written).
+    // Decoded but no colour/size yet: counter must still read 0 of 3 and nothing
+    // may be written (no pick, no tap).
     expect(screen.getByText(/0 of 3/)).toBeInTheDocument();
     expect(tripsService.scanBarcodeIntoStock).not.toHaveBeenCalled();
 
+    // Picking the last required field is the commit (auto commit-repeat loop).
     await pickColourSize('Red', 'M');
-    fireEvent.click(screen.getByTestId('save-unit'));
 
     await waitFor(() => expect(screen.getByText(/1 of 3/)).toBeInTheDocument());
     expect(tripsService.scanBarcodeIntoStock).toHaveBeenCalledTimes(1);
@@ -143,16 +144,16 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
 
     await enterDecodedState('100001');
     await pickColourSize('Red', 'M');
-    fireEvent.click(screen.getByTestId('save-unit'));
 
     await waitFor(() => expect(screen.getByText(/already used/i)).toBeInTheDocument());
     // Counter unchanged on refusal (nothing written, no increment).
     expect(screen.getByText(/0 of 3/)).toBeInTheDocument();
+    expect(tripsService.scanBarcodeIntoStock).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByTestId('dismiss-refusal'));
     // Dismiss re-arms the camera (ARMED state) so the operator can rescan immediately.
     await waitFor(() => expect(screen.getByTestId('camera-stub')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
   });
 
   it('disables saving when the stock is full and offers Close stock', async () => {
@@ -164,20 +165,24 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
     expect(screen.queryByTestId('save-unit')).not.toBeInTheDocument();
   });
 
-  it('pre-fills colour + size from the previously saved unit on the next scan', async () => {
+  it('pre-fills colour + size from the previously saved unit and auto-commits the next scan (UX-H5)', async () => {
     setup();
     renderIntake();
     await waitFor(() => expect(screen.getByText(/0 of 3/)).toBeInTheDocument());
 
-    // Save a first unit with Red/M.
+    // Save a first unit with Red/M — the pick commits it.
     await enterDecodedState('100001');
     await pickColourSize('Red', 'M');
-    fireEvent.click(screen.getByTestId('save-unit'));
     await waitFor(() => expect(screen.getByText(/1 of 3/)).toBeInTheDocument());
 
-    // Second unit: colour+size should pre-fill from the last saved unit.
+    // Second unit: colour+size pre-fill from the last saved unit and the save
+    // fires immediately — no picking, no extra tap.
     await enterDecodedState('100002');
-    expect(screen.getByLabelText(/colour/i)).toHaveTextContent('Red');
-    expect(screen.getByLabelText(/size/i)).toHaveTextContent('M');
+    await waitFor(() => expect(screen.getByText(/2 of 3/)).toBeInTheDocument());
+    expect(tripsService.scanBarcodeIntoStock).toHaveBeenLastCalledWith(
+      't1',
+      'S1',
+      { barcode: '100002', colourUuid: 'c1', sizeUuid: 's1' }
+    );
   });
 });

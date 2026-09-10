@@ -20,7 +20,7 @@ const SCAN_PAUSE_DURATION = 5;
  */
 const DEFAULT_ZOOM = 1;
 
-function BarcodeScanner({ onDetected }) {
+function BarcodeScanner({ onDetected, onError }) {
     const videoRef = useRef(null);
     const streamRef = useRef(null);
 
@@ -684,6 +684,10 @@ function BarcodeScanner({ onDetected }) {
                 setError(
                     'Unable to access camera.'
                 );
+            }
+
+            if (typeof onError === 'function') {
+                onError();
             }
         }
     };

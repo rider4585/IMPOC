@@ -50,6 +50,9 @@ export function CustomersScreen() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  // UX-M8: in-flight guard so a rapid double-click can't fire two consent toggles.
+  const [consentBusy, setConsentBusy] = useState(false);
+
   const debounceRef = useRef(null);
 
   const load = useCallback(async (term) => {
@@ -96,14 +99,17 @@ export function CustomersScreen() {
   };
 
   const handleToggleConsent = async (customer, { channel, key }) => {
-    if (!canUpdate) return;
+    if (!canUpdate || consentBusy) return;
     const next = !customer[key];
+    setConsentBusy(true);
     try {
       const updated = await updateCustomerConsent(customer.uuid, channel, next);
       setCustomers((prev) => prev.map((c) => (c.uuid === customer.uuid ? { ...c, ...updated } : c)));
       toast.success({ title: `${next ? 'Consent granted' : 'Consent withdrawn'} (${channel.toLowerCase()})` });
     } catch (err) {
       toast.error({ title: 'Consent update failed', description: err.message });
+    } finally {
+      setConsentBusy(false);
     }
   };
 
@@ -191,13 +197,13 @@ export function CustomersScreen() {
                               key={cc.channel}
                               type="button"
                               title={`${cc.label} consent: ${active ? 'on' : 'off'} (click to toggle)`}
-                              disabled={!canUpdate}
+                              disabled={!canUpdate || consentBusy}
                               onClick={() => handleToggleConsent(c, cc)}
-                              className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                              className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 ${
                                 active
                                   ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
                                   : 'bg-[var(--surface-sunken)] text-[var(--ink-faint)]'
-                              } ${canUpdate ? 'hover:brightness-95' : 'cursor-not-allowed opacity-70'}`}
+                              } ${canUpdate && !consentBusy ? 'hover:brightness-95' : 'cursor-not-allowed opacity-70'}`}
                             >
                               {cc.short}
                             </button>

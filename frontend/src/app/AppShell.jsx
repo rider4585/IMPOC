@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth';
 import { navigationSections } from './navigation';
 import { ShopLogo } from '../components/ShopLogo';
 import { SettingsDrawer } from '../theme/index.js';
+import { NavItem } from '../components/ui';
 import {
   Boxes,
   ScanBarcode,
@@ -177,23 +178,22 @@ export function AppShell({ children }) {
   )?.label;
 
   const railItem = (entry) => (
-    <button
+    <NavItem
       key={entry.path}
-      type="button"
-      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${
+      active={isActive(entry.path)}
+      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm ${
         isActive(entry.path)
           ? 'bg-primary text-primary-foreground'
           : 'text-[var(--ink-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)]'
       }`}
       onClick={() => handleNavigation(entry.path)}
       role="menuitem"
-      aria-current={isActive(entry.path) ? 'page' : undefined}
     >
       <span className={isActive(entry.path) ? 'text-primary-foreground' : 'text-[var(--ink-faint)]'}>
         {iconFor(itemIcon[entry.path])}
       </span>
       {entry.label}
-    </button>
+    </NavItem>
   );
 
   const railSection = (section) => (
@@ -215,7 +215,7 @@ export function AppShell({ children }) {
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              className="rounded-md p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)]"
+              className="flex h-11 w-11 items-center justify-center rounded-md text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
               onClick={() => setSettingsOpen(true)}
               aria-label="Open theme settings"
               title="Theme settings"
@@ -224,7 +224,7 @@ export function AppShell({ children }) {
             </button>
             <button
               type="button"
-              className="rounded-md border border-[var(--border-strong)] px-2.5 py-1.5 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-60"
+              className="flex min-h-[44px] items-center rounded-md border border-[var(--border-strong)] px-2.5 py-1.5 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
               onClick={handleSignOut}
               disabled={isSigningOut}
               aria-busy={isSigningOut}
@@ -257,7 +257,7 @@ export function AppShell({ children }) {
           <div className="border-t border-[var(--border)] p-3">
             <button
               type="button"
-              className="w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-3 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--border-strong)] disabled:opacity-60"
+              className="flex min-h-[44px] w-full items-center justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface-sunken)] px-3 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--border-strong)] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
               onClick={handleSignOut}
               disabled={isSigningOut}
               aria-busy={isSigningOut}
@@ -278,7 +278,7 @@ export function AppShell({ children }) {
               <span className="text-sm font-medium text-[var(--ink-muted)]">SHREE Fashion Store</span>
               <button
                 type="button"
-                className="rounded-md p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)]"
+                className="flex h-11 w-11 items-center justify-center rounded-md text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
                 onClick={() => setSettingsOpen(true)}
                 aria-label="Open theme settings"
                 title="Theme settings"
@@ -301,21 +301,20 @@ export function AppShell({ children }) {
           <div className="flex flex-1 gap-1 overflow-x-auto" role="menubar">
             {flatItems.length > 0 ? (
               flatItems.map((entry) => (
-                <button
+                <NavItem
                   key={entry.path}
-                  type="button"
-                  className={`flex min-w-[64px] flex-1 flex-col items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium ${
+                  active={isActive(entry.path)}
+                  className={`flex min-h-[44px] min-w-[64px] flex-1 flex-col items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] ${
                     isActive(entry.path)
                       ? 'text-primary'
                       : 'text-[var(--ink-muted)]'
                   }`}
                   onClick={() => handleNavigation(entry.path)}
                   role="menuitem"
-                  aria-current={isActive(entry.path) ? 'page' : undefined}
                 >
                   {iconFor(itemIcon[entry.path])}
                   {entry.label}
-                </button>
+                </NavItem>
               ))
             ) : (
               <div className="flex flex-1 items-center justify-center text-xs text-[var(--ink-faint)]">

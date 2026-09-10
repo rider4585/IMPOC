@@ -1,34 +1,54 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from '../../components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getVendorHistory } from '../../services/vendorsApi.js';
 import { formatPaise } from '../../platform/money.js';
+import { unitStatusBadgeVariant } from '../rentals/rentalStatus.js';
 
 function StockBlock({ stock }) {
   const units = stock.units || [];
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3">
-      <div className="flex items-baseline justify-between gap-2 text-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
         <span className="font-semibold">{stock.stockName || stock.name || 'Stock'}</span>
-        <span className="text-[var(--ink-muted)]">qty {stock.quantity} · {stock.channel}</span>
-      </div>
-      <div className="mt-1 text-xs text-[var(--ink-muted)]">
-        Buy {formatPaise(Number(stock.buyingPricePaise))} · Sell {formatPaise(Number(stock.sellingPricePaise))}
+        <span className="text-sm flex items-baseline gap-3">
+          <span className="text-sm font-semibold text-[var(--ink)]">{formatPaise(Number(stock.buyingPricePaise))}</span>
+          <span className="text-xs text-[var(--ink-muted)]">qty {stock.quantity} · {stock.channel}</span>
+        </span>
       </div>
       {units.length === 0 ? (
         <p className="mt-1 text-xs text-[var(--ink-faint)]">No units scanned.</p>
       ) : (
-        <ul className="mt-2 flex flex-col gap-1">
-          {units.map((unit) => (
-            <li key={unit.uuid} className="flex items-center gap-2 text-xs">
-              <span className="font-mono text-[var(--ink)]">{unit.barcode}</span>
-              <span className="text-[var(--ink-muted)]">{unit.colourName || ''} {unit.sizeName || ''}</span>
-              <span className="ml-auto text-[var(--ink-muted)]">{unit.status}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-2 overflow-x-auto">
+          <Table>
+            <TableHead sticky>
+              <TableRow>
+                <TableHeaderCell frozen>Barcode</TableHeaderCell>
+                <TableHeaderCell>Variant</TableHeaderCell>
+                <TableHeaderCell className="text-right">Status</TableHeaderCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {units.map((unit) => (
+                <TableRow key={unit.uuid}>
+                  <TableCell frozen>
+                    <span className="font-mono text-[var(--ink)]">{unit.barcode}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs text-[var(--ink-muted)]">
+                      {unit.colourName || ''} {unit.sizeName || ''}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant={unitStatusBadgeVariant(unit.status)}>{unit.status || 'Unknown'}</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );
@@ -150,10 +170,17 @@ export function VendorDetail() {
                   <CardTitle className="flex items-baseline justify-between gap-2">
                     <span>Trip — {new Date(trip.purchasedOn).toLocaleDateString()}</span>
                     <span className="text-sm font-normal text-[var(--ink-muted)]">
-                      Paid {formatPaise(Number(trip.totalPaidPaise))}
-                      {trip.variancePaise != null && (
-                        <span className={Number(trip.variancePaise) < 0 ? ' text-[var(--money-out)]' : Number(trip.variancePaise) > 0 ? ' text-[var(--money-in)]' : ''}>
-                          {' '}&middot; Variance {formatPaise(Number(trip.variancePaise))}
+                      <span className="typography-money-sm text-[var(--ink)]">Paid {formatPaise(Number(trip.totalPaidPaise))}</span>
+                      {trip.variancePaise != null && Number(trip.variancePaise) !== 0 && (
+                        <span className={Number(trip.variancePaise) < 0 ? 'text-[var(--money-out)]' : 'text-[var(--money-in)]'}>
+                          {' '}&middot; <span aria-hidden="true">{Number(trip.variancePaise) < 0 ? '↓' : '↑'}</span>{' '}
+                          <span className="sr-only">Variance:</span>
+                          <span className="typography-money-sm">{formatPaise(Number(trip.variancePaise))}</span>
+                        </span>
+                      )}
+                      {trip.variancePaise != null && Number(trip.variancePaise) === 0 && (
+                        <span className="text-[var(--ink-muted)]">
+                          {' '}&middot; Variance <span className="typography-money-sm">{formatPaise(Number(trip.variancePaise))}</span>
                         </span>
                       )}
                     </span>
@@ -165,11 +192,11 @@ export function VendorDetail() {
                       {summaries.map((s) => (
                         <span
                           key={s.key}
-                          className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1 text-[13px] text-[var(--ink)]"
+                          className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1 text-sm text-[var(--ink)]"
                         >
                           {s.name}
                           {s.billReference ? ` · ${s.billReference}` : ''}
-                          {s.totalPaid != null && ` · ${formatPaise(Number(s.totalPaid))}`}
+                          {s.totalPaid != null && <span className="typography-money-sm"> · {formatPaise(Number(s.totalPaid))}</span>}
                         </span>
                       ))}
                     </div>

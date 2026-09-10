@@ -160,7 +160,7 @@ describe('POSScreen (T-09)', () => {
           customerName: undefined,
           customerUuid: undefined,
           paymentMethod: 'Cash',
-          items: [{ unitUuid: 'u1' }],
+          items: [{ unitUuid: 'u1', sellingPricePaise: 25000 }],
           requestUuid: expect.stringMatching(UUID_V4_REGEX),
         })
       );
@@ -220,11 +220,81 @@ describe('POSScreen (T-09)', () => {
           customerName: 'Priya Sharma',
           customerUuid: 'cust-1',
           paymentMethod: 'Cash',
-          items: [{ unitUuid: 'u1' }],
+          items: [{ unitUuid: 'u1', sellingPricePaise: 25000 }],
           requestUuid: expect.stringMatching(UUID_V4_REGEX),
         })
       );
       expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
+    });
+  });
+
+  it('edits a cart line selling price and sends the edited amount (R-30)', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+      floorPricePaise: '20000',
+    });
+    salesService.createSale.mockResolvedValue({
+      uuid: 's1',
+      saleNumber: 'SALE-001',
+      customerName: null,
+      soldAt: '2026-01-01T00:00:00.000Z',
+      totalPaise: '30000',
+      status: 'completed',
+      lines: [{ uuid: 'l1', barcode: 'B-100', sellingPricePaise: '30000', unitStatus: 'sold' }],
+      reversals: [],
+    });
+    renderWithToast(<POSScreen />);
+    const barcodeInput = screen.getByLabelText(/barcode/);
+    fireEvent.change(barcodeInput, { target: { value: 'B-100' } });
+    fireEvent.keyDown(barcodeInput, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
+
+    const priceInput = screen.getByLabelText('Selling price for B-100');
+    fireEvent.change(priceInput, { target: { value: '300.00' } });
+    fireEvent.keyDown(priceInput, { key: 'Enter' });
+    await waitFor(() => {
+      expect(screen.getByTestId('pos-total').textContent).toBe('₹300.00');
+    });
+
+    fireEvent.click(screen.getByTestId('pos-checkout'));
+    await waitFor(() => {
+      expect(salesService.createSale).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [{ unitUuid: 'u1', sellingPricePaise: 30000 }],
+        })
+      );
+    });
+  });
+
+  it('refuses a selling price below the floor price at checkout (R-30)', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+      floorPricePaise: '30000',
+    });
+    renderWithToast(<POSScreen />);
+    const barcodeInput = screen.getByLabelText(/barcode/);
+    fireEvent.change(barcodeInput, { target: { value: 'B-100' } });
+    fireEvent.keyDown(barcodeInput, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
+
+    const priceInput = screen.getByLabelText(/^Selling price for B-100/);
+    fireEvent.change(priceInput, { target: { value: '100' } });
+    fireEvent.keyDown(priceInput, { key: 'Enter' });
+    await waitFor(() => {
+      expect(screen.getByText('Price cannot be below floor price')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('pos-checkout'));
+    await waitFor(() => {
+      expect(salesService.createSale).not.toHaveBeenCalled();
     });
   });
 });
@@ -295,7 +365,7 @@ describe('POS scanner feature', () => {
           customerUuid: undefined,
           paymentMethod: 'Cash',
           customerSource: 'Instagram',
-          items: [{ unitUuid: 'u1' }],
+          items: [{ unitUuid: 'u1', sellingPricePaise: 25000 }],
           requestUuid: expect.stringMatching(UUID_V4_REGEX),
         })
       );

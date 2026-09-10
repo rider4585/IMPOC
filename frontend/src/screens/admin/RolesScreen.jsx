@@ -44,6 +44,9 @@ export function RolesScreen() {
   const [editingRole, setEditingRole] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   const [permsOpen, setPermsOpen] = useState(false);
   const [permsTarget, setPermsTarget] = useState(null);
   const [allPermissions, setAllPermissions] = useState([]);
@@ -97,15 +100,24 @@ export function RolesScreen() {
     }
   };
 
-  const handleDelete = async (role) => {
+  const requestDelete = (role) => {
     if (!canManage) return;
-    if (!window.confirm(`Delete role ${role.name}?`)) return;
+    setConfirmDelete(role);
+  };
+
+  const handleDelete = async () => {
+    const role = confirmDelete;
+    if (!role) return;
+    setDeleting(true);
     try {
       await deleteRole(role.uuid);
       toast.success({ title: 'Role deleted' });
+      setConfirmDelete(null);
       await load();
     } catch (err) {
       toast.error({ title: 'Delete failed', description: err.message });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -209,7 +221,7 @@ export function RolesScreen() {
                             </Button>
                           )}
                           {canManage && (
-                            <Button variant="danger" size="sm" onClick={() => handleDelete(role)}>
+                            <Button variant="danger" size="sm" onClick={() => requestDelete(role)}>
                               Delete
                             </Button>
                           )}
@@ -311,6 +323,28 @@ export function RolesScreen() {
           </Card>
         </Dialog>
       )}
+
+      <Dialog
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title="Delete role?"
+        role="alertdialog"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmDelete(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDelete} loading={deleting}>
+              Delete role
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm">
+          Delete role <span className="font-semibold">{confirmDelete?.name || ''}</span>? Users with
+          this role will lose all of its permissions.
+        </p>
+      </Dialog>
     </div>
   );
 }

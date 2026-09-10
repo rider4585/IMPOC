@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, SearchableSelect } from '../../components/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Input,
+  SearchableSelect,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableHeaderCell,
+  TableCell,
+} from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrips, listAllStocks } from '../../services/tripsApi.js';
@@ -158,58 +172,73 @@ export function StocksScreen() {
           ) : stocks.length === 0 ? (
             <p className="text-sm text-[var(--ink-muted)]">No stocks.</p>
           ) : (
-            <ul className="flex flex-col gap-2">
-              {stocks.map((stock) => {
-                const qty = Number(stock.quantity);
-                const scanned = Number(stock.unitsScannedCount ?? 0);
-                const trip = tripByUuid.get(stock.tripUuid);
-                const vendor = stock.vendorName || vendorByUuid.get(stock.vendorUuid)?.name || 'Vendor';
-                const sub = subTypeName(stock.subTypeUuid);
-                return (
-                  <li
-                    key={stock.uuid}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
-                    data-testid="stock-row"
-                  >
-                    <div>
-                      <div className="font-semibold">
-                        {typeName(stock.productTypeUuid)}
-                        {sub && <span className="text-[var(--ink-muted)]"> ({sub})</span>}
-                      </div>
-                      <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
-                        {vendor}
-                        {trip && <span> &middot; {tripLabel(trip)}</span>}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 text-[13px]">
-                      <span className="text-[var(--ink-muted)]">
-                        <span className={scanned >= qty && qty > 0 ? 'font-semibold text-[var(--success)]' : ''}>
-                          {scanned} of {qty}
-                        </span>{' '}
-                        scanned
-                      </span>
-                      <span className="text-[var(--ink-muted)]">
-                        Whole{' '}
-                        {stock.wholeBuyingPricePaise != null ? (
-                          formatPaise(Number(stock.wholeBuyingPricePaise))
-                        ) : (
-                          '—'
-                        )}{' '}
-                        &middot; Per unit {formatPaise(Number(stock.buyingPricePaise))}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => navigate(`/units?stockUuid=${encodeURIComponent(stock.uuid)}`)} data-testid="stock-units">
-                        Units
-                      </Button>
-                      <Button size="sm" onClick={() => navigate(`/trips/${encodeURIComponent(stock.tripUuid)}/stocks/${encodeURIComponent(stock.uuid)}/scan`)} data-testid="stock-scan">
-                        Scan
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHead sticky>
+                  <TableRow>
+                    <TableHeaderCell frozen>Stock</TableHeaderCell>
+                    <TableHeaderCell>Vendor / Trip</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Scanned</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Money (₹)</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Actions</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {stocks.map((stock) => {
+                    const qty = Number(stock.quantity);
+                    const scanned = Number(stock.unitsScannedCount ?? 0);
+                    const trip = tripByUuid.get(stock.tripUuid);
+                    const vendor = stock.vendorName || vendorByUuid.get(stock.vendorUuid)?.name || 'Vendor';
+                    const sub = subTypeName(stock.subTypeUuid);
+                    const complete = qty > 0 && scanned >= qty;
+                    return (
+                      <TableRow key={stock.uuid} data-testid="stock-row">
+                        <TableCell frozen>
+                          <div className="font-semibold">
+                            {typeName(stock.productTypeUuid)}
+                            {sub && <span className="text-[var(--ink-muted)]"> ({sub})</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="typography-body-sm text-[var(--ink-muted)]">
+                            {vendor}
+                            {trip && <span> &middot; {tripLabel(trip)}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {/* UX-H4: completion is never colour alone. */}
+                          <span className={complete ? 'font-semibold text-[var(--success)]' : 'text-[var(--ink-muted)]'}>
+                            {complete && <span aria-hidden="true">✓ </span>}
+                            <span className={complete ? 'sr-only' : ''}>{complete ? 'Complete' : ''}</span>
+                            {scanned} of {qty} scanned
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="typography-money-sm text-[var(--ink)]">
+                            {stock.wholeBuyingPricePaise != null
+                              ? `Whole ${formatPaise(Number(stock.wholeBuyingPricePaise))}`
+                              : 'Whole —'}
+                          </div>
+                          <div className="typography-money-sm text-[var(--ink-muted)]">
+                            Per unit {formatPaise(Number(stock.buyingPricePaise))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => navigate(`/units?stockUuid=${encodeURIComponent(stock.uuid)}`)} data-testid="stock-units">
+                              Units
+                            </Button>
+                            <Button size="sm" onClick={() => navigate(`/trips/${encodeURIComponent(stock.tripUuid)}/stocks/${encodeURIComponent(stock.uuid)}/scan`)} data-testid="stock-scan">
+                              Scan
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

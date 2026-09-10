@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Dialog, SearchableSelect, useToast } from '../../components/ui';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Input,
+  Dialog,
+  SearchableSelect,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableHeaderCell,
+  TableCell,
+  useToast,
+} from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrip, getStocks, cloneLastStock, addTripVendor } from '../../services/tripsApi.js';
@@ -330,16 +346,14 @@ export function TripDetailScreen() {
             <span className="text-[var(--ink-muted)]">&middot;</span>
             <span>
               Variance{' '}
-              <span
-                className={
-                  'font-semibold tabular-nums ' +
-                  (Number(trip.variancePaise) < 0
-                    ? 'text-[var(--money-out)]'
-                    : Number(trip.variancePaise) > 0
-                    ? 'text-[var(--money-in)]'
-                    : '')
-                }
-              >
+              <span className={'font-semibold tabular-nums ' + (Number(trip.variancePaise) < 0
+                ? 'text-[var(--money-out)]'
+                : Number(trip.variancePaise) > 0
+                ? 'text-[var(--money-in)]'
+                : 'text-[var(--ink-muted)]')}>
+                {/* UX-H4: glyph + explicit label ride along with the money colour. */}
+                <span aria-hidden="true">{Number(trip.variancePaise) < 0 ? '↓' : Number(trip.variancePaise) > 0 ? '↑' : '±'}</span>{' '}
+                <span className="sr-only">Variance:</span>
                 {formatPaise(Number(trip.variancePaise))}
               </span>
             </span>
@@ -358,50 +372,70 @@ export function TripDetailScreen() {
               No vendors on this trip yet. Add one to start buying stock.
             </p>
           ) : (
-            <ul className="flex flex-col gap-2">
-              {tripVendors.map((tv, idx) => {
-                const name = tv.vendor?.name || vendorName(tv.vendorUuid);
-                const billRef = tv.bill_reference ?? tv.billReference;
-                const paid = tv.total_paid ?? tv.totalPaidPaise;
-                const receipt = tv.receiptImage ?? tv.receipt_image ?? null;
-                return (
-                  <li
-                    key={tv.uuid || tv.vendor?.uuid || tv.vendorUuid || idx}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
-                  >
-                    <div>
-                      <div className="font-semibold">{name}</div>
-                      <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
-                        {billRef ? `Bill ${billRef}` : 'No bill reference'}
-                        {paid != null && <> &middot; Paid {formatPaise(Number(paid))}</>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {receipt && (
-                        <button
-                          type="button"
-                          onClick={() => setReceiptView({ src: receipt, name })}
-                          data-testid="view-receipt"
-                          className="h-12 w-12 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] transition-opacity hover:opacity-80"
-                          title={`View receipt — ${name}`}
-                          aria-label={`View receipt for ${name}`}
-                        >
-                          <img src={receipt} alt="" className="h-full w-full object-cover" />
-                        </button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/vendors/${tv.vendor?.uuid || tv.vendorUuid}`)}
-                        disabled={!tv.vendor?.uuid && !tv.vendorUuid}
-                      >
-                        View vendor
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHead sticky>
+                  <TableRow>
+                    <TableHeaderCell frozen>Vendor</TableHeaderCell>
+                    <TableHeaderCell>Bill reference</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Paid (₹)</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Receipt</TableHeaderCell>
+                    <TableHeaderCell className="text-right">View</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {tripVendors.map((tv, idx) => {
+                    const name = tv.vendor?.name || vendorName(tv.vendorUuid);
+                    const billRef = tv.bill_reference ?? tv.billReference;
+                    const paid = tv.total_paid ?? tv.totalPaidPaise;
+                    const receipt = tv.receiptImage ?? tv.receipt_image ?? null;
+                    return (
+                      <TableRow key={tv.uuid || tv.vendor?.uuid || tv.vendorUuid || idx}>
+                        <TableCell frozen>
+                          <div className="font-semibold">{name}</div>
+                        </TableCell>
+                        <TableCell>
+                          {billRef ? `Bill ${billRef}` : <span className="text-[var(--ink-muted)]">No bill reference</span>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {paid != null ? (
+                            <span className="typography-money-sm text-[var(--ink)]">{formatPaise(Number(paid))}</span>
+                          ) : (
+                            <span className="text-[var(--ink-muted)]">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {receipt ? (
+                            <button
+                              type="button"
+                              onClick={() => setReceiptView({ src: receipt, name })}
+                              data-testid="view-receipt"
+                              className="inline-block h-11 w-11 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] transition-opacity hover:opacity-80"
+                              title={`View receipt — ${name}`}
+                              aria-label={`View receipt for ${name}`}
+                            >
+                              <img src={receipt} alt="" className="h-full w-full object-cover" />
+                            </button>
+                          ) : (
+                            <span className="text-[var(--ink-muted)]">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/vendors/${tv.vendor?.uuid || tv.vendorUuid}`)}
+                            disabled={!tv.vendor?.uuid && !tv.vendorUuid}
+                          >
+                            View vendor
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -413,52 +447,66 @@ export function TripDetailScreen() {
             <CardTitle>Stocks — {group.name} ({group.stocks.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
-            <ul className="flex flex-col gap-2">
-              {group.stocks.map((stock) => {
-                const scanned = stock.unitsScannedCount ?? 0;
-                const qty = Number(stock.quantity);
-                const isFull = scanned >= qty;
-                return (
-                  <li
-                    key={stock.uuid}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
-                  >
-                    <div>
-                      <div className="font-semibold">
-                        {ptName(stock.productTypeUuid)} {stock.name ? `· ${stock.name}` : ''} &middot; qty {qty}
-                      </div>
-                      <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
-                        Buy {formatPaise(Number(stock.buyingPricePaise))} · Sell{' '}
-                        {formatPaise(Number(stock.sellingPricePaise))} · Channel{' '}
-                        <span className="capitalize">{stock.channel?.toLowerCase()}</span>
-                        {stock.channel === 'RENTAL' && stock.rentPerDayPaise && (
-                          <> &middot; Rent {formatPaise(Number(stock.rentPerDayPaise))}/day</>
-                        )}
-                      </div>
-                      <div className="mt-0.5 text-[13px]">
-                        <span className={isFull ? 'font-semibold text-[var(--success)]' : 'text-[var(--ink-muted)]'}>
-                          {scanned} of {qty} scanned
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      {canCreate && !isFull && (
-                        <Button
-                          size="sm"
-                          onClick={() => navigate(`/trips/${tripUuid}/stocks/${stock.uuid}/scan`)}
-                          data-testid="start-scanning"
-                        >
-                          Start scanning
-                        </Button>
-                      )}
-                      {canCreate && isFull && (
-                        <span className="text-xs font-semibold text-[var(--success)]">Stock complete</span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHead sticky>
+                  <TableRow>
+                    <TableHeaderCell frozen>Stock</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Money (₹)</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Scanned</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Action</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {group.stocks.map((stock) => {
+                    const scanned = stock.unitsScannedCount ?? 0;
+                    const qty = Number(stock.quantity);
+                    const isFull = scanned >= qty;
+                    return (
+                      <TableRow key={stock.uuid}>
+                        <TableCell frozen>
+                          <div className="font-semibold">
+                            {ptName(stock.productTypeUuid)} {stock.name ? `· ${stock.name}` : ''} &middot; qty {qty}
+                          </div>
+                          <div className="typography-body-sm text-[var(--ink-muted)]">
+                            Channel <span className="capitalize">{stock.channel?.toLowerCase()}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="typography-money-sm text-[var(--ink)]">Buy {formatPaise(Number(stock.buyingPricePaise))}</div>
+                          <div className="typography-money-sm text-[var(--ink-muted)]">Sell {formatPaise(Number(stock.sellingPricePaise))}</div>
+                          {stock.channel === 'RENTAL' && stock.rentPerDayPaise && (
+                            <div className="typography-money-sm text-[var(--ink-muted)]">Rent {formatPaise(Number(stock.rentPerDayPaise))}/day</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {/* UX-H4: completeness carries a glyph, never colour alone. */}
+                          <span className={isFull ? 'font-semibold text-[var(--success)]' : 'text-[var(--ink-muted)]'}>
+                            {isFull && <span aria-hidden="true">✓ </span>}
+                            <span className={isFull ? 'sr-only' : ''}>{isFull ? 'Complete: ' : ''}</span>
+                            {scanned} of {qty} scanned
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canCreate && !isFull && (
+                            <Button
+                              size="sm"
+                              onClick={() => navigate(`/trips/${tripUuid}/stocks/${stock.uuid}/scan`)}
+                              data-testid="start-scanning"
+                            >
+                              Start scanning
+                            </Button>
+                          )}
+                          {canCreate && isFull && (
+                            <span className="text-xs font-semibold text-[var(--success)]">Stock complete</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       ))}

@@ -22,7 +22,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '40px', textAlign: 'center' }}>
+        <div className="p-10 text-center">
           <h2>Something went wrong</h2>
           <p>Please try refreshing the page or signing in again.</p>
         </div>
@@ -48,7 +48,7 @@ export function RouteGuard({ children }) {
   // Null check for useAuth() return value (patch 1)
   if (!authContext) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
+      <div className="p-10 text-center">
         <p>Authentication context not available.</p>
       </div>
     );
@@ -72,17 +72,7 @@ export function RouteGuard({ children }) {
     <ErrorBoundary>
       <div>
         {status === 'session-expired' && (
-          <div
-            className="session-expired-banner"
-            style={{
-              padding: '16px',
-              backgroundColor: 'color-mix(in srgb, var(--danger) 12%, transparent)',
-              color: 'var(--danger)',
-              border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)',
-              borderRadius: 'var(--rounded-md)',
-              marginBottom: '16px',
-            }}
-          >
+          <div className="mb-4 rounded-md bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger)]" role="alert">
             {sessionExpiredMessage || 'Your session expired. Sign in again to continue.'}
           </div>
         )}

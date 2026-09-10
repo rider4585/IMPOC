@@ -20,6 +20,7 @@ export const Dialog = ({
   children,
   footer,
   className = '',
+  role = 'dialog',
 }) => {
   useEffect(() => {
     if (!open) return undefined;
@@ -38,7 +39,7 @@ export const Dialog = ({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="relative z-50" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="relative z-50" role={role} aria-modal="true" aria-label={title}>
           <motion.div
             className="fixed inset-0 bg-black/50"
             initial={{ opacity: 0 }}
