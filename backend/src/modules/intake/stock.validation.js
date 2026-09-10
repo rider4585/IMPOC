@@ -247,10 +247,14 @@ export const scanIntoStockSchema = z.object({
 });
 
 /**
- * Query schema for GET /api/stocks (bare list-all endpoint)
+ * Query schema for GET /api/stocks (bare list-all endpoint).
+ * limit/offset (R-32 Phase A) are optional grid pagination params; when absent
+ * the endpoint returns every matching stock exactly as before.
  */
 export const listAllStocksQuerySchema = z.object({
     tripUuid: z.string().uuid('Invalid trip UUID format').optional(),
     vendorUuid: z.string().uuid('Invalid vendor UUID format').optional(),
     search: z.string().trim().max(200).optional(),
+    limit: z.coerce.number().int('limit must be a positive integer').min(1, 'limit must be a positive integer').max(200).optional(),
+    offset: z.coerce.number().int('offset must be a non-negative integer').min(0, 'offset must be a non-negative integer').optional(),
 });

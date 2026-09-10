@@ -79,10 +79,14 @@ function mapSaleDTO(sale, lines = [], reversals = []) {
 }
 
 /**
- * Resolve a single sellable unit (RETAIL + in_stock).
+ * Resolve a single sellable unit (RETAIL + in_stock). When a custom
+ * sellingPricePaise is supplied it is validated against the unit's floor price
+ * (R-30: POS price edits may not undercut the floor), though the caller still
+ * keeps using the unit's snapshot for amount bookkeeping.
+ *
  * @returns {Promise<Unit>}
  */
-async function resolveSellableUnit({ unitUuid, barcode }, transaction) {
+async function resolveSellableUnit({ unitUuid, barcode, sellingPricePaise }, transaction) {
     if (!unitUuid && !barcode) {
         const error = new Error('Each item must specify exactly one of barcode or unitUuid');
         error.statusCode = 400;
@@ -113,6 +117,16 @@ async function resolveSellableUnit({ unitUuid, barcode }, transaction) {
         throw error;
     }
 
+    if (sellingPricePaise !== undefined && sellingPricePaise !== null) {
+        const price = Number(sellingPricePaise);
+        const floor = Number(unit.floorPricePaise || 0);
+        if (price < floor) {
+            const error = new Error('Price cannot be below floor price');
+            error.statusCode = 400;
+            throw error;
+        }
+    }
+
     return unit;
 }
 
@@ -133,11 +147,17 @@ const MAX_NUMBER_RETRIES = 3;
 const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, items, actorUserId, requestUuid }) => {
     const transaction = await sequelize.transaction();
     try {
-        const units = [];
+        // Resolve each unit plus the price actually charged at checkout: the
+        // caller's edited price when supplied, otherwise the unit snapshot.
+        const itemsSnapshot = [];
         for (const item of items) {
             // eslint-disable-next-line no-await-in-loop
             const unit = await resolveSellableUnit(item, transaction);
-            units.push(unit);
+            const pricePaise =
+                item.sellingPricePaise !== undefined && item.sellingPricePaise !== null
+                    ? Number(item.sellingPricePaise)
+                    : unit.sellingPricePaise;
+            itemsSnapshot.push({ unit, pricePaise });
         }
 
         const linkedCustomer = await resolveCustomer(customerUuid, transaction);
@@ -145,7 +165,7 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
         const date = soldAt || new Date().toISOString().split('T')[0];
         const saleNumber = await nextSaleNumber(transaction);
 
-        const totalPaise = Number(units.reduce((sum, u) => sum + BigInt(u.sellingPricePaise), 0n));
+        const totalPaise = Number(itemsSnapshot.reduce((sum, x) => sum + BigInt(x.pricePaise), 0n));
 
         // SEC-M-8: ledger snapshots must reference the active picklists.
         await assertPaymentMethodInPicklist(paymentMethod, transaction);
@@ -169,7 +189,7 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
         );
 
         const lines = [];
-        for (const unit of units) {
+        for (const { unit, pricePaise } of itemsSnapshot) {
             // eslint-disable-next-line no-await-in-loop
             const line = await SaleLine.create(
                 {
@@ -177,7 +197,7 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
                     unitId: unit.id,
                     unitUuid: unit.uuid,
                     barcode: unit.barcode,
-                    sellingPricePaise: unit.sellingPricePaise,
+                    sellingPricePaise: pricePaise,
                 },
                 { transaction }
             );
@@ -265,16 +285,44 @@ export const createSale = async (params) => {
  * read scope (ADMIN/MANAGER), only sales the caller created are visible
  * (SEC-M-5).
  *
- * @param {Object} [options] - { actorUserId, viewAll }
+ * R-32 Phase A: the page id set (respecting LIMIT/OFFSET) is produced by the
+ * v_sales_grid read-layer view, then the DTO is hydrated for that page only.
+ *
+ * @param {Object} [options] - { actorUserId, viewAll, limit, offset }
  */
-export const listSales = async ({ actorUserId, viewAll } = {}) => {
-    const where = { deletedAt: null };
+export const listSales = async ({ actorUserId, viewAll, limit, offset } = {}) => {
+    // v_sales_grid already excludes soft-deleted sales, so no outer
+    // deleted_at predicate is needed (and the view does not expose one).
+    const filters = [];
+    const replacements = {};
     if (!viewAll && actorUserId) {
-        where.createdBy = actorUserId;
+        filters.push('s."createdBy" = :createdBy');
+        replacements.createdBy = actorUserId;
+    }
+
+    let sql = `
+        SELECT s.id
+        FROM v_sales_grid s
+        ${filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : ''}
+        ORDER BY s."createdAt" DESC`;
+
+    if (limit !== undefined && limit !== null) {
+        sql += ' LIMIT :limit';
+        replacements.limit = limit;
+    }
+    if (offset !== undefined && offset !== null) {
+        sql += ' OFFSET :offset';
+        replacements.offset = offset;
+    }
+
+    const rows = await sequelize.query(sql, { replacements, type: sequelize.QueryTypes.SELECT });
+    const ids = rows.map((row) => row.id);
+    if (ids.length === 0) {
+        return [];
     }
 
     const sales = await Sale.findAll({
-        where,
+        where: { id: ids },
         order: [['createdAt', 'DESC']],
         include: [
             { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },

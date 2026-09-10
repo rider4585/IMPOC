@@ -34,6 +34,7 @@ describe('Sales / POS module (T-08)', () => {
     let unit2;
     let unit5;
     let unit6;
+    let floorStock;
 
     async function scanUnit(barcode, targetStock = stock) {
         const res = await request(app)
@@ -120,6 +121,22 @@ describe('Sales / POS module (T-08)', () => {
         unit2 = await scanUnit('A1000000002');
         unit5 = await scanUnit('A1000000005');
         unit6 = await scanUnit('A1000000006');
+
+        // Dedicated stock for the R-30 floor-price tests so they never consume
+        // the shared stock's declared quantity (which later race tests depend on).
+        floorStock = await createTestStock({
+            trip,
+            tripVendor,
+            vendor,
+            productType,
+            overrides: {
+                quantity: 10,
+                buyingPricePaise: 100000,
+                sellingPricePaise: 200000,
+                floorPricePaise: 150000,
+                channel: 'RETAIL',
+            },
+        });
     });
 
     afterAll(async () => {
@@ -241,6 +258,52 @@ describe('Sales / POS module (T-08)', () => {
 
             expect(res.body.data.lines).toHaveLength(1);
             expect(res.body.data.lines[0].barcode).toBe(unit4.barcode);
+        });
+
+        it('should reject a checkout price below the unit floor (R-30, unitUuid path)', async () => {
+            const unit = await scanUnit('FLR00000001', floorStock);
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: unit.uuid, sellingPricePaise: 149999 }] })
+                .expect(400);
+
+            expect(res.body.message).toBe('Price cannot be below floor price');
+        });
+
+        it('should reject a checkout price below the unit floor (R-30, barcode path)', async () => {
+            const unit = await scanUnit('FLR00000002', floorStock);
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid: uuidv4(), items: [{ barcode: unit.barcode, sellingPricePaise: 100000 }] })
+                .expect(400);
+
+            expect(res.body.message).toBe('Price cannot be below floor price');
+        });
+
+        it('should accept a checkout price exactly at the floor (R-30)', async () => {
+            const unit = await scanUnit('FLR00000003', floorStock);
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: unit.uuid, sellingPricePaise: 150000 }] })
+                .expect(201);
+
+            expect(res.body.data.totalPaise).toBe('150000');
+            expect(res.body.data.lines[0].sellingPricePaise).toBe('150000');
+        });
+
+        it('should accept a checkout price equal to the unit snapshot (R-30)', async () => {
+            const unit = await scanUnit('FLR00000004', floorStock);
+            const res = await request(testApp)
+                .post('/api/sales')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .send({ requestUuid: uuidv4(), items: [{ unitUuid: unit.uuid, sellingPricePaise: 200000 }] })
+                .expect(201);
+
+            expect(res.body.data.totalPaise).toBe('200000');
+            expect(res.body.data.lines[0].sellingPricePaise).toBe('200000');
         });
 
         it('should reject at the service layer when a sale item has no identifier (SEC-H-6)', async () => {

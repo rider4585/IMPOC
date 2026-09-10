@@ -14,6 +14,7 @@ import {
     scanIntoStock as scanIntoStockService,
     listAllStocks as listAllStocksService,
 } from './stock.service.js';
+import { MAX_PAGE_SIZE } from '../../utils/pagination.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -162,7 +163,10 @@ export const scanIntoStock = async (req, res, next) => {
 export const listAllStocks = async (req, res, next) => {
     try {
         const query = listAllStocksQuerySchema.parse(req.query || {});
-        const stocks = await listAllStocksService(query);
+        const stocks = await listAllStocksService({
+            ...query,
+            limit: query.limit !== undefined ? Math.min(query.limit, MAX_PAGE_SIZE) : undefined,
+        });
 
         return res.status(200).json({
             success: true,

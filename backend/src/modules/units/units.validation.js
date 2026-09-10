@@ -37,11 +37,16 @@ export const getStatusEventsQuerySchema = z.object({
 
 /**
  * Validation schema for GET /api/units (bare list-all endpoint)
+ *
+ * limit/offset (R-32 Phase A) are optional grid pagination params; when absent
+ * the endpoint returns every matching unit exactly as before.
  */
 export const listAllUnitsQuerySchema = z.object({
     search: z.string().trim().max(200).optional(),
     status: z.string().trim().max(20).optional(),
     stockUuid: uuidSchema.optional(),
+    limit: z.coerce.number().int('limit must be a positive integer').min(1, 'limit must be a positive integer').max(200).optional(),
+    offset: z.coerce.number().int('offset must be a non-negative integer').min(0, 'offset must be a non-negative integer').optional(),
 });
 
 /**

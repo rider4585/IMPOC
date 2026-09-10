@@ -1,14 +1,7 @@
 import {
     Unit,
     UnitStatusEvent,
-    Stock,
-    Colour,
-    Size,
-    Vendor,
-    Trip,
-    ProductType,
     sequelize,
-    Sequelize,
 } from '../../../database/models/index.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { escapeLike } from '../../utils/escapeLike.js';
@@ -17,69 +10,53 @@ import { escapeLike } from '../../utils/escapeLike.js';
  * List ALL units across stocks (bare GET /api/units endpoint).
  * Ordered newest first. Optional filters: search (partial barcode),
  * status, stockUuid.
+ *
+ * R-32 Phase A: the read layer is now the v_units_grid view (id/aggregates are
+ * precomputed in postgres); LIMIT/OFFSET window the returned page. When no
+ * pagination is supplied every matching unit is returned, preserving the
+ * historical response shape.
  */
-export const listAllUnits = async ({ search, status, stockUuid } = {}) => {
-    const where = {};
+export const listAllUnits = async ({ search, status, stockUuid, limit, offset } = {}) => {
+    // v_units_grid already excludes soft-deleted units, so no outer
+    // deleted_at predicate is needed (and the view does not expose one).
+    const filters = [];
+    const replacements = {};
 
     if (search) {
         // SEC-L-5: escape LIKE wildcards so a literal "%" / "_" barcode search
         // is matched literally instead of acting as a wildcard.
-        where.barcode = { [Sequelize.Op.like]: `%${escapeLike(search)}%` };
+        filters.push('u.barcode LIKE :barcode');
+        replacements.barcode = `%${escapeLike(search)}%`;
     }
 
     if (status) {
-        where.status = status;
+        filters.push(`u.status = :status`);
+        replacements.status = status;
     }
 
     if (stockUuid) {
-        where['$stock.uuid$'] = stockUuid;
+        filters.push(`u."stockUuid" = :stockUuid`);
+        replacements.stockUuid = stockUuid;
     }
 
-    const units = await Unit.findAll({
-        where,
-        include: [
-            {
-                model: Stock,
-                as: 'stock',
-                attributes: ['uuid'],
-                include: [
-                    {
-                        model: ProductType,
-                        as: 'productType',
-                        attributes: ['uuid', 'name'],
-                    },
-                    {
-                        model: ProductType,
-                        as: 'subType',
-                        attributes: ['uuid', 'name'],
-                    },
-                    {
-                        model: Vendor,
-                        as: 'vendor',
-                        attributes: ['uuid', 'name'],
-                    },
-                    {
-                        model: Trip,
-                        as: 'trip',
-                        attributes: ['uuid'],
-                    },
-                ],
-            },
-            {
-                model: Colour,
-                as: 'colour',
-                attributes: ['uuid', 'name'],
-            },
-            {
-                model: Size,
-                as: 'size',
-                attributes: ['uuid', 'name'],
-            },
-        ],
-        order: [['createdAt', 'DESC']],
-    });
+    let sql = `
+        SELECT *
+        FROM v_units_grid u
+        ${filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : ''}
+        ORDER BY u."createdAt" DESC`;
 
-    return units.map(mapListAllUnitsDTO);
+    if (limit !== undefined && limit !== null) {
+        sql += ' LIMIT :limit';
+        replacements.limit = limit;
+    }
+    if (offset !== undefined && offset !== null) {
+        sql += ' OFFSET :offset';
+        replacements.offset = offset;
+    }
+
+    const rows = await sequelize.query(sql, { replacements, type: sequelize.QueryTypes.SELECT });
+
+    return rows.map(mapListAllUnitsDTO);
 };
 
 function deriveStockName(stock) {
@@ -93,15 +70,15 @@ function mapListAllUnitsDTO(unit) {
     return {
         uuid: unit.uuid,
         barcode: unit.barcode,
-        stockUuid: unit.stock?.uuid || null,
-        stockName: unit.stock ? deriveStockName(unit.stock) : null,
-        vendorUuid: unit.stock?.vendor?.uuid || null,
-        vendorName: unit.stock?.vendor?.name || null,
-        tripUuid: unit.stock?.trip?.uuid || null,
-        colourUuid: unit.colour?.uuid || null,
-        colourName: unit.colour?.name || null,
-        sizeUuid: unit.size?.uuid || null,
-        sizeName: unit.size?.name || null,
+        stockUuid: unit.stockUuid || null,
+        stockName: unit.stockName || null,
+        vendorUuid: unit.vendorUuid || null,
+        vendorName: unit.vendorName || null,
+        tripUuid: unit.tripUuid || null,
+        colourUuid: unit.colourUuid || null,
+        colourName: unit.colourName || null,
+        sizeUuid: unit.sizeUuid || null,
+        sizeName: unit.sizeName || null,
         status: unit.status,
         channel: unit.channel,
         buyingPricePaise: String(unit.buyingPricePaise),

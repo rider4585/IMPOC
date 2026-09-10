@@ -1,5 +1,6 @@
 import { getUnitByUuid, getUnitByBarcode, getUnitStatusEvents, transitionUnitEndpoint, listAllUnits } from './units.service.js';
 import { transitionUnitParamsSchema, transitionUnitBodySchema, listAllUnitsQuerySchema } from './units.validation.js';
+import { MAX_PAGE_SIZE } from '../../utils/pagination.js';
 
 /**
  * GET /api/units
@@ -8,8 +9,10 @@ import { transitionUnitParamsSchema, transitionUnitBodySchema, listAllUnitsQuery
 export const listAllUnitsRoute = async (req, res, next) => {
     try {
         const query = listAllUnitsQuerySchema.parse(req.query || {});
-
-        const units = await listAllUnits(query);
+        const units = await listAllUnits({
+            ...query,
+            limit: query.limit !== undefined ? Math.min(query.limit, MAX_PAGE_SIZE) : undefined,
+        });
 
         return res.status(200).json({
             success: true,
