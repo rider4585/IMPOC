@@ -406,8 +406,15 @@ export function POSScreen() {
   if (receipt) {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
-        {/* UX-M5: sticky "New transaction" so a fresh sale is always one tap away. */}
-        <div className="sticky top-0 z-10 -mx-6 -mt-1 mb-1 flex justify-end bg-[var(--surface-base)] px-6 pb-2 pt-3">
+        {/*
+          UX-M5: sticky "New transaction" so a fresh sale is always one tap away.
+          The scroll container is AppShell's <main> which carries p-4/sm:p-6.
+          A plain `top-0` pins the bar at the INNER edge of that padding, leaving
+          a 16-24px band above it where scrolling content bleeds through. Offset
+          `top` by main's padding so the bar sticks flush to main's top border and
+          its background covers that band (values mirror main's p-4 / sm:p-6).
+        */}
+        <div className="sticky top-[-16px] z-10 -mx-6 -mt-1 mb-1 flex justify-end bg-[var(--surface-base)] px-6 pb-2 pt-3 sm:top-[-24px]">
           <Button onClick={() => setReceipt(null)} data-testid="pos-new-transaction">
             New transaction
           </Button>
