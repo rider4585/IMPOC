@@ -207,7 +207,7 @@ export function RolesScreen() {
   ], [canManage]);
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1100px] flex-col gap-5 p-6 overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="typography-heading mb-1">Roles</h1>
@@ -225,7 +225,7 @@ export function RolesScreen() {
       {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.ROLES.VIEW) && (
-        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
           <DataGrid
             data={roles}
             columns={columns}

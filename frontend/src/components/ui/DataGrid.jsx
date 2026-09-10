@@ -168,10 +168,10 @@ export function DataGrid({
   const displayedRowModel = table.getRowModel();
 
   return (
-    <div className={`flex flex-col gap-3 ${className}`}>
+    <div className={`flex min-h-0 flex-col gap-3 ${className}`}>
 
-      <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)]">
-        <div className="overflow-x-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)]">
+        <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full border-collapse text-sm">
             <thead className="sticky top-0 bg-[var(--surface-sunken)]">
               {table.getHeaderGroups().map((headerGroup) => (

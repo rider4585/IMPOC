@@ -191,7 +191,7 @@ export function StocksScreen() {
   ], [navigate, tripByUuid, vendorByUuid, typeName, subTypeName]);
 
   return (
-    <div className="flex flex-col gap-5 p-6 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col gap-5 p-6 overflow-hidden">
       <div>
         <h1 className="typography-heading mb-1">Stocks</h1>
         <p className="typography-body-sm text-[var(--ink-muted)]">
@@ -244,7 +244,7 @@ export function StocksScreen() {
         </div>
       )}
 
-      <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
         <DataGrid
           data={stocks}
           columns={columns}

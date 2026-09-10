@@ -106,7 +106,7 @@ export function CustomersScreen() {
 
   if (!canView) {
     return (
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1100px] flex-col gap-5 p-6 overflow-hidden">
         <p className="text-sm text-[var(--ink-muted)]">You do not have permission to view customers.</p>
       </div>
     );
@@ -237,7 +237,7 @@ export function CustomersScreen() {
           />
         </div>
 
-        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
           <DataGrid
             data={customers}
             columns={dgColumns}
