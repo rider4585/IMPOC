@@ -4,6 +4,29 @@ import { login as loginAPI, refresh as refreshAPI, logout as logoutAPI, getCurre
 import { setAccessTokenGetter, setTokenRefreshHandler } from '../platform/apiClient.js';
 
 /**
+ * Single-flight guard for the boot-time refresh.
+ *
+ * React StrictMode (dev) intentionally runs an effect as setup -> cleanup ->
+ * setup, so the boot restore effect fires twice. Two concurrent POST
+ * /auth/refresh calls send the SAME httpOnly refresh cookie; refresh-token
+ * rotation consumes the first, and the backend treats the second as token
+ * REUSE and revokes the whole session (auth-session.service reuse detection) —
+ * which logged the user out on every page reload. Collapsing concurrent boot
+ * refreshes into one network call keeps rotation to a single hop.
+ *
+ * Module scope (not a ref) so it is shared across the StrictMode double-mount.
+ */
+let bootRefreshInFlight = null;
+function dedupedBootRefresh() {
+  if (!bootRefreshInFlight) {
+    bootRefreshInFlight = refreshAPI().finally(() => {
+      bootRefreshInFlight = null;
+    });
+  }
+  return bootRefreshInFlight;
+}
+
+/**
  * AuthProvider component - the actual provider that wraps the app
  * Holds:
  * - accessToken (in memory only, never persisted)
@@ -92,13 +115,20 @@ export function AuthProvider({ children }) {
    * Sets status to 'restoring' during the process
    */
   useEffect(() => {
+    // Re-arm the mounted flag on every effect run. Under StrictMode the first
+    // cleanup sets it false; without re-arming, the restore continuation below
+    // would bail and never transition to 'signed-in' — the user would land
+    // signed-out on every reload even when the refresh cookie is valid.
+    isMountedRef.current = true;
     const restoreSession = async () => {
       if (!isMountedRef.current) return;
       setStatus('restoring');
       try {
-        // Attempt to refresh the access token using the httpOnly cookie
+        // Attempt to refresh the access token using the httpOnly cookie.
+        // Single-flighted so StrictMode's double-mount does not fire two
+        // refreshes and trip server-side refresh-token reuse detection.
         let newAccessToken;
-        const refreshData = await refreshAPI();
+        const refreshData = await dedupedBootRefresh();
         newAccessToken = refreshData.accessToken;
 
         if (!isMountedRef.current) return;

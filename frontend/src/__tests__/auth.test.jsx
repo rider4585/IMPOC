@@ -231,6 +231,46 @@ describe('Authentication Flow', () => {
     expect(screen.getByTestId('token')).toHaveTextContent('jwt-new-token-456');
   });
 
+  it('boot restore under StrictMode fires ONE refresh and still signs in (regression: logout-on-reload)', async () => {
+    // React StrictMode runs the boot effect setup -> cleanup -> setup. Before
+    // the fix, the first cleanup left isMountedRef false (restore bailed ->
+    // stuck signed-out) and/or a second refresh tripped server-side refresh-
+    // token reuse detection. Assert exactly one refresh and a signed-in result.
+    let resolveRefresh;
+    authApi.refresh.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRefresh = resolve;
+      })
+    );
+    authApi.getCurrentUser.mockResolvedValue({
+      uuid: 'user-123',
+      username: 'strictuser',
+      permissions: ['inventory.view'],
+    });
+
+    render(
+      <React.StrictMode>
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      </React.StrictMode>
+    );
+
+    // Resolve the single in-flight refresh after both StrictMode setups have run.
+    await act(async () => {
+      resolveRefresh({ accessToken: 'jwt-strict-1', refreshTokenExpiresAt: '2026-09-08T00:00:00Z' });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('signed-in');
+    });
+
+    // Single-flight: only ONE network refresh despite the double-mount.
+    expect(authApi.refresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('user')).toHaveTextContent('strictuser');
+    expect(screen.getByTestId('token')).toHaveTextContent('jwt-strict-1');
+  });
+
   it('boot-time session restore handles expired/absent cookie gracefully', async () => {
     const refreshError = new Error('No refresh token in cookie');
     refreshError.statusCode = 400;
