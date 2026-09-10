@@ -501,3 +501,59 @@ html {
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* =============================================================================
+   Customer display: animated QR border (R-42b)
+
+   Two selectable styles around the awaiting-payment QR — a gentle pulse/glow
+   and a marching/running light around the perimeter. Toggle + persistence
+   live in PosDisplayScreen.jsx / platform/displayBorderStyle.js.
+   ========================================================================== */
+
+.qr-border {
+  position: relative;
+  border-radius: 0.75rem;
+}
+
+.qr-border--pulse {
+  animation: qr-pulse-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes qr-pulse-glow {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+}
+
+.qr-border--marching::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  padding: 3px;
+  background: conic-gradient(from 0deg, transparent 0deg, var(--primary) 55deg, transparent 130deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: qr-marching-spin 2.4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes qr-marching-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qr-border--pulse,
+  .qr-border--marching::before {
+    animation: none;
+  }
+}

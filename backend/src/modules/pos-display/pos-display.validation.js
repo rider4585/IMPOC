@@ -11,6 +11,15 @@ export const publishStateSchema = z
         method: z.enum(['UPI', 'Cash']).optional(),
         amountPaise: z.number().int().nonnegative().optional(),
         upiUri: z.string().max(2000).optional(),
+        // R-42c: first name ONLY (single token, no whitespace) — see the
+        // no-PII note in pos-display.state.js.
+        customerFirstName: z
+            .string()
+            .trim()
+            .min(1)
+            .max(50)
+            .regex(/^\S+$/, 'customerFirstName must be a single name token')
+            .optional(),
     })
     .refine(
         (data) => (data.status === 'awaiting' ? data.method != null && data.amountPaise != null : true),

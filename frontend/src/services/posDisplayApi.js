@@ -11,7 +11,7 @@ import buildError from '../platform/buildError.js';
 /**
  * POST /pos-display/:code
  * @param {string} code
- * @param {{status: 'idle'|'awaiting'|'received', method?: 'UPI'|'Cash', amountPaise?: number, upiUri?: string}} state
+ * @param {{status: 'idle'|'awaiting'|'received', method?: 'UPI'|'Cash', amountPaise?: number, upiUri?: string, customerFirstName?: string}} state
  */
 export async function publishPosDisplayState(code, state) {
   try {

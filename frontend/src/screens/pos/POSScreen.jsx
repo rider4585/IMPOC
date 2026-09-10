@@ -479,7 +479,9 @@ export function POSScreen() {
         })),
       });
 
-      publishDisplay({ status: 'received' });
+      // R-42c: first name only (single token) for the display's spoken thank-you.
+      const customerFirstName = customer?.name?.trim().split(/\s+/)[0] || undefined;
+      publishDisplay({ status: 'received', customerFirstName });
       setPaymentStep('thankyou');
       toast.success({ title: 'Checkout complete' });
 

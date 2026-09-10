@@ -1,12 +1,63 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { getPosDisplayStreamUrl } from '../../platform/posDisplayStream.js';
 import { formatPaise } from '../../platform/money.js';
 import { SHOP_NAME } from '../../components/ShopLogo.jsx';
+import { qrLogoSettings } from '../../platform/qrLogo.js';
+import { BORDER_STYLES, getBorderStyle, setBorderStyle } from '../../platform/displayBorderStyle.js';
 
-const DEFAULT_STATE = { status: 'idle', method: null, amountPaise: null, upiUri: null };
+const DEFAULT_STATE = { status: 'idle', method: null, amountPaise: null, upiUri: null, customerFirstName: null };
+
+/**
+ * Speaks the R-42c thank-you line via the Web Speech API. No-ops (silently)
+ * when speech synthesis isn't available in this browser.
+ */
+function speakThankYou(firstName) {
+  if (typeof window === 'undefined') return;
+  const synth = window.speechSynthesis;
+  if (!synth || typeof window.SpeechSynthesisUtterance !== 'function') return;
+
+  const text = firstName
+    ? `Thank you for shopping with us, ${firstName}!`
+    : 'Thank you for shopping with us!';
+
+  try {
+    synth.speak(new window.SpeechSynthesisUtterance(text));
+  } catch {
+    // Speech unavailable/blocked — degrade silently.
+  }
+}
+
+/**
+ * Speaks the thank-you line on a LIVE non-received -> received transition
+ * only. `messageCount` (real SSE messages received, from useDisplayState) is
+ * what "first message" is judged against — NOT this effect's own run count,
+ * which would otherwise also fire (and wrongly burn the "first message" flag)
+ * on mount / on a soundUnlocked change, before any SSE message has arrived.
+ * Guards against: the first SSE message already being 'received' (a
+ * late-join / page-reload joining mid-confirmation), a reconnect replaying
+ * the current state, and speaking before the user has unlocked audio.
+ */
+function useSpeakOnReceived(status, customerFirstName, soundUnlocked, messageCount) {
+  const prevStatusRef = useRef(null);
+  const lastProcessedCountRef = useRef(0);
+
+  useEffect(() => {
+    if (messageCount === 0 || messageCount === lastProcessedCountRef.current) return;
+
+    const isFirstMessage = lastProcessedCountRef.current === 0;
+    const prevStatus = prevStatusRef.current;
+    lastProcessedCountRef.current = messageCount;
+    prevStatusRef.current = status;
+
+    if (!soundUnlocked || isFirstMessage) return;
+    if (status !== 'received' || prevStatus === 'received') return;
+
+    speakThankYou(customerFirstName);
+  }, [status, customerFirstName, soundUnlocked, messageCount]);
+}
 
 /**
  * PUBLIC, no-auth page for a customer-facing device (R-35). Subscribes to
@@ -17,6 +68,10 @@ const DEFAULT_STATE = { status: 'idle', method: null, amountPaise: null, upiUri:
  */
 function useDisplayState(code) {
   const [state, setState] = useState(DEFAULT_STATE);
+  // Counts real SSE messages (as opposed to the initial DEFAULT_STATE render) —
+  // R-42c's speak-dedupe needs to tell "no message yet" apart from "an actual
+  // idle/awaiting message happened to arrive first".
+  const [messageCount, setMessageCount] = useState(0);
 
   useEffect(() => {
     if (!code) return undefined;
@@ -27,6 +82,7 @@ function useDisplayState(code) {
       try {
         const next = JSON.parse(event.data);
         setState({ ...DEFAULT_STATE, ...next });
+        setMessageCount((n) => n + 1);
       } catch {
         // Ignore malformed events (e.g. a stray heartbeat comment line).
       }
@@ -35,7 +91,7 @@ function useDisplayState(code) {
     return () => source.close();
   }, [code]);
 
-  return state;
+  return { state, messageCount };
 }
 
 function DisplayCodeEntry() {
@@ -99,7 +155,7 @@ function IdleView() {
   );
 }
 
-function AwaitingView({ method, amountPaise, upiUri }) {
+function AwaitingView({ method, amountPaise, upiUri, borderStyle }) {
   const amount = Number(amountPaise) || 0;
   return (
     <motion.div
@@ -112,8 +168,16 @@ function AwaitingView({ method, amountPaise, upiUri }) {
     >
       {method === 'UPI' && upiUri ? (
         <>
-          <div className="rounded-xl bg-white p-6 shadow-lg">
-            <QRCodeSVG value={upiUri} size={280} data-testid="display-upi-qr" />
+          <div className={`qr-border qr-border--${borderStyle}`} data-testid="display-qr-border">
+            <div className="rounded-xl bg-white p-6 shadow-lg">
+              <QRCodeSVG
+                value={upiUri}
+                size={280}
+                level="H"
+                imageSettings={qrLogoSettings(280)}
+                data-testid="display-upi-qr"
+              />
+            </div>
           </div>
           <p className="typography-heading text-[var(--ink)]">Scan to pay {formatPaise(amount)}</p>
         </>
@@ -127,7 +191,7 @@ function AwaitingView({ method, amountPaise, upiUri }) {
   );
 }
 
-function ReceivedView() {
+function ReceivedView({ customerFirstName }) {
   return (
     <motion.div
       key="received"
@@ -145,22 +209,88 @@ function ReceivedView() {
           <path d="M20 6 9 17l-5-5" />
         </svg>
       </span>
-      <h1 className="typography-heading text-[var(--ink)]">Thank you!</h1>
+      <h1 className="typography-heading text-[var(--ink)]">
+        {customerFirstName ? `Thank you, ${customerFirstName}!` : 'Thank you!'}
+      </h1>
       <p className="text-[var(--ink-muted)]">Payment received.</p>
     </motion.div>
   );
 }
 
+const BORDER_STYLE_LABEL = { pulse: 'Pulse', marching: 'Marching' };
+
+/** Small, unobtrusive top-left toggle between the two awaiting-QR border styles (R-42b). */
+function BorderStyleToggle({ borderStyle, onCycle }) {
+  return (
+    <button
+      type="button"
+      onClick={onCycle}
+      data-testid="display-border-toggle"
+      className="fixed left-3 top-3 rounded-full border border-[var(--border)] bg-[var(--surface-raised)]/70 px-3 py-1 text-xs text-[var(--ink-muted)] opacity-40 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+      title="Change QR border animation"
+    >
+      Border: {BORDER_STYLE_LABEL[borderStyle] || borderStyle}
+    </button>
+  );
+}
+
+/** One-time top-right "Tap to enable sound" affordance (R-42c) — browsers block speech before a user gesture. */
+function SoundUnlockButton({ onUnlock }) {
+  return (
+    <button
+      type="button"
+      onClick={onUnlock}
+      data-testid="display-sound-enable"
+      className="fixed right-3 top-3 rounded-full border border-[var(--border)] bg-[var(--surface-raised)]/70 px-3 py-1 text-xs text-[var(--ink-muted)] opacity-40 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+      title="Enable sound"
+    >
+      🔈 Tap to enable sound
+    </button>
+  );
+}
+
 function PosDisplayView({ code }) {
-  const state = useDisplayState(code);
+  const { state, messageCount } = useDisplayState(code);
+  const [borderStyle, setBorderStyleState] = useState(() => getBorderStyle());
+  const [soundUnlocked, setSoundUnlocked] = useState(false);
+
+  useSpeakOnReceived(state.status, state.customerFirstName, soundUnlocked, messageCount);
+
+  const cycleBorderStyle = useCallback(() => {
+    setBorderStyleState((current) => {
+      const next = BORDER_STYLES[(BORDER_STYLES.indexOf(current) + 1) % BORDER_STYLES.length];
+      setBorderStyle(next);
+      return next;
+    });
+  }, []);
+
+  const unlockSound = useCallback(() => {
+    // Speaking a (near-)empty utterance synchronously inside the click handler
+    // satisfies the browser's user-gesture requirement for the rest of the session.
+    if (typeof window !== 'undefined' && window.speechSynthesis && typeof window.SpeechSynthesisUtterance === 'function') {
+      try {
+        window.speechSynthesis.speak(new window.SpeechSynthesisUtterance(' '));
+      } catch {
+        // Speech unavailable — still mark unlocked so we stop showing the button.
+      }
+    }
+    setSoundUnlocked(true);
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--surface-base)] p-6 text-center">
+      {state.status === 'awaiting' && <BorderStyleToggle borderStyle={borderStyle} onCycle={cycleBorderStyle} />}
+      {!soundUnlocked && <SoundUnlockButton onUnlock={unlockSound} />}
       <AnimatePresence mode="wait">
         {state.status === 'awaiting' && (
-          <AwaitingView method={state.method} amountPaise={state.amountPaise} upiUri={state.upiUri} />
+          <AwaitingView
+            method={state.method}
+            amountPaise={state.amountPaise}
+            upiUri={state.upiUri}
+            borderStyle={borderStyle}
+          />
         )}
-        {state.status === 'received' && <ReceivedView />}
+        {state.status === 'received' && <ReceivedView customerFirstName={state.customerFirstName} />}
         {state.status !== 'awaiting' && state.status !== 'received' && <IdleView />}
       </AnimatePresence>
     </div>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, Button, Select } from '../../components/ui';
 import { formatPaise } from '../../platform/money.js';
+import { qrLogoSettings } from '../../platform/qrLogo.js';
 
 /**
  * PaymentDialog (R-35) — the two-step Checkout confirmation.
@@ -102,7 +103,13 @@ export function PaymentDialog({
 
             {isUpi && upiUri && (
               <div className="flex flex-col items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] p-4">
-                <QRCodeSVG value={upiUri} size={200} data-testid="payment-upi-qr" />
+                <QRCodeSVG
+                  value={upiUri}
+                  size={200}
+                  level="H"
+                  imageSettings={qrLogoSettings(200)}
+                  data-testid="payment-upi-qr"
+                />
                 <p className="text-center text-sm font-medium text-[var(--ink)]">
                   Scan to pay {formatPaise(totalPaise)}
                 </p>
