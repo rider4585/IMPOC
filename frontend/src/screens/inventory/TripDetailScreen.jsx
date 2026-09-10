@@ -10,6 +10,12 @@ import {
   Dialog,
   SearchableSelect,
   useToast,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableHeaderCell,
+  TableCell,
 } from '../../components/ui';
 import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
@@ -258,43 +264,6 @@ export function TripDetailScreen() {
 
   const setNewV = (key) => (e) => setNewVendor((f) => ({ ...f, [key]: e.target.value }));
 
-  if (!can(PERMISSIONS.INVENTORY.VIEW)) {
-    return (
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
-        <p className="text-sm text-[var(--ink-muted)]">You do not have permission to view this trip.</p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
-        <div className="h-8 w-48 animate-pulse rounded bg-[var(--surface-sunken)]" />
-        <div className="h-20 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
-      </div>
-    );
-  }
-
-  if (error || !trip) {
-    return (
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/trips')}>&larr; All trips</Button>
-        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Trip not found'}</div>
-      </div>
-    );
-  }
-
-  const existingVendorUuids = new Set(tripVendors.map((tv) => tv.vendor?.uuid || tv.vendorUuid).filter(Boolean));
-  const availableVendors = vendors.filter((v) => v.isActive !== false && !existingVendorUuids.has(v.uuid));
-  const selectedVendor = availableVendors.find((v) => v.uuid === vendorForm.vendorUuid);
-  const vendorComboboxOptions = availableVendors.map((v) => ({
-    value: v.uuid,
-    label: v.name,
-    description: v.phone || undefined,
-  }));
-
-  const stocksByVendor = stockByVendorGroups;
-
   const vendorColumns = useMemo(() => [
     {
       accessorKey: 'vendorName',
@@ -364,6 +333,45 @@ export function TripDetailScreen() {
       enableSorting: false,
     },
   ], [vendorName]);
+
+  if (!can(PERMISSIONS.INVENTORY.VIEW)) {
+    return (
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+        <p className="text-sm text-[var(--ink-muted)]">You do not have permission to view this trip.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+        <div className="h-8 w-48 animate-pulse rounded bg-[var(--surface-sunken)]" />
+        <div className="h-20 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
+      </div>
+    );
+  }
+
+  if (error || !trip) {
+    return (
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/trips')}>&larr; All trips</Button>
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error || 'Trip not found'}</div>
+      </div>
+    );
+  }
+
+  const existingVendorUuids = new Set(tripVendors.map((tv) => tv.vendor?.uuid || tv.vendorUuid).filter(Boolean));
+  const availableVendors = vendors.filter((v) => v.isActive !== false && !existingVendorUuids.has(v.uuid));
+  const selectedVendor = availableVendors.find((v) => v.uuid === vendorForm.vendorUuid);
+  const vendorComboboxOptions = availableVendors.map((v) => ({
+    value: v.uuid,
+    label: v.name,
+    description: v.phone || undefined,
+  }));
+
+  const stocksByVendor = stockByVendorGroups;
+
+
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
