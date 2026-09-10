@@ -462,3 +462,42 @@ textarea,
 select {
   font-family: inherit;
 }
+
+/* =============================================================================
+   Scrollbar Styling (theme-aware, CSS-only, global)
+
+   WebKit/Blink (Chrome, Safari, Edge): ::-webkit-scrollbar pseudo-elements
+   Firefox: scrollbar-width and scrollbar-color properties
+   Applies to html, body, and all overflow containers (modals, grids, dropdowns)
+   ========================================================================== */
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* WebKit/Blink scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--ink-faint);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--border-strong);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
