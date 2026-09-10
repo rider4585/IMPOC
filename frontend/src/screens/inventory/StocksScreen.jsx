@@ -108,8 +108,8 @@ export function StocksScreen() {
           </div>
         );
       },
-      enableColumnFilter: false,
       enableSorting: false,
+      filter: { type: 'text' },
     },
     {
       accessorKey: 'vendorName',
@@ -126,7 +126,7 @@ export function StocksScreen() {
           </div>
         );
       },
-      enableColumnFilter: false,
+      filter: { type: 'text' },
     },
     {
       accessorKey: 'unitsScannedCount',
@@ -145,7 +145,7 @@ export function StocksScreen() {
           </span>
         );
       },
-      enableColumnFilter: false,
+      filter: { type: 'number' },
     },
     {
       accessorKey: 'buyingPricePaise',
@@ -166,8 +166,8 @@ export function StocksScreen() {
           </div>
         );
       },
-      enableColumnFilter: false,
       enableSorting: false,
+      filter: { type: 'number' },
     },
     {
       id: 'actions',
@@ -186,7 +186,6 @@ export function StocksScreen() {
           </div>
         );
       },
-      enableColumnFilter: false,
       enableSorting: false,
     },
   ], [navigate, tripByUuid, vendorByUuid, typeName, subTypeName]);

@@ -150,8 +150,8 @@ export function TripsScreen() {
           </Button>
         );
       },
-      enableColumnFilter: false,
       enableSorting: false,
+      filter: { type: 'text' },
     },
     {
       accessorKey: 'totalPaidPaise',
@@ -162,7 +162,7 @@ export function TripsScreen() {
           {formatPaise(Number(info.getValue()) || 0)}
         </span>
       ),
-      enableColumnFilter: false,
+      filter: { type: 'number' },
     },
     {
       accessorKey: 'variancePaise',
@@ -179,7 +179,7 @@ export function TripsScreen() {
           </span>
         );
       },
-      enableColumnFilter: false,
+      filter: { type: 'number' },
     },
     {
       id: 'actions',
@@ -196,7 +196,6 @@ export function TripsScreen() {
           </Button>
         </div>
       ),
-      enableColumnFilter: false,
       enableSorting: false,
     },
   ], [navigate, tripLabel]);

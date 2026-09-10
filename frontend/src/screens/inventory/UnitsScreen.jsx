@@ -132,8 +132,8 @@ export function UnitsScreen() {
           {info.getValue()}
         </span>
       ),
-      enableColumnFilter: false,
       enableSorting: false,
+      filter: { type: 'text' },
     },
     {
       accessorKey: 'status',
@@ -148,7 +148,6 @@ export function UnitsScreen() {
           </span>
         );
       },
-      enableColumnFilter: false,
     },
     {
       accessorKey: 'stockName',
@@ -167,8 +166,8 @@ export function UnitsScreen() {
           </div>
         );
       },
-      enableColumnFilter: false,
       enableSorting: false,
+      filter: { type: 'text' },
     },
     {
       accessorKey: 'buyingPricePaise',
@@ -179,8 +178,8 @@ export function UnitsScreen() {
           Buy {formatPaise(Number(info.getValue()))}
         </span>
       ),
-      enableColumnFilter: false,
       enableSorting: false,
+      filter: { type: 'number' },
     },
   ], []);
 
