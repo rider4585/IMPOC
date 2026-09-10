@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card,
   CardHeader,
@@ -7,14 +7,9 @@ import {
   Button,
   SearchableSelect,
   Dialog,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
   useToast,
 } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import {
@@ -168,6 +163,49 @@ export function RolesScreen() {
     (p) => !assignedPerms.some((a) => a.uuid === p.uuid)
   );
 
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      size: 200,
+      filter: { type: 'text' },
+    },
+    {
+      accessorKey: 'description',
+      header: 'Description',
+      size: 300,
+      filter: { type: 'text' },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      size: 200,
+      cell: (info) => {
+        const role = info.row.original;
+        return (
+          <div className="flex flex-wrap gap-2">
+            {canManage && (
+              <Button variant="outline" size="sm" onClick={() => openEdit(role)}>
+                Edit
+              </Button>
+            )}
+            {canManage && (
+              <Button variant="outline" size="sm" onClick={() => openPermsDialog(role)}>
+                Permissions
+              </Button>
+            )}
+            {canManage && (
+              <Button variant="danger" size="sm" onClick={() => requestDelete(role)}>
+                Delete
+              </Button>
+            )}
+          </div>
+        );
+      },
+      enableSorting: false,
+    },
+  ], [canManage]);
+
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -187,60 +225,16 @@ export function RolesScreen() {
       {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.ROLES.VIEW) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>All roles</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            {loading ? (
-              <p className="text-sm text-[var(--ink-muted)]">Loading roles…</p>
-            ) : (
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHeaderCell>Name</TableHeaderCell>
-                    <TableHeaderCell>Description</TableHeaderCell>
-                    <TableHeaderCell>Actions</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {roles.map((role) => (
-                    <TableRow key={role.uuid}>
-                      <TableCell>{role.name}</TableCell>
-                      <TableCell>{role.description || '—'}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {canManage && (
-                            <Button variant="outline" size="sm" onClick={() => openEdit(role)}>
-                              Edit
-                            </Button>
-                          )}
-                          {canManage && (
-                            <Button variant="outline" size="sm" onClick={() => openPermsDialog(role)}>
-                              Permissions
-                            </Button>
-                          )}
-                          {canManage && (
-                            <Button variant="danger" size="sm" onClick={() => requestDelete(role)}>
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {roles.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-sm text-[var(--ink-muted)]">
-                        No roles found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+          <DataGrid
+            data={roles}
+            columns={columns}
+            isLoading={loading}
+            isEmpty={roles.length === 0}
+            emptyMessage="No roles."
+            loadingMessage="Loading roles…"
+          />
+        </div>
       )}
 
       {formOpen && (

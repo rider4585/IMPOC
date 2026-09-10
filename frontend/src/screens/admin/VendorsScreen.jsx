@@ -7,15 +7,10 @@ import {
   Button,
   Input,
   Dialog,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeaderCell,
-  TableCell,
   Badge,
   useToast,
 } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import {
@@ -48,8 +43,6 @@ export function VendorsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [search, setSearch] = useState('');
-
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -76,13 +69,63 @@ export function VendorsScreen() {
     load();
   }, [load]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return vendors;
-    return vendors.filter((v) =>
-      [v.name, v.phone, v.address].filter(Boolean).some((f) => String(f).toLowerCase().includes(q))
-    );
-  }, [vendors, search]);
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      size: 200,
+      filter: { type: 'text' },
+    },
+    {
+      accessorKey: 'phone',
+      header: 'Phone',
+      size: 150,
+      filter: { type: 'text' },
+    },
+    {
+      accessorKey: 'address',
+      header: 'Address',
+      size: 250,
+      filter: { type: 'text' },
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Status',
+      size: 120,
+      cell: (info) => (
+        <Badge variant={info.getValue() ? 'success' : 'neutral'}>
+          {info.getValue() ? 'active' : 'inactive'}
+        </Badge>
+      ),
+      filter: { type: 'picklist', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      size: 180,
+      cell: (info) => {
+        const v = info.row.original;
+        return (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => openHistory(v)}>
+              History
+            </Button>
+            {canUpdate && (
+              <Button variant="outline" size="sm" onClick={() => { setEditing(v); setFormOpen(true); }}>
+                Edit
+              </Button>
+            )}
+            {canUpdate && (
+              <Button variant="ghost" size="sm" onClick={() => handleToggleActive(v)}>
+                {v.isActive ? 'Deactivate' : 'Activate'}
+              </Button>
+            )}
+          </div>
+        );
+      },
+      enableSorting: false,
+    },
+  ], [canUpdate]);
 
   const handleSave = async ({ name, phone, address, notes }) => {
     setSaving(true);
@@ -142,7 +185,7 @@ export function VendorsScreen() {
   };
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-6 overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="typography-heading mb-1">Vendors</h1>
@@ -160,76 +203,17 @@ export function VendorsScreen() {
       {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.INVENTORY.VIEW) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>All vendors</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="mb-4 max-w-[360px]">
-              <Input
-                type="search"
-                placeholder="Search by name, phone, address…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search vendors"
-              />
-            </div>
-
-            {loading ? (
-              <p className="text-sm text-[var(--ink-muted)]">Loading vendors…</p>
-            ) : (
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHeaderCell>Name</TableHeaderCell>
-                    <TableHeaderCell>Phone</TableHeaderCell>
-                    <TableHeaderCell>Address</TableHeaderCell>
-                    <TableHeaderCell>Status</TableHeaderCell>
-                    <TableHeaderCell>Actions</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filtered.map((v) => (
-                    <TableRow key={v.uuid}>
-                      <TableCell>{v.name}</TableCell>
-                      <TableCell>{v.phone || '—'}</TableCell>
-                      <TableCell>{v.address || '—'}</TableCell>
-                      <TableCell>
-                        <Badge variant={v.isActive ? 'success' : 'neutral'}>
-                          {v.isActive ? 'active' : 'inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          <Button variant="outline" size="sm" onClick={() => openHistory(v)}>
-                            History
-                          </Button>
-                          {canUpdate && (
-                            <Button variant="outline" size="sm" onClick={() => { setEditing(v); setFormOpen(true); }}>
-                              Edit
-                            </Button>
-                          )}
-                          {canUpdate && (
-                            <Button variant="ghost" size="sm" onClick={() => handleToggleActive(v)}>
-                              {v.isActive ? 'Deactivate' : 'Activate'}
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filtered.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-sm text-[var(--ink-muted)]">
-                        No vendors found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+          <DataGrid
+            data={vendors}
+            columns={columns}
+            isLoading={loading}
+            isEmpty={vendors.length === 0}
+            emptyMessage="No vendors."
+            loadingMessage="Loading vendors…"
+            getRowTestId={(v) => `vendor-row-${v.uuid}`}
+          />
+        </div>
       )}
 
       {formOpen && (
