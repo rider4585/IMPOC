@@ -6,7 +6,7 @@ import { ProductTypesManager } from './ProductTypesManager.jsx';
 import {
   FlatPicklistManager,
 } from './FlatPicklistManager.jsx';
-import { getColours, getSizes, getDamageGrades, getPaymentMethods, getCustomerSources, getExpenseTypes } from '../../services/picklistsApi.js';
+import { getColours, getSizes, getDamageGrades, getPaymentMethods, getCustomerSources, getExpenseTypes, getUpiAccounts } from '../../services/picklistsApi.js';
 import { DAMAGE_GRADE_OUTCOMES } from '../../constants/damageGrades.js';
 
 const TABS = [
@@ -17,6 +17,7 @@ const TABS = [
   { key: 'payment-methods', label: 'Payment methods' },
   { key: 'customer-sources', label: 'Customer sources' },
   { key: 'expense-types', label: 'Expense types' },
+  { key: 'upi-accounts', label: 'UPI accounts' },
 ];
 
 const COLOUR_COLUMNS = [{ key: 'name', label: 'Name' }];
@@ -47,6 +48,15 @@ const CUSTOMER_SOURCE_FIELDS = [{ key: 'name', label: 'Name', required: true }];
 
 const EXPENSE_TYPE_COLUMNS = [{ key: 'name', label: 'Name' }];
 const EXPENSE_TYPE_FIELDS = [{ key: 'name', label: 'Name', required: true }];
+
+const UPI_ACCOUNT_COLUMNS = [
+  { key: 'label', label: 'Label' },
+  { key: 'vpa', label: 'UPI ID (VPA)' },
+];
+const UPI_ACCOUNT_FIELDS = [
+  { key: 'label', label: 'Label', required: true },
+  { key: 'vpa', label: 'UPI ID (VPA), e.g. shree@okhdfcbank', required: true },
+];
 
 export function PicklistManagementScreen() {
   const { permissions } = useAuth();
@@ -141,6 +151,15 @@ export function PicklistManagementScreen() {
           source={getExpenseTypes}
           columns={EXPENSE_TYPE_COLUMNS}
           fields={EXPENSE_TYPE_FIELDS}
+        />
+      )}
+      {active === 'upi-accounts' && (
+        <FlatPicklistManager
+          resource="upiAccounts"
+          singular="UPI account"
+          source={getUpiAccounts}
+          columns={UPI_ACCOUNT_COLUMNS}
+          fields={UPI_ACCOUNT_FIELDS}
         />
       )}
       </div>

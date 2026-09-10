@@ -51,6 +51,8 @@ const SAFE_4XX_MESSAGES = Object.freeze([
     'Vendor already added to this trip',
     'Payment method already exists',
     'Customer source already exists',
+    'UPI account already exists',
+    'UPI account not found',
     'Sub type must belong to a parent product type',
     'Sub type not found',
     'Product type not found',

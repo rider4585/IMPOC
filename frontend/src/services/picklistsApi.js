@@ -16,6 +16,7 @@ const RESOURCE_BASE = {
   paymentMethods: '/picklists/payment-methods',
   customerSources: '/picklists/customer-sources',
   expenseTypes: '/picklists/expense-types',
+  upiAccounts: '/picklists/upi-accounts',
 };
 
 /**
@@ -159,9 +160,21 @@ export async function getExpenseTypes() {
   }
 }
 
+export async function getUpiAccounts() {
+  try {
+    const response = await apiClient.get(RESOURCE_BASE.upiAccounts);
+    if (response.data?.success && response.data?.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to fetch UPI accounts');
+  } catch (error) {
+    throw buildError(error, 'Failed to fetch UPI accounts');
+  }
+}
+
 /**
  * Generic create for flat picklists.
- * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'} resource
+ * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'|'upiAccounts'} resource
  * @param {Object} payload
  */
 export async function createPicklistItem(resource, payload) {
