@@ -9,18 +9,7 @@ import {
   TRIP_ROUTES,
   STOCK_ROUTES,
 } from '../platform/routes.js';
-
-function buildError(error, fallback) {
-  if (error.response?.data?.message) {
-    const err = new Error(error.response.data.message);
-    err.statusCode = error.response.status;
-    err.errors = error.response.data.errors;
-    return err;
-  }
-  const err = new Error(error?.message || fallback);
-  err.statusCode = error?.statusCode;
-  return err;
-}
+import buildError from '../platform/buildError.js';
 
 /**
  * GET /trips
@@ -224,12 +213,6 @@ export async function scanBarcodeIntoStock(tripUuid, stockUuid, { barcode, colou
     }
     throw new Error(response.data?.message || 'Scan failed');
   } catch (error) {
-    if (error.response?.data?.message) {
-      const err = new Error(error.response.data.message);
-      err.statusCode = error.response.status;
-      err.errors = error.response.data.errors;
-      throw err;
-    }
-    throw error;
+    throw buildError(error, 'Scan failed');
   }
 }
