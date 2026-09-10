@@ -52,7 +52,6 @@ function mapSaleDTO(sale, lines = [], reversals = []) {
         saleNumber: sale.saleNumber,
         customerName: sale.customerName,
         customerMobile: sale.customerMobile,
-        customerId: sale.customerId,
         customer,
         soldAt: sale.soldAt,
         paymentMethod: sale.paymentMethod || null,

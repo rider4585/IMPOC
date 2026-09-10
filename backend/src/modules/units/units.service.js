@@ -11,6 +11,7 @@ import {
     Sequelize,
 } from '../../../database/models/index.js';
 import { CHANNEL } from '../../constants/channel.js';
+import { escapeLike } from '../../utils/escapeLike.js';
 
 /**
  * List ALL units across stocks (bare GET /api/units endpoint).
@@ -21,7 +22,9 @@ export const listAllUnits = async ({ search, status, stockUuid } = {}) => {
     const where = {};
 
     if (search) {
-        where.barcode = { [Sequelize.Op.like]: `%${search}%` };
+        // SEC-L-5: escape LIKE wildcards so a literal "%" / "_" barcode search
+        // is matched literally instead of acting as a wildcard.
+        where.barcode = { [Sequelize.Op.like]: `%${escapeLike(search)}%` };
     }
 
     if (status) {

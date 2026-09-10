@@ -1,6 +1,7 @@
 export const PERMISSIONS = Object.freeze({
     USERS: {
         VIEW: 'users.view',
+        VIEW_PII: 'users.view_pii',
         CREATE: 'users.create',
         UPDATE: 'users.update',
         DELETE: 'users.delete',

@@ -167,6 +167,7 @@ export async function seedTestData() {
     { name: 'users.create', description: 'Create users' },
     { name: 'users.update', description: 'Update users' },
     { name: 'users.delete', description: 'Delete users' },
+    { name: 'users.view_pii', description: 'View staff contact details (privileged read scope)' },
     // Inventory permissions
     { name: 'inventory.view', description: 'View inventory' },
     { name: 'inventory.create', description: 'Create inventory items' },

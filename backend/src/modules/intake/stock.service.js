@@ -2,6 +2,7 @@ import { Stock, Trip, TripVendor, Vendor, ProductType, Unit, Colour, Size, seque
 import { Sequelize } from 'sequelize';
 import { userHasPermission } from '../auth/permission.service.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
+import { escapeLike } from '../../utils/escapeLike.js';
 
 const STOCK_INCLUDES = [
     {
@@ -673,7 +674,9 @@ export const listAllStocks = async ({ tripUuid, vendorUuid, search } = {}) => {
     }
 
     if (search) {
-        const like = `%${search}%`;
+        // SEC-L-5: escape LIKE wildcards so a literal "%" / "_" search term is
+        // matched literally instead of acting as a wildcard.
+        const like = `%${escapeLike(search)}%`;
         where[Sequelize.Op.or] = [
             { '$productType.name$': { [Sequelize.Op.like]: like } },
             { '$subType.name$': { [Sequelize.Op.like]: like } },
