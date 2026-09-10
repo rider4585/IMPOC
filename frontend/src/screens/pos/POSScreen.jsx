@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Card,
   CardHeader,
@@ -16,14 +16,19 @@ import { PERMISSIONS } from '../../constants/permissions.js';
 import { getUnitByBarcode } from '../../services/unitsApi.js';
 import { createSale } from '../../services/salesApi.js';
 import { createRental } from '../../services/rentalsApi.js';
-import { getPaymentMethods, getCustomerSources } from '../../services/picklistsApi.js';
+import { getPaymentMethods, getCustomerSources, getUpiAccounts } from '../../services/picklistsApi.js';
+import { publishPosDisplayState } from '../../services/posDisplayApi.js';
 import BarcodeScanner from '../../components/BarcodeScanner.jsx';
 import { formatPaise } from '../../platform/money.js';
 import { formatPaiseForInput, parseRupeesToPaise } from '../../platform/moneyInput.js';
 import { createRequestKey } from '../../platform/requestKey.js';
+import { buildUpiUri } from '../../platform/upi.js';
+import { getOrCreateDisplayCode } from '../../platform/posDisplayCode.js';
 import { CustomerPicker } from '../../components/customers/CustomerPicker.jsx';
 import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
 import { SaleReceipt } from './SaleReceipt.jsx';
+import { PaymentDialog } from './PaymentDialog.jsx';
+import { SHOP_NAME } from '../../components/ShopLogo.jsx';
 
 function todayISO() {
   const d = new Date();
@@ -40,6 +45,10 @@ function itemDetail(item) {
   const bits = [item.colourName, item.sizeName].filter(Boolean);
   return bits.length > 0 ? bits.join(' · ') : null;
 }
+
+// R-35: how long the Payment dialog's "Thank you" confirmation shows before
+// the existing SaleReceipt is revealed.
+const THANK_YOU_DELAY_MS = 450;
 
 /**
  * SalePriceInput (R-30) — inline money editor for a cart line. Editing the
@@ -123,6 +132,12 @@ export function POSScreen() {
   const [customerSource, setCustomerSource] = useState('');
   const [picklistsError, setPicklistsError] = useState('');
 
+  const [upiAccounts, setUpiAccounts] = useState([]);
+  const [selectedUpiAccountUuid, setSelectedUpiAccountUuid] = useState('');
+
+  // R-35: display code is stable per terminal (persisted in localStorage).
+  const [displayCode] = useState(() => getOrCreateDisplayCode());
+
   useEffect(() => {
     let cancelled = false;
     setPicklistsError('');
@@ -145,6 +160,14 @@ export function POSScreen() {
       .catch((err) => {
         if (!cancelled) setPicklistsError(err.message || 'Failed to load customer sources.');
       });
+    getUpiAccounts()
+      .then((accounts) => {
+        if (cancelled) return;
+        setUpiAccounts(accounts);
+      })
+      .catch((err) => {
+        if (!cancelled) setPicklistsError(err.message || 'Failed to load UPI accounts.');
+      });
     return () => {
       cancelled = true;
     };
@@ -165,7 +188,18 @@ export function POSScreen() {
     getCustomerSources()
       .then((sources) => setCustomerSources(sources))
       .catch((err) => setPicklistsError(err.message || 'Failed to load customer sources.'));
+    getUpiAccounts()
+      .then((accounts) => setUpiAccounts(accounts))
+      .catch((err) => setPicklistsError(err.message || 'Failed to load UPI accounts.'));
   }, [paymentMethod]);
+
+  // Default the UPI account selector to the first active account once loaded.
+  useEffect(() => {
+    if (upiAccounts.length > 0 && !upiAccounts.some((a) => a.uuid === selectedUpiAccountUuid)) {
+      setSelectedUpiAccountUuid(upiAccounts[0].uuid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upiAccounts]);
 
   const [barcode, setBarcode] = useState('');
   const [cart, setCart] = useState([]);
@@ -183,6 +217,15 @@ export function POSScreen() {
   const [rentalDays, setRentalDays] = useState('3');
   const [rentalNotes, setRentalNotes] = useState('');
 
+  // R-35: two-step payment confirmation (sale mode only).
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [paymentStep, setPaymentStep] = useState('confirm'); // 'confirm' | 'thankyou'
+  const thankYouTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    if (thankYouTimerRef.current) clearTimeout(thankYouTimerRef.current);
+  }, []);
+
   // SEC-M-3 idempotency: one key per checkout intent, reused across retries of the same
   // intent (fresh key once the checkout succeeds or the cart is cleared).
   const checkoutKeyRef = useRef(null);
@@ -193,6 +236,51 @@ export function POSScreen() {
     }
     return cart.reduce((sum, item) => sum + item.rentPerDayPaise * Number(rentalDays || 0), 0);
   }, [cart, mode, rentalDays]);
+
+  // R-35: fire-and-forget publish to the customer-facing display channel — a
+  // display update must never block or fail the actual checkout.
+  const publishDisplay = useCallback(
+    (state) => {
+      publishPosDisplayState(displayCode, state).catch(() => {});
+    },
+    [displayCode]
+  );
+
+  const selectedUpiAccount = useMemo(
+    () => upiAccounts.find((a) => a.uuid === selectedUpiAccountUuid) || upiAccounts[0] || null,
+    [upiAccounts, selectedUpiAccountUuid]
+  );
+
+  const upiUri = useMemo(() => {
+    if (paymentMethod !== 'UPI' || !selectedUpiAccount || !checkoutKeyRef.current) return null;
+    return buildUpiUri({
+      vpa: selectedUpiAccount.vpa,
+      payee: SHOP_NAME,
+      amountRupees: totalPaise / 100,
+      note: `${SHOP_NAME} sale`,
+      txnRef: checkoutKeyRef.current,
+    });
+    // paymentDialogOpen forces a recompute once the idempotency key is minted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMethod, selectedUpiAccount, totalPaise, paymentDialogOpen]);
+
+  const displayUrl = useMemo(
+    () => `${window.location.origin}/display/${displayCode}`,
+    [displayCode]
+  );
+
+  // Mirror the payment step to the customer-facing display whenever the
+  // dialog is open in the confirm step (an amount/method/QR change re-publishes).
+  useEffect(() => {
+    if (!paymentDialogOpen || paymentStep !== 'confirm') return;
+    if (paymentMethod === 'UPI' && !upiUri) return;
+    publishDisplay({
+      status: 'awaiting',
+      method: paymentMethod === 'UPI' ? 'UPI' : 'Cash',
+      amountPaise: totalPaise,
+      upiUri: paymentMethod === 'UPI' ? upiUri : undefined,
+    });
+  }, [paymentDialogOpen, paymentStep, paymentMethod, totalPaise, upiUri, publishDisplay]);
 
   const addByBarcode = useCallback(
     async (value) => {
@@ -289,9 +377,19 @@ export function POSScreen() {
     );
   };
 
+  const resetPaymentMethodToDefault = (methods) => {
+    if (methods.length > 0 && !methods.some((m) => m.name === 'Cash')) {
+      setPaymentMethod(methods[0].name);
+    } else {
+      setPaymentMethod('Cash');
+    }
+  };
+
   const clearCart = () => {
     if (confirmClearTimerRef.current) clearTimeout(confirmClearTimerRef.current);
     confirmClearTimerRef.current = null;
+    if (thankYouTimerRef.current) clearTimeout(thankYouTimerRef.current);
+    thankYouTimerRef.current = null;
     setConfirmClear(false);
     setCart([]);
     setCustomer(null);
@@ -303,11 +401,10 @@ export function POSScreen() {
     setRentalNotes('');
     setCustomerSource('');
     checkoutKeyRef.current = null;
-    if (paymentMethods.length > 0 && !paymentMethods.some((m) => m.name === 'Cash')) {
-      setPaymentMethod(paymentMethods[0].name);
-    } else {
-      setPaymentMethod('Cash');
-    }
+    setPaymentDialogOpen(false);
+    setPaymentStep('confirm');
+    publishDisplay({ status: 'idle' });
+    resetPaymentMethodToDefault(paymentMethods);
   };
 
   // UX-M5: destructive Clear needs a lightweight 3s re-tap confirm.
@@ -325,6 +422,89 @@ export function POSScreen() {
     clearCart();
   };
 
+  /**
+   * R-35: Checkout (sale mode) opens the Payment dialog instead of creating
+   * the sale immediately. The sale is created only in handleMarkReceived.
+   */
+  const openPayment = () => {
+    if (cart.length === 0) return;
+    const belowFloor = cart.find((item) => item.sellingPricePaise < item.floorPricePaise);
+    if (belowFloor) {
+      toast.error({
+        title: 'Price below floor',
+        description: `Price cannot be below floor price for ${belowFloor.barcode}.`,
+      });
+      return;
+    }
+    if (paymentMethod === 'UPI' && upiAccounts.length === 0) {
+      toast.error({
+        title: 'No UPI account',
+        description: 'Add a UPI account in Picklists to accept UPI.',
+      });
+      return;
+    }
+    if (!checkoutKeyRef.current) {
+      checkoutKeyRef.current = createRequestKey();
+    }
+    setPaymentStep('confirm');
+    setPaymentDialogOpen(true);
+  };
+
+  const handleCancelPayment = () => {
+    setPaymentDialogOpen(false);
+    setPaymentStep('confirm');
+    publishDisplay({ status: 'idle' });
+    // checkoutKeyRef intentionally kept (SEC-M-3): re-opening reuses the same intent.
+  };
+
+  /**
+   * R-35: Mark received — creates the sale (moved from the old handleCheckout),
+   * then shows a brief Thank you step before revealing the existing SaleReceipt.
+   */
+  const handleMarkReceived = async () => {
+    setCheckingOut(true);
+    try {
+      const customerPayload = {
+        customerName: customer?.name || undefined,
+        customerUuid: customer?.uuid,
+        paymentMethod: paymentMethod || undefined,
+        customerSource: customerSource || undefined,
+      };
+      const sale = await createSale({
+        ...customerPayload,
+        requestUuid: checkoutKeyRef.current,
+        items: cart.map((item) => ({
+          unitUuid: item.uuid,
+          sellingPricePaise: item.sellingPricePaise,
+        })),
+      });
+
+      publishDisplay({ status: 'received' });
+      setPaymentStep('thankyou');
+      toast.success({ title: 'Checkout complete' });
+
+      thankYouTimerRef.current = setTimeout(() => {
+        setReceipt(sale);
+        setPaymentDialogOpen(false);
+        setPaymentStep('confirm');
+        setCart([]);
+        setCustomer(null);
+        setBarcode('');
+        setCustomerSource('');
+        checkoutKeyRef.current = null;
+        resetPaymentMethodToDefault(paymentMethods);
+      }, THANK_YOU_DELAY_MS);
+    } catch (err) {
+      toast.error({ title: 'Checkout failed', description: err.message });
+    } finally {
+      setCheckingOut(false);
+    }
+  };
+
+  /**
+   * Rental checkout — unchanged by R-35 (rental mode keeps the single-step
+   * "Check out rental" flow).
+   */
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     setCheckingOut(true);
@@ -338,44 +518,21 @@ export function POSScreen() {
         paymentMethod: paymentMethod || undefined,
         customerSource: customerSource || undefined,
       };
-      if (mode === 'sale') {
-        const belowFloor = cart.find(
-          (item) => item.sellingPricePaise < item.floorPricePaise
-        );
-        if (belowFloor) {
-          toast.error({
-            title: 'Price below floor',
-            description: `Price cannot be below floor price for ${belowFloor.barcode}.`,
-          });
-          setCheckingOut(false);
-          return;
-        }
-        const sale = await createSale({
-          ...customerPayload,
-          requestUuid: checkoutKeyRef.current,
-          items: cart.map((item) => ({
-            unitUuid: item.uuid,
-            sellingPricePaise: item.sellingPricePaise,
-          })),
-        });
-        setReceipt(sale);
-      } else {
-        const days = Number(rentalDays);
-        if (!Number.isInteger(days) || days <= 0) {
-          toast.error({ title: 'Invalid days', description: 'Rental days must be a positive number.' });
-          setCheckingOut(false);
-          return;
-        }
-        const agreement = await createRental({
-          ...customerPayload,
-          requestUuid: checkoutKeyRef.current,
-          startDate: startDate || undefined,
-          rentalDays: days,
-          notes: rentalNotes.trim() || undefined,
-          items: cart.map((item) => ({ unitUuid: item.uuid })),
-        });
-        setReceipt(agreement);
+      const days = Number(rentalDays);
+      if (!Number.isInteger(days) || days <= 0) {
+        toast.error({ title: 'Invalid days', description: 'Rental days must be a positive number.' });
+        setCheckingOut(false);
+        return;
       }
+      const agreement = await createRental({
+        ...customerPayload,
+        requestUuid: checkoutKeyRef.current,
+        startDate: startDate || undefined,
+        rentalDays: days,
+        notes: rentalNotes.trim() || undefined,
+        items: cart.map((item) => ({ unitUuid: item.uuid })),
+      });
+      setReceipt(agreement);
       setCart([]);
       setCustomer(null);
       setBarcode('');
@@ -384,11 +541,7 @@ export function POSScreen() {
       setRentalNotes('');
       setCustomerSource('');
       checkoutKeyRef.current = null;
-      if (paymentMethods.length > 0 && !paymentMethods.some((m) => m.name === 'Cash')) {
-        setPaymentMethod(paymentMethods[0].name);
-      } else {
-        setPaymentMethod('Cash');
-      }
+      resetPaymentMethodToDefault(paymentMethods);
       toast.success({ title: 'Checkout complete' });
     } catch (err) {
       toast.error({ title: 'Checkout failed', description: err.message });
@@ -698,19 +851,37 @@ export function POSScreen() {
                 {confirmClear ? 'Confirm clear?' : 'Clear'}
               </Button>
               <Button
-                onClick={handleCheckout}
-                loading={checkingOut}
+                onClick={mode === 'sale' ? openPayment : handleCheckout}
+                loading={mode === 'rental' && checkingOut}
                 disabled={cart.length === 0}
                 data-testid="pos-checkout"
               >
                 {mode === 'sale'
-                  ? (canCheckoutSale ? 'Charge' : 'No permission')
+                  ? (canCheckoutSale ? 'Checkout' : 'No permission')
                   : (canCheckoutRental ? 'Check out rental' : 'No permission')}
               </Button>
             </CardFooter>
           </Card>
         </div>
       </div>
+
+      {mode === 'sale' && (
+        <PaymentDialog
+          open={paymentDialogOpen}
+          step={paymentStep}
+          paymentMethod={paymentMethod}
+          totalPaise={totalPaise}
+          upiAccounts={upiAccounts}
+          selectedUpiAccountUuid={selectedUpiAccount?.uuid || ''}
+          onSelectUpiAccount={setSelectedUpiAccountUuid}
+          upiUri={upiUri}
+          confirming={checkingOut}
+          onMarkReceived={handleMarkReceived}
+          onCancel={handleCancelPayment}
+          displayCode={displayCode}
+          displayUrl={displayUrl}
+        />
+      )}
     </div>
   );
 }

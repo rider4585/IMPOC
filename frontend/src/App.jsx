@@ -14,6 +14,7 @@ import TemplateForm from './screens/inventory/TemplateForm';
 import VendorDetail from './screens/inventory/VendorDetail';
 import StocksScreen from './screens/inventory/StocksScreen';
 import UnitsScreen from './screens/inventory/UnitsScreen';
+import PosDisplayScreen from './screens/display/PosDisplayScreen';
 
 /**
  * App.jsx — top-level router and auth setup
@@ -21,9 +22,12 @@ import UnitsScreen from './screens/inventory/UnitsScreen';
  * Structure:
  * Router (react-router-dom)
  *   └─ AuthProvider (auth state: accessToken, currentUser, permissions, status)
- *       └─ RouteGuard (blocks unauthenticated access)
- *           └─ AppShell (navigation chrome + sign-out)
- *               └─ Routes (permission-gated screens)
+ *       └─ Routes
+ *           ├─ /display, /display/:code (R-35: PUBLIC, no auth, no nav chrome —
+ *           |   the customer-facing display on a separate device)
+ *           └─ /* → RouteGuard (blocks unauthenticated access)
+ *                     └─ AppShell (navigation chrome + sign-out)
+ *                         └─ Routes (permission-gated screens)
  *
  * Patch 11: Verify all navigationRegistry entries have corresponding Route elements
  * Patch 19: Add loading state indicator during route transitions
@@ -84,51 +88,67 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <RouteGuard>
-          <AppShell>
-            <Suspense fallback={<RouteLoadingFallback />}>
-              <Routes>
-                {/* Dynamically render routes from navigation registry */}
-                {validEntries.map((entry) => {
-                  // Ensure element is a valid React component
-                  const Element = entry.element;
-                  return (
-                    <Route
-                      key={entry.path}
-                      path={entry.path}
-                      element={<Element />}
-                    />
-                  );
-                })}
+        <Routes>
+          {/*
+            R-35: the customer-facing POS display is a PUBLIC, full-screen
+            page on a separate device — it must render outside RouteGuard
+            (no auth) and AppShell (no nav chrome). Every other path falls
+            through to the guarded app below.
+          */}
+          <Route path="/display" element={<PosDisplayScreen />} />
+          <Route path="/display/:code" element={<PosDisplayScreen />} />
 
-                {/* Nested inventory routes */}
-                <Route path="/trips/:tripUuid" element={<TripDetailScreen />} />
-                <Route path="/trips/:tripUuid/stocks/new" element={<StockForm />} />
-                <Route path="/trips/:tripUuid/stocks/:stockUuid/scan" element={<StockIntake />} />
-                <Route path="/trips/:tripUuid/templates" element={<TemplateForm />} />
-                <Route path="/stocks" element={<StocksScreen />} />
-                <Route path="/units" element={<UnitsScreen />} />
+          <Route
+            path="/*"
+            element={
+              <RouteGuard>
+                <AppShell>
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <Routes>
+                      {/* Dynamically render routes from navigation registry */}
+                      {validEntries.map((entry) => {
+                        // Ensure element is a valid React component
+                        const Element = entry.element;
+                        return (
+                          <Route
+                            key={entry.path}
+                            path={entry.path}
+                            element={<Element />}
+                          />
+                        );
+                      })}
 
-                {/* Nested vendor detail route */}
-                <Route path="/vendors/:uuid" element={<VendorDetail />} />
+                      {/* Nested inventory routes */}
+                      <Route path="/trips/:tripUuid" element={<TripDetailScreen />} />
+                      <Route path="/trips/:tripUuid/stocks/new" element={<StockForm />} />
+                      <Route path="/trips/:tripUuid/stocks/:stockUuid/scan" element={<StockIntake />} />
+                      <Route path="/trips/:tripUuid/templates" element={<TemplateForm />} />
+                      <Route path="/stocks" element={<StocksScreen />} />
+                      <Route path="/units" element={<UnitsScreen />} />
 
-                {/* UX-C1: post-login landing — redirect `/` to the first permitted screen */}
-                <Route path="/" element={<LandingRedirect />} />
+                      {/* Nested vendor detail route */}
+                      <Route path="/vendors/:uuid" element={<VendorDetail />} />
 
-                {/* Fallback: if user has no accessible routes, show "nothing here yet" */}
-                <Route
-                  path="*"
-                  element={
-                    <div className="p-10 text-center">
-                      <h2>Nothing here yet</h2>
-                      <p>You don't have access to any screens in this version of the app.</p>
-                    </div>
-                  }
-                />
-              </Routes>
-            </Suspense>
-          </AppShell>
-        </RouteGuard>
+                      {/* UX-C1: post-login landing — redirect `/` to the first permitted screen */}
+                      <Route path="/" element={<LandingRedirect />} />
+
+                      {/* Fallback: if user has no accessible routes, show "nothing here yet" */}
+                      <Route
+                        path="*"
+                        element={
+                          <div className="p-10 text-center">
+                            <h2>Nothing here yet</h2>
+                            <p>You don't have access to any screens in this version of the app.</p>
+                          </div>
+                        }
+                      />
+                    </Routes>
+                  </Suspense>
+                </AppShell>
+              </RouteGuard>
+            }
+          />
+        </Routes>
       </AuthProvider>
     </Router>
   );

@@ -63,6 +63,15 @@ function getBaseURL() {
 }
 
 /**
+ * Public accessor for the resolved API base URL — used by callers that build
+ * a URL outside axios (e.g. an EventSource for the public POS-display stream,
+ * which needs no auth so it never goes through apiClient itself).
+ */
+export function getApiBaseUrl() {
+  return getBaseURL();
+}
+
+/**
  * Create and export the configured axios instance.
  */
 const apiClient = axios.create({

@@ -9,6 +9,7 @@ import * as salesService from '../../services/salesApi.js';
 import * as tripsService from '../../services/tripsApi.js';
 import * as vendorsService from '../../services/vendorsApi.js';
 import * as customersApi from '../../services/customersApi.js';
+import * as posDisplayService from '../../services/posDisplayApi.js';
 
 vi.mock('../../auth/useAuth.js');
 vi.mock('../../services/unitsApi.js');
@@ -32,6 +33,13 @@ vi.mock('../../services/picklistsApi.js', () => ({
     { uuid: 'cs-2', name: 'WhatsApp group', isActive: true },
     { uuid: 'cs-3', name: 'Pamphlet', isActive: true },
   ]),
+  getUpiAccounts: vi.fn().mockResolvedValue([
+    { uuid: 'upi-1', label: 'Shop UPI', vpa: 'shop@okbank', isActive: true },
+  ]),
+}));
+
+vi.mock('../../services/posDisplayApi.js', () => ({
+  publishPosDisplayState: vi.fn().mockResolvedValue({ status: 'idle' }),
 }));
 
 vi.mock('../../components/BarcodeScanner.jsx', () => ({
@@ -56,6 +64,20 @@ const FULL = {
 
 function renderWithToast(ui) {
   return render(<ToastProvider>{ui}</ToastProvider>);
+}
+
+// R-35: Checkout now opens a Payment dialog; the sale is created only when
+// "Mark received" is clicked, then a brief "Thank you" step reveals the
+// existing receipt.
+async function checkoutViaPaymentDialog() {
+  fireEvent.click(screen.getByTestId('pos-checkout'));
+  await waitFor(() => {
+    expect(screen.getByTestId('payment-mark-received')).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByTestId('payment-mark-received'));
+  await waitFor(() => {
+    expect(screen.getByTestId('payment-thankyou')).toBeInTheDocument();
+  });
 }
 
 describe('POSScreen (T-09)', () => {
@@ -153,19 +175,22 @@ describe('POSScreen (T-09)', () => {
     fireEvent.change(input, { target: { value: 'B-100' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId('pos-checkout'));
-    await waitFor(() => {
-      expect(salesService.createSale).toHaveBeenCalledWith(
-        expect.objectContaining({
-          customerName: undefined,
-          customerUuid: undefined,
-          paymentMethod: 'Cash',
-          items: [{ unitUuid: 'u1', sellingPricePaise: 25000 }],
-          requestUuid: expect.stringMatching(UUID_V4_REGEX),
-        })
-      );
-      expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
-    });
+    await checkoutViaPaymentDialog();
+    expect(salesService.createSale).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerName: undefined,
+        customerUuid: undefined,
+        paymentMethod: 'Cash',
+        items: [{ unitUuid: 'u1', sellingPricePaise: 25000 }],
+        requestUuid: expect.stringMatching(UUID_V4_REGEX),
+      })
+    );
+    await waitFor(
+      () => {
+        expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
   });
 
   it('does not crash when CustomerPicker search returns results', async () => {
@@ -213,19 +238,22 @@ describe('POSScreen (T-09)', () => {
     fireEvent.change(pickerInput, { target: { value: 'Priya' } });
     fireEvent.click(await screen.findByRole('button', { name: /priya sharma/i }));
 
-    fireEvent.click(screen.getByTestId('pos-checkout'));
-    await waitFor(() => {
-      expect(salesService.createSale).toHaveBeenCalledWith(
-        expect.objectContaining({
-          customerName: 'Priya Sharma',
-          customerUuid: 'cust-1',
-          paymentMethod: 'Cash',
-          items: [{ unitUuid: 'u1', sellingPricePaise: 25000 }],
-          requestUuid: expect.stringMatching(UUID_V4_REGEX),
-        })
-      );
-      expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
-    });
+    await checkoutViaPaymentDialog();
+    expect(salesService.createSale).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerName: 'Priya Sharma',
+        customerUuid: 'cust-1',
+        paymentMethod: 'Cash',
+        items: [{ unitUuid: 'u1', sellingPricePaise: 25000 }],
+        requestUuid: expect.stringMatching(UUID_V4_REGEX),
+      })
+    );
+    await waitFor(
+      () => {
+        expect(screen.getByRole('heading', { name: /Receipt — SALE-001/ })).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
   });
 
   it('edits a cart line selling price and sends the edited amount (R-30)', async () => {
@@ -260,14 +288,12 @@ describe('POSScreen (T-09)', () => {
       expect(screen.getByTestId('pos-total').textContent).toBe('₹300.00');
     });
 
-    fireEvent.click(screen.getByTestId('pos-checkout'));
-    await waitFor(() => {
-      expect(salesService.createSale).toHaveBeenCalledWith(
-        expect.objectContaining({
-          items: [{ unitUuid: 'u1', sellingPricePaise: 30000 }],
-        })
-      );
-    });
+    await checkoutViaPaymentDialog();
+    expect(salesService.createSale).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: [{ unitUuid: 'u1', sellingPricePaise: 30000 }],
+      })
+    );
   });
 
   it('refuses a selling price below the floor price at checkout (R-30)', async () => {
@@ -357,19 +383,135 @@ describe('POS scanner feature', () => {
     fireEvent.click(screen.getByTestId('pos-customer-source'));
     fireEvent.click(await screen.findByRole('option', { name: /instagram/i }));
 
+    await checkoutViaPaymentDialog();
+    expect(salesService.createSale).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerName: undefined,
+        customerUuid: undefined,
+        paymentMethod: 'Cash',
+        customerSource: 'Instagram',
+        items: [{ unitUuid: 'u1', sellingPricePaise: 25000 }],
+        requestUuid: expect.stringMatching(UUID_V4_REGEX),
+      })
+    );
+  });
+});
+
+describe('POS display channel (R-35)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authModule.useAuth.mockReturnValue({ permissions: [FULL.SALES.CREATE, FULL.SALES.VIEW] });
+  });
+
+  it('publishes an awaiting/UPI state with amount + upiUri when opening the payment dialog', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+    });
+    renderWithToast(<POSScreen />);
+    const input = screen.getByLabelText(/barcode/);
+    fireEvent.change(input, { target: { value: 'B-100' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('pos-payment-method'));
+    fireEvent.click(await screen.findByRole('option', { name: /^upi$/i }));
+
     fireEvent.click(screen.getByTestId('pos-checkout'));
     await waitFor(() => {
-      expect(salesService.createSale).toHaveBeenCalledWith(
+      expect(posDisplayService.publishPosDisplayState).toHaveBeenCalledWith(
+        expect.any(String),
         expect.objectContaining({
-          customerName: undefined,
-          customerUuid: undefined,
-          paymentMethod: 'Cash',
-          customerSource: 'Instagram',
-          items: [{ unitUuid: 'u1', sellingPricePaise: 25000 }],
-          requestUuid: expect.stringMatching(UUID_V4_REGEX),
+          status: 'awaiting',
+          method: 'UPI',
+          amountPaise: 25000,
+          upiUri: expect.stringContaining('upi://pay?pa=shop%40okbank'),
         })
       );
     });
+  });
+
+  it('publishes an awaiting/Cash state (no upiUri) when opening the payment dialog with Cash', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+    });
+    renderWithToast(<POSScreen />);
+    const input = screen.getByLabelText(/barcode/);
+    fireEvent.change(input, { target: { value: 'B-100' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('pos-checkout'));
+    await waitFor(() => {
+      expect(posDisplayService.publishPosDisplayState).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ status: 'awaiting', method: 'Cash', amountPaise: 25000 })
+      );
+    });
+  });
+
+  it('publishes a received state on Mark received', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+    });
+    salesService.createSale.mockResolvedValue({
+      uuid: 's1',
+      saleNumber: 'SALE-001',
+      soldAt: '2026-01-01T00:00:00.000Z',
+      totalPaise: '25000',
+      status: 'completed',
+      lines: [{ uuid: 'l1', barcode: 'B-100', sellingPricePaise: '25000', unitStatus: 'sold' }],
+      reversals: [],
+    });
+    renderWithToast(<POSScreen />);
+    const input = screen.getByLabelText(/barcode/);
+    fireEvent.change(input, { target: { value: 'B-100' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
+
+    await checkoutViaPaymentDialog();
+    expect(posDisplayService.publishPosDisplayState).toHaveBeenCalledWith(
+      expect.any(String),
+      { status: 'received' }
+    );
+  });
+
+  it('publishes an idle state on Cancel', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+    });
+    renderWithToast(<POSScreen />);
+    const input = screen.getByLabelText(/barcode/);
+    fireEvent.change(input, { target: { value: 'B-100' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('pos-checkout'));
+    await waitFor(() => expect(screen.getByTestId('payment-mark-received')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => {
+      expect(posDisplayService.publishPosDisplayState).toHaveBeenCalledWith(
+        expect.any(String),
+        { status: 'idle' }
+      );
+    });
+    expect(salesService.createSale).not.toHaveBeenCalled();
   });
 });
 

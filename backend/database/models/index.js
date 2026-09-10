@@ -41,6 +41,7 @@ import DamageGradeModel from './DamageGrade.js';
 import PaymentMethodModel from './PaymentMethod.js';
 import CustomerSourceModel from './CustomerSource.js';
 import ExpenseTypeModel from './ExpenseType.js';
+import UpiAccountModel from './UpiAccount.js';
 import VendorModel from './Vendor.js';
 import TripModel from './Trip.js';
 import TripVendorModel from './TripVendor.js';
@@ -75,6 +76,7 @@ const DamageGrade = DamageGradeModel(sequelize);
 const PaymentMethod = PaymentMethodModel(sequelize);
 const CustomerSource = CustomerSourceModel(sequelize);
 const ExpenseType = ExpenseTypeModel(sequelize);
+const UpiAccount = UpiAccountModel(sequelize);
 const Vendor = VendorModel(sequelize);
 const Trip = TripModel(sequelize);
 const TripVendor = TripVendorModel(sequelize);
@@ -535,6 +537,7 @@ export {
     PaymentMethod,
     CustomerSource,
     ExpenseType,
+    UpiAccount,
     Vendor,
     Trip,
     TripVendor,

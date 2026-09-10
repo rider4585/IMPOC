@@ -27,6 +27,7 @@ vi.mock('../services/authApi', () => ({
 vi.mock('../platform/apiClient', () => ({
   setAccessTokenGetter: vi.fn(),
   setTokenRefreshHandler: vi.fn(),
+  getApiBaseUrl: vi.fn(() => '/api'),
 }));
 
 describe('Routing and Permission-Driven Navigation (Story 1.15)', () => {
@@ -302,6 +303,50 @@ describe('Routing and Permission-Driven Navigation (Story 1.15)', () => {
       await waitFor(() => {
         expect(screen.getByPlaceholderText('Enter your username')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Public POS display route (R-35)', () => {
+    class FakeEventSource {
+      constructor(url) {
+        this.url = url;
+        this.onmessage = null;
+      }
+      close() {}
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal('EventSource', FakeEventSource);
+    });
+
+    afterEach(() => {
+      window.history.pushState({}, '', '/');
+    });
+
+    it('renders the public display page at /display/:code WITHOUT the SignIn gate', async () => {
+      window.history.pushState({}, '', '/display/TESTCODE');
+
+      await act(async () => {
+        render(<App />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('display-idle')).toBeInTheDocument();
+      });
+      expect(screen.queryByPlaceholderText('Enter your username')).not.toBeInTheDocument();
+    });
+
+    it('renders the display code-entry page at /display WITHOUT the SignIn gate', async () => {
+      window.history.pushState({}, '', '/display');
+
+      await act(async () => {
+        render(<App />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/display code/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByPlaceholderText('Enter your username')).not.toBeInTheDocument();
     });
   });
 });
