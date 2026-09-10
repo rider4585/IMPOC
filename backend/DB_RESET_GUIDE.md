@@ -125,7 +125,8 @@ Without this, the admin user creation will fail.
 
 ```bash
 # 1. Set admin password
-export SEED_ADMIN_PASSWORD=password123
+# DEV-ONLY seed password (rotated 2026-09, SEC-L-4). Never reuse in prod.
+export SEED_ADMIN_PASSWORD=Impoc-Devseed-2026!
 
 # 2. Reset database
 npm run db:reset
@@ -135,7 +136,7 @@ npm run dev
 
 # 4. Login with
 # Username: admin
-# Password: password123
+# Password: Impoc-Devseed-2026! (DEV-ONLY - same as SEED_ADMIN_PASSWORD set above)
 ```
 
 ### After Modifying Migrations
@@ -182,7 +183,7 @@ npm run dev
 # In another terminal, test login
 curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"password123"}'
+  -d '{"username":"admin","password":"Impoc-Devseed-2026!"}'
 ```
 
 ---

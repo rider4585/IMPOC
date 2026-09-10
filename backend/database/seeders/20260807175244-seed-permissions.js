@@ -6,6 +6,7 @@ export async function up(queryInterface) {
         ['users.create', 'Create users'],
         ['users.update', 'Update users'],
         ['users.delete', 'Soft delete users'],
+        ['users.view_pii', 'View staff contact details (privileged read scope)'],
 
         ['roles.view', 'View roles'],
         ['roles.manage', 'Manage roles and permissions'],
@@ -70,6 +71,7 @@ export async function down(queryInterface) {
             'users.create',
             'users.update',
             'users.delete',
+            'users.view_pii',
             'users.assign_role',
             'roles.view',
             'roles.manage',

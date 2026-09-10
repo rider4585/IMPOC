@@ -147,6 +147,41 @@ describe('Customers module - /api/customers', () => {
             const emails = res.body.data.customers.map((c) => c.email);
             expect(emails).toContain('TEST_alpha@example.com');
         });
+
+        it('should not treat % or _ in the search term as LIKE wildcards (SEC-L-5)', async () => {
+            const created = await request(testApp)
+                .post('/api/customers')
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send(generateTestCustomer({ name: 'TEST_Customer_PlainName' }));
+            expect(created.statusCode).toBe(201);
+
+            // A literal "%" must not match every customer via the wildcard.
+            const percentRes = await request(testApp)
+                .get('/api/customers?search=%25')
+                .set('Authorization', `Bearer ${adminToken}`);
+
+            expect(percentRes.statusCode).toBe(200);
+            const percentNames = percentRes.body.data.customers.map((c) => c.name);
+            expect(percentNames).not.toContain('TEST_Customer_PlainName');
+
+            // A "_" must not fuzzy-match against a hyphen in a stored name.
+            const dash = await request(testApp)
+                .post('/api/customers')
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send(generateTestCustomer({ name: 'TEST_Customer_Dashed-Name' }));
+            expect(dash.statusCode).toBe(201);
+
+            const underscoreRes = await request(testApp)
+                .get('/api/customers?search=TEST_Customer_Dashed_Name')
+                .set('Authorization', `Bearer ${adminToken}`);
+
+            expect(underscoreRes.statusCode).toBe(200);
+            const underscoreNames = underscoreRes.body.data.customers.map((c) => c.name);
+            expect(underscoreNames).not.toContain('TEST_Customer_Dashed-Name');
+
+            // The dash-named row does not match the afterEach cleanup glob.
+            await db.Customer.destroy({ where: { name: 'TEST_Customer_Dashed-Name' } });
+        });
     });
 
     describe('GET /customers/:uuid', () => {

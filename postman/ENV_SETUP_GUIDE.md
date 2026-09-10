@@ -19,8 +19,13 @@ baseUrl = http://localhost:5000
 accessToken = (leave empty - auto-filled after login)
 refreshToken = (leave empty - auto-filled after login)
 testUsername = admin
-testPassword = password123
+testPassword = Impoc-Devseed-2026! (DEV-ONLY — see note below)
 ```
+
+> **DEV-ONLY seed credentials (rotated 2026-09, SEC-L-4):** these are local
+> development credentials only. `testPassword` must equal the
+> `SEED_ADMIN_PASSWORD` you set when seeding the backend. Never use these
+> values (or any committed sample credential) in a production deployment.
 
 ### Step 3: Test Login
 
@@ -54,7 +59,7 @@ After successful login:
 ```
 baseUrl = http://localhost:5000
 testUsername = admin
-testPassword = password123
+testPassword = Impoc-Devseed-2026!
 ```
 
 ### Auto-Populated After Login
@@ -142,7 +147,7 @@ cp .env.template .env
 1. Create environment "IMPOC Development"
 2. Add baseUrl = http://localhost:5000
 3. Add testUsername = admin
-4. Add testPassword = password123
+4. Add testPassword = Impoc-Devseed-2026!
 5. Select environment from dropdown
 ```
 
@@ -192,7 +197,7 @@ Collections → IMPOC API → Run Collection
 | `accessToken` | string | Auto (Login) | ✅ Yes | `eyJhbGc...` |
 | `refreshToken` | string | Auto (Login) | ✅ Yes | `eyJhbGc...` |
 | `testUsername` | string | Manual | ✅ Yes | `admin` |
-| `testPassword` | string | Manual | ✅ Yes | `password123` |
+| `testPassword` | string | Manual | ✅ Yes | `Impoc-Devseed-2026!` (DEV-ONLY) |
 | `adminRoleUuid` | UUID | GET /roles | ✅ Yes | `550e8400-e29b-41d4-a716-446655440000` |
 | `permissionUuid` | UUID | GET /permissions | ✅ Yes | `550e8400-e29b-41d4-a716-446655440001` |
 | `userUuid` | UUID | POST /users | ⚠️ For CRUD tests | `550e8400-e29b-41d4-a716-446655440002` |

@@ -1,5 +1,6 @@
 import { Customer, sequelize } from '../../../database/models/index.js';
 import { Sequelize } from '../../../database/models/index.js';
+import { escapeLike } from '../../utils/escapeLike.js';
 
 const CONSENT_CHANNELS = {
     WHATSAPP: 'consentWhatsapp',
@@ -81,7 +82,9 @@ export const listCustomers = async ({ search } = {}) => {
     const where = { deletedAt: null };
 
     if (search && search.trim()) {
-        const term = search.trim();
+        // SEC-L-5: escape LIKE wildcards so literal "%" / "_" in a search term
+        // are matched literally instead of acting as wildcards.
+        const term = escapeLike(search.trim());
         where[Sequelize.Op.or] = [
             { name: { [Sequelize.Op.iLike]: `%${term}%` } },
             { phone: { [Sequelize.Op.iLike]: `%${term}%` } },

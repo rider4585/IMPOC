@@ -144,7 +144,7 @@ export const scanIntoStock = async (req, res, next) => {
             barcode: data.barcode,
             colourUuid: data.colourUuid,
             sizeUuid: data.sizeUuid,
-            actorUserId: req.user.id,
+            actorUserId: req.user?.id,
         });
 
         return res.status(201).json({

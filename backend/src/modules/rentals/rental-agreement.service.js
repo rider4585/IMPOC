@@ -133,7 +133,6 @@ function mapAgreementDTO(agreement, lines = [], returns = [], reversals = []) {
         agreementNumber: agreement.agreementNumber,
         customerName: agreement.customerName,
         customerMobile: agreement.customerMobile,
-        customerId: agreement.customerId,
         customer,
         startDate: agreement.startDate,
         dueDate: agreement.dueDate,

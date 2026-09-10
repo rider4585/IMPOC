@@ -7,20 +7,37 @@ import {
     updateUserStatus as updateUserStatusAccount,
     deleteUser as deleteUserAccount,
 } from './user.service.js';
+import { userHasPermission } from '../auth/permission.service.js';
+import { PERMISSIONS } from '../../constants/permissions.js';
+
+/*
+ * SEC-L-2: staff email/phone are contact PII. A plain users.view holder (e.g.
+ * a future auditor role) must not receive them; only holders of the dedicated
+ * privileged read permission (users.view_pii, seeded to ADMIN) see them.
+ */
+const canViewStaffPii = async (userUuid) => {
+    try {
+        return await userHasPermission(userUuid, PERMISSIONS.USERS.VIEW_PII);
+    } catch {
+        return false;
+    }
+};
 
 export const getUsers = async (req, res, next) => {
     try {
         const users = await getUsersList();
+
+        const showPii = await canViewStaffPii(req.auth.userUuid);
 
         return res.status(200).json({
             success: true,
             data: users.map((user) => ({
                 uuid: user.uuid,
                 username: user.username,
-                email: user.email,
+                email: showPii ? user.email : null,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                phone: user.phone,
+                phone: showPii ? user.phone : null,
                 status: user.status,
                 lastLoginAt: user.lastLoginAt,
                 createdAt: user.createdAt,
@@ -62,15 +79,17 @@ export const getUserByUuid = async (req, res, next) => {
 
         const user = await getUserByUuidAccount(uuid);
 
+        const showPii = await canViewStaffPii(req.auth.userUuid);
+
         return res.status(200).json({
             success: true,
             data: {
                 uuid: user.uuid,
                 username: user.username,
-                email: user.email,
+                email: showPii ? user.email : null,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                phone: user.phone,
+                phone: showPii ? user.phone : null,
                 status: user.status,
                 lastLoginAt: user.lastLoginAt,
                 createdAt: user.createdAt,

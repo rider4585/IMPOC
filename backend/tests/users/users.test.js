@@ -509,4 +509,60 @@ describe('Users Module - /api/users', () => {
       expect(res.statusCode).toBe(403);
     });
   });
+
+  describe('Staff PII scoping (SEC-L-2)', () => {
+    const createPiiUser = async () => {
+      const data = generateTestUser({ phone: '+919876543210' });
+      return db.User.create({
+        username: data.username,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        passwordHash: await argon2.hash(data.password),
+      });
+    };
+
+    it('MANAGER (users.view, no users.view_pii) sees email/phone redacted in list', async () => {
+      const user = await createPiiUser();
+
+      const res = await request(app)
+        .get('/api/users')
+        .set('Authorization', `Bearer ${managerToken}`);
+
+      expect(res.statusCode).toBe(200);
+
+      const row = res.body.data.find((u) => u.uuid === user.uuid);
+      expect(row).toBeDefined();
+      expect(row.email).toBeNull();
+      expect(row.phone).toBeNull();
+    });
+
+    it('ADMIN (users.view_pii) sees email/phone in list', async () => {
+      const user = await createPiiUser();
+
+      const res = await request(app)
+        .get('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.statusCode).toBe(200);
+
+      const row = res.body.data.find((u) => u.uuid === user.uuid);
+      expect(row).toBeDefined();
+      expect(row.email).toBe(user.email);
+      expect(row.phone).toBe(user.phone);
+    });
+
+    it('MANAGER sees email/phone redacted on GET /users/:uuid', async () => {
+      const user = await createPiiUser();
+
+      const res = await request(app)
+        .get(`/api/users/${user.uuid}`)
+        .set('Authorization', `Bearer ${managerToken}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data.email).toBeNull();
+      expect(res.body.data.phone).toBeNull();
+    });
+  });
 });
