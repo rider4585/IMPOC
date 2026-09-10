@@ -5,6 +5,7 @@ import { navigationSections } from './navigation';
 import { ShopLogo } from '../components/ShopLogo';
 import { SettingsDrawer } from '../theme/index.js';
 import { NavItem } from '../components/ui';
+import { primeMediaPermissions } from '../platform/mediaPermissions.js';
 import {
   Boxes,
   ScanBarcode,
@@ -129,6 +130,13 @@ export function AppShell({ children }) {
   // Whether desktop rail is in icon-only mode.
   const [railCollapsed, setRailCollapsed] = useState(loadRailCollapsed);
   const resizeObserverRef = useRef(null);
+
+  // Post-login: request the camera permission once up front so the barcode
+  // scanner (Intake / POS) opens without a mid-scan prompt. AppShell only
+  // renders for a signed-in user, so this runs after login. Runs once/load.
+  useEffect(() => {
+    primeMediaPermissions();
+  }, []);
 
   const toggleSection = (key) => {
     setCollapsedSections((prev) => {
