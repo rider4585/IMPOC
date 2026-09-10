@@ -925,26 +925,7 @@ function BarcodeScanner({ onDetected, onError }) {
              * ImageCapture.grabFrame(): on Windows Chrome grabFrame frequently
              * returns a black frame (while drawImage(video) is fine), which broke
              * decoding on the Windows laptop while macOS/iOS worked.
-             *
-             * One-time diagnostic (frame size + whether the first captured frame
-             * is all-black) is logged so field issues are self-explaining.
              */
-            let diagnosed = false;
-
-            const centerIsBlack = (ctx, w, h) => {
-                try {
-                    const sx = Math.max(0, Math.floor(w / 2) - 16);
-                    const sy = Math.max(0, Math.floor(h / 2) - 16);
-                    const { data } = ctx.getImageData(sx, sy, 32, 32);
-                    for (let i = 0; i < data.length; i += 4) {
-                        if (data[i] || data[i + 1] || data[i + 2]) return false;
-                    }
-                    return true;
-                } catch {
-                    return false;
-                }
-            };
-
             const decodeLoop = () => {
                 if (cancelled) return;
 
@@ -963,14 +944,6 @@ function BarcodeScanner({ onDetected, onError }) {
                             willReadFrequently: true,
                         });
                         ctx.drawImage(video, 0, 0, w, h);
-
-                        if (!diagnosed) {
-                            diagnosed = true;
-                            // eslint-disable-next-line no-console
-                            console.info(
-                                `[scanner] capture ${w}x${h}, centerBlack=${centerIsBlack(ctx, w, h)}`
-                            );
-                        }
 
                         try {
                             const source = new HTMLCanvasElementLuminanceSource(captureCanvas);
