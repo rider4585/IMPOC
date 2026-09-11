@@ -1,0 +1,56 @@
+import React, { useMemo, useRef } from 'react';
+import { Dialog, Button } from '../ui';
+import { buildBrandedReceiptHtml } from '../../platform/brandedReceiptHtml.js';
+
+/**
+ * BrandedReceiptDialog — live preview + print for the colourful A5 branded
+ * receipt (R-45). Renders the self-contained HTML from
+ * `buildBrandedReceiptHtml` inside an isolated iframe (srcDoc) so the
+ * receipt's own cream/brown palette never inherits the app's dark theme, and
+ * "Print" triggers the iframe's own print — no other screen content is
+ * affected.
+ *
+ * Props: open, onClose, receipt (the /receipts/preview payload), title
+ */
+export function BrandedReceiptDialog({ open, onClose, receipt, title = 'Branded receipt' }) {
+  const iframeRef = useRef(null);
+  const html = useMemo(() => (receipt ? buildBrandedReceiptHtml(receipt) : ''), [receipt]);
+
+  const handlePrint = () => {
+    const win = iframeRef.current?.contentWindow;
+    if (win) win.print();
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      className="max-w-4xl"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          <Button onClick={handlePrint} disabled={!html}>
+            Print
+          </Button>
+        </>
+      }
+    >
+      {receipt ? (
+        <iframe
+          ref={iframeRef}
+          title="Branded receipt preview"
+          srcDoc={html}
+          data-testid="branded-receipt-frame"
+          className="h-[70vh] w-full rounded-md border border-[var(--border)] bg-white"
+        />
+      ) : (
+        <p className="text-sm text-[var(--ink-muted)]">No receipt data available.</p>
+      )}
+    </Dialog>
+  );
+}
+
+export default BrandedReceiptDialog;

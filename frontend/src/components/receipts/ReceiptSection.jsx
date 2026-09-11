@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent, Button } from '../ui';
 import { getReceiptPreview } from '../../services/receiptApi.js';
 import { ReceiptPreview } from './ReceiptPreview.jsx';
 import { ReceiptPrintDialog } from './ReceiptPrintDialog.jsx';
+import { BrandedReceiptDialog } from './BrandedReceiptDialog.jsx';
 
 /**
  * ReceiptSection — digital receipt (getReceiptPreview) + printer button
@@ -16,6 +17,7 @@ export function ReceiptSection({ entityType, entityUuid, printTitle = 'Print rec
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [printOpen, setPrintOpen] = useState(false);
+  const [brandedOpen, setBrandedOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!entityUuid) return;
@@ -42,7 +44,16 @@ export function ReceiptSection({ entityType, entityUuid, printTitle = 'Print rec
 
   return (
     <>
-      <div className="mb-1 flex justify-end">
+      <div className="mb-1 flex justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setBrandedOpen(true)}
+          disabled={!preview}
+          data-testid="branded-receipt-button"
+        >
+          Branded receipt
+        </Button>
         <Button variant="outline" size="sm" onClick={handlePrintClick} disabled={!entityUuid}>
           Print receipt
         </Button>
@@ -80,6 +91,13 @@ export function ReceiptSection({ entityType, entityUuid, printTitle = 'Print rec
         entityType={entityType}
         entityUuid={entityUuid}
         title={printTitle}
+      />
+
+      <BrandedReceiptDialog
+        open={brandedOpen}
+        onClose={() => setBrandedOpen(false)}
+        receipt={preview}
+        title={printTitle.replace(/^Print receipt/, 'Branded receipt')}
       />
     </>
   );

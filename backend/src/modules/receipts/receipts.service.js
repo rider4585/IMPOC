@@ -1,4 +1,5 @@
 import { Sale, RentalAgreement } from '../../../database/models/index.js';
+import { buildBrandedReceiptHtml } from './receipts.html.js';
 
 const LINE_PRODUCT_INCLUDE = {
     association: 'unit',
@@ -314,4 +315,15 @@ export const buildReceiptText = async ({ entityType, entityUuid, isPrivileged = 
     const receipt = await buildReceipt({ entityType, entityUuid, isPrivileged });
     if (!receipt) return null;
     return renderTextReceipt(receipt);
+};
+
+/**
+ * Build a receipt and return its colourful branded A4 HTML rendering
+ * (R-45's `receipts.html.js` template). Not wired to a route yet -- ready
+ * for R-47 (email receipts) to call directly.
+ */
+export const buildReceiptHtml = async ({ entityType, entityUuid, isPrivileged = false }) => {
+    const receipt = await buildReceipt({ entityType, entityUuid, isPrivileged });
+    if (!receipt) return null;
+    return buildBrandedReceiptHtml(receipt);
 };
