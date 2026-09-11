@@ -16,7 +16,7 @@ testApp.use(errorMiddleware);
 
 function buildValidReceiptPayload() {
     return {
-        store: { name: 'SHREE Fashion Store', address: 'Main Bazaar', phone: '9876543210' },
+        store: { name: 'Shree Fashion Store', address: 'Main Bazaar', phone: '9876543210' },
         transaction: {
             type: 'SALE',
             number: 'S-0001',

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 /**
  * SHOP_NAME — single source of truth for the brand shown alongside the logo.
  */
-export const SHOP_NAME = 'SHREE Fashion Store';
+export const SHOP_NAME = 'Shree Fashion Store';
 
 /**
  * ShopLogo — reusable brand lockup (logo mark + full shop name).

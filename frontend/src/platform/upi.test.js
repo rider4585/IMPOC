@@ -5,14 +5,14 @@ describe('buildUpiUri', () => {
   it('builds a upi://pay deep link with all params in order', () => {
     const uri = buildUpiUri({
       vpa: 'shree@okhdfcbank',
-      payee: 'SHREE Fashion Store',
+      payee: 'Shree Fashion Store',
       amountRupees: 250,
-      note: 'SHREE Fashion Store sale',
+      note: 'Shree Fashion Store sale',
       txnRef: 'abc-123',
     });
 
     expect(uri).toBe(
-      'upi://pay?pa=shree%40okhdfcbank&pn=SHREE%20Fashion%20Store&am=250.00&cu=INR&tn=SHREE%20Fashion%20Store%20sale&tr=abc-123'
+      'upi://pay?pa=shree%40okhdfcbank&pn=Shree%20Fashion%20Store&am=250.00&cu=INR&tn=Shree%20Fashion%20Store%20sale&tr=abc-123'
     );
   });
 
