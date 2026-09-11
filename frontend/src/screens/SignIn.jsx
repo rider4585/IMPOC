@@ -29,7 +29,11 @@ export function SignIn() {
       <Card className="w-full max-w-sm shadow-sm">
         <CardContent className="p-6 sm:p-8">
           <div className="mb-8">
-            <ShopLogo size={{ logo: 44, text: 'text-xl' }} align="center" className="justify-center" />
+            <ShopLogo
+              size={{ logo: 44, text: 'text-lg sm:text-xl' }}
+              align="center"
+              className="flex-wrap justify-center"
+            />
             <p className="mt-3 text-center text-sm text-[var(--ink-muted)]">
               Sign in to continue to your account
             </p>

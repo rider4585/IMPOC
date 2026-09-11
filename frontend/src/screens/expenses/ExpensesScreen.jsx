@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
   Button,
   Input,
-  SearchableSelect,
   Dialog,
   Badge,
   useToast,
 } from '../../components/ui';
+import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import {
@@ -22,8 +18,6 @@ import {
 import { formatPaise } from '../../platform/money.js';
 import { createRequestKey } from '../../platform/requestKey.js';
 import { ExpenseFormDialog } from './ExpenseFormDialog.jsx';
-
-const STATUS_FILTERS = ['all', 'completed', 'cancelled'];
 
 export function ExpensesScreen() {
   const { permissions } = useAuth();
@@ -37,9 +31,6 @@ export function ExpensesScreen() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -68,21 +59,6 @@ export function ExpensesScreen() {
   useEffect(() => {
     if (canView) load();
   }, [canView, load]);
-
-  const categories = useMemo(() => {
-    const set = new Set();
-    expenses.forEach((e) => set.add(e.category));
-    return Array.from(set).sort();
-  }, [expenses]);
-
-  const filtered = useMemo(() => {
-    return expenses.filter((e) => {
-      if (statusFilter !== 'all' && e.status !== statusFilter) return false;
-      if (categoryFilter && e.category !== categoryFilter) return false;
-      if (dateFilter && e.expenseDate !== dateFilter) return false;
-      return true;
-    });
-  }, [expenses, statusFilter, categoryFilter, dateFilter]);
 
   const handleSave = async (payload) => {
     setSaving(true);
@@ -128,6 +104,85 @@ export function ExpensesScreen() {
     }
   };
 
+  const columns = useMemo(() => [
+    {
+      accessorKey: 'category',
+      header: 'Category',
+      size: 160,
+      filter: { type: 'picklist' },
+      cell: (info) => <span className="font-semibold">{info.getValue()}</span>,
+    },
+    {
+      accessorKey: 'expenseDate',
+      header: 'Date',
+      size: 110,
+      filter: { type: 'date' },
+    },
+    {
+      accessorKey: 'purpose',
+      header: 'Purpose',
+      size: 260,
+      filter: { type: 'text' },
+      enableSorting: false,
+      cell: (info) => {
+        const e = info.row.original;
+        return (
+          <div>
+            <div>{e.purpose || 'No purpose'}</div>
+            {e.notes && <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">{e.notes}</div>}
+            {e.reversals && e.reversals.length > 0 && (
+              <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
+                Reversals: {e.reversals.map((r) => `${r.reversalType} (${formatPaise(Number(r.amountPaise))})`).join(', ')}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      size: 110,
+      filter: { type: 'picklist' },
+      cell: (info) => (
+        <Badge variant={info.getValue() === 'cancelled' ? 'neutral' : 'success'}>{info.getValue()}</Badge>
+      ),
+    },
+    {
+      accessorKey: 'amountPaise',
+      header: 'Amount',
+      size: 130,
+      filter: { type: 'number' },
+      cell: (info) => (
+        <strong className="text-[var(--ink)]">{formatPaise(Number(info.getValue()))}</strong>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      size: 170,
+      enableSorting: false,
+      cell: (info) => {
+        const e = info.row.original;
+        if (e.status === 'cancelled' || !canUpdate) return null;
+        return (
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setEditing(e); setFormOpen(true); }}>
+              Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { cancelKeyRef.current = createRequestKey(); setCancelling(e); setCancelReason(''); }}
+            >
+              Cancel
+            </Button>
+          </div>
+        );
+      },
+    },
+  ], [canUpdate]);
+
   if (!canView) {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-5 p-6">
@@ -164,91 +219,16 @@ export function ExpensesScreen() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle>Expense list</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <SearchableSelect
-              label="Status"
-              className="min-w-[160px]"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={[
-                { value: 'all', label: 'All' },
-                ...STATUS_FILTERS.filter((s) => s !== 'all').map((s) => ({ value: s, label: s })),
-              ]}
-            />
-            <SearchableSelect
-              label="Category"
-              className="min-w-[160px]"
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              searchPlaceholder="Search categories…"
-              emptyMessage="No categories yet."
-              options={[
-                { value: '', label: 'All categories' },
-                ...categories.map((c) => ({ value: c, label: c })),
-              ]}
-            />
-            <Input
-              label="Date"
-              type="date"
-              className="min-w-[160px]"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
-          </div>
-
-          {loading ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-16 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-sm text-[var(--ink-muted)]">No expenses match this view.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {filtered.map((e) => (
-                <li
-                  key={e.uuid}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-sm"
-                >
-                  <div>
-                    <div className="font-semibold">{e.category}</div>
-                    <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
-                      {e.expenseDate} · {e.purpose || 'No purpose'}
-                      {e.notes ? ` · ${e.notes}` : ''}
-                    </div>
-                    {e.reversals && e.reversals.length > 0 && (
-                      <div className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
-                        Reversals: {e.reversals.map((r) => `${r.reversalType} (${formatPaise(Number(r.amountPaise))})`).join(', ')}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={e.status === 'cancelled' ? 'neutral' : 'success'}>{e.status}</Badge>
-                    <strong>{formatPaise(Number(e.amountPaise))}</strong>
-                    {e.status !== 'cancelled' && canUpdate && (
-                      <>
-                        <Button variant="outline" size="sm" onClick={() => { setEditing(e); setFormOpen(true); }}>
-                          Edit
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => { cancelKeyRef.current = createRequestKey(); setCancelling(e); setCancelReason(''); }}>
-                          Cancel
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+        <DataGrid
+          data={expenses}
+          columns={columns}
+          isLoading={loading}
+          isEmpty={expenses.length === 0}
+          emptyMessage="No expenses match this view."
+          loadingMessage="Loading expenses…"
+          className="flex-1"
+        />
       </div>
 
       {formOpen && (

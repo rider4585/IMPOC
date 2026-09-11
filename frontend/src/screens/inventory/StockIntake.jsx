@@ -335,7 +335,7 @@ export function StockIntake() {
     || '';
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--surface-scan)]">
+    <div className="flex min-h-dvh flex-col bg-[var(--surface-scan)]">
       {/* Back button */}
       <div className="absolute left-4 top-4 z-30">
         <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={() => navigate(`/trips/${tripUuid}`)}>

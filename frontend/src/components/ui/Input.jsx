@@ -24,7 +24,7 @@ export const Input = forwardRef(function Input(
   return (
     <div className="space-y-2">
       {label && (
-        <label className="text-sm font-medium text-[var(--ink)]" htmlFor={inputId}>
+        <label className="block pb-0.5 text-sm font-medium text-[var(--ink)]" htmlFor={inputId}>
           {label}
         </label>
       )}

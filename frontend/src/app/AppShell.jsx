@@ -377,12 +377,12 @@ export function AppShell({ children }) {
       )}
 
       {/* Content area + desktop top header */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {isDesktop && (
           <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--surface-raised)] px-6">
-            <h1 className="typography-heading mb-0">{currentTitle || 'SHREE Fashion Store'}</h1>
+            <h1 className="typography-heading mb-0">{currentTitle || 'Shree Fashion Store'}</h1>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-[var(--ink-muted)]">SHREE Fashion Store</span>
+              <span className="text-sm font-medium text-[var(--ink-muted)]">Shree Fashion Store</span>
               <button
                 type="button"
                 className="flex h-11 w-11 items-center justify-center rounded-md text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
@@ -395,13 +395,21 @@ export function AppShell({ children }) {
             </div>
           </header>
         )}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+        <main
+          className={`min-h-0 flex-1 overflow-y-auto ${
+            isDesktop
+              ? 'p-4 sm:p-6'
+              : 'px-0 pt-4 sm:pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))]'
+          }`}
+        >
+          {children}
+        </main>
       </div>
 
       {/* Mobile bottom tab bar */}
       {!isDesktop && (
         <nav
-          className="fixed inset-x-0 bottom-0 z-20 flex h-16 items-center border-t border-[var(--border)] bg-[var(--surface-raised)] px-2"
+          className="fixed inset-x-0 bottom-0 z-20 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-center border-t border-[var(--border)] bg-[var(--surface-raised)] px-2 pb-[env(safe-area-inset-bottom)]"
           aria-label="Main Navigation"
           onKeyDown={(e) => handleKeyDown(e, flatItems)}
         >

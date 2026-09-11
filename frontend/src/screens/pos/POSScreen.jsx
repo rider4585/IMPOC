@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { Trash2 } from 'lucide-react';
 import {
   Card,
   CardHeader,
@@ -748,7 +749,7 @@ export function POSScreen() {
                   {cart.map((item) => (
                     <li
                       key={item.uuid}
-                      className="flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm"
+                      className="flex flex-col gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm sm:flex-row sm:items-center sm:gap-3"
                     >
                       <div className="min-w-0">
                         <span className="block truncate font-semibold">{itemTitle(item)}</span>
@@ -757,23 +758,32 @@ export function POSScreen() {
                           {itemDetail(item) && <span> · {itemDetail(item)}</span>}
                         </span>
                       </div>
-                      <span className="ml-auto whitespace-nowrap">
-                        {mode === 'sale' ? (
-                          <SalePriceInput
-                            valuePaise={item.sellingPricePaise}
-                            floorPaise={item.floorPricePaise}
-                            name={item.barcode}
-                            onChange={(paise) => updateItemPrice(item.uuid, paise)}
-                          />
-                        ) : (
-                          <span className="typography-money-sm text-right text-[var(--ink-muted)]">
-                            {formatPaise(item.rentPerDayPaise)}/day · deposit {formatPaise(item.depositPaise)}
-                          </span>
-                        )}
-                      </span>
-                      <Button variant="ghost" size="sm" onClick={() => removeItem(item.uuid)} aria-label={`Remove ${item.barcode}`}>
-                        Remove
-                      </Button>
+                      <div className="flex items-center justify-between gap-2 sm:contents">
+                        <span className="whitespace-nowrap sm:ml-auto">
+                          {mode === 'sale' ? (
+                            <SalePriceInput
+                              valuePaise={item.sellingPricePaise}
+                              floorPaise={item.floorPricePaise}
+                              name={item.barcode}
+                              onChange={(paise) => updateItemPrice(item.uuid, paise)}
+                            />
+                          ) : (
+                            <span className="typography-money-sm text-right text-[var(--ink-muted)]">
+                              {formatPaise(item.rentPerDayPaise)}/day · deposit {formatPaise(item.depositPaise)}
+                            </span>
+                          )}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeItem(item.uuid)}
+                          aria-label={`Remove ${item.barcode}`}
+                          className="shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                          <span className="hidden sm:inline">Remove</span>
+                        </Button>
+                      </div>
                     </li>
                   ))}
                 </ul>

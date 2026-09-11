@@ -57,12 +57,12 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={api}>
       {children}
       {createPortal(
-        <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-full max-w-sm flex-col gap-2" aria-live="polite" role="status">
+        <div className="pointer-events-none fixed inset-x-4 top-4 z-50 flex w-auto flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-full sm:max-w-sm" aria-live="polite" role="status">
           <AnimatePresence>
             {toasts.map((toast) => (
               <motion.div
                 key={toast.id}
-                className={`pointer-events-auto flex items-start gap-3 rounded-md border border-[var(--border)] border-l-4 bg-[var(--surface-raised)] p-4 shadow-lg ${variantStyles[toast.variant] || variantStyles.info}`}
+                className={`pointer-events-auto flex items-start gap-3 rounded-md border border-[var(--border)] border-l-4 bg-[var(--surface-raised)] p-3 shadow-lg sm:p-4 ${variantStyles[toast.variant] || variantStyles.info}`}
                 initial={{ opacity: 0, x: 24 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 24 }}

@@ -106,7 +106,7 @@ function DisplayCodeEntry() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[var(--surface-base)] p-6 text-center">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-[var(--surface-base)] p-6 text-center">
       <h1 className="typography-heading text-[var(--ink)]">{SHOP_NAME}</h1>
       <p className="text-[var(--ink-muted)]">Enter the display code shown at the counter.</p>
       <form onSubmit={submit} className="flex gap-2">
@@ -278,7 +278,7 @@ function PosDisplayView({ code }) {
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--surface-base)] p-6 text-center">
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-[var(--surface-base)] p-6 text-center">
       {state.status === 'awaiting' && <BorderStyleToggle borderStyle={borderStyle} onCycle={cycleBorderStyle} />}
       {!soundUnlocked && <SoundUnlockButton onUnlock={unlockSound} />}
       <AnimatePresence mode="wait">
