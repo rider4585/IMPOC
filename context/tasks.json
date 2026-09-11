@@ -1,0 +1,1054 @@
+{
+  "tasks": [
+    {
+      "id": "R-32",
+      "title": "DB read-layer: SQL views for grids + trigger/materialized summaries for dashboard (performance, reduce DB calls)",
+      "status": "done",
+      "assignee": "worker-r32-db-views-r30",
+      "priority": "medium",
+      "deps": [
+        "R-28"
+      ],
+      "humanQA": [
+        {
+          "q": "R-32 DB read-layer integrated?",
+          "a": "Merged 4ed6479 + migration ESM fix 4994b96 on framework/md-impoc. 5 grid views + 34 indexes + pagination + dashboard matviews. Backend 669/669 green; 3 migrations applied to dev DB.",
+          "askedAt": "2026-09-10T02:45:00Z"
+        }
+      ],
+      "detail": "PLANNED 2026-09-10 (god). Human request: use view tables, triggers for grids and dashboard items to reduce DB calls and improve performance. Analysis: FEASIBLE.\nEvidence: backend/src/modules/reports/reports.service.js loads whole tables into Node and aggregates in JS (getDashboard = Sale.findAll + reduce, SaleReversal full scan, RentalReturn full scan with 2 nested joins, inventorySnapshot = 4 queries; getTripPnlReport/getVendorSellThroughReport full-table cross-refs; getMarginsReport loads all units into memory). R-28 findings already flag: no SQL pushdown, ~25 unindexed FKs, no date indexes on sold_at/expense_date/start_date, unpaginated lists.\nPHASES:\nA) GRIDS (sales/rentals/expenses/units/stocks list screens) = regular SQL views (v_sales_grid per-row totalPaise/refundedPaise/units, v_rentals_grid earned/overdue/damage + counts, v_expenses_grid, v_units_grid, v_stocks_grid) + add missing date/FK indexes + LIMIT/OFFSET (or keyset) pagination. Views push join+aggregate into Postgres; the real win for grids is indexes + pagination (overlaps NOD-3 + PG unindexed-FK findings - dedupe at dispatch). List endpoints query views; keep DTO shapes identical.\nB) DASHBOARD KPIs + analytics (dashboard, trip P&L, vendor sell-through, stock levels, margins) = materialized view refreshed with REFRESH MATERIALIZED VIEW CONCURRENTLY OR trigger-maintained incremental summary tables (e.g. reporting_daily keyed by metric_date + dims) maintained by AFTER INSERT triggers on the append-only financial ledger (sales, sale_reversals, rental_returns, expenses). Dashboard endpoint then reads 1-2 indexed rows instead of 5-8 table scans.\nCONSTRAINTS:\n- Money stays BIGINT paise (JS already BigInt per SEC-H-7); SQL sums must be BIGINT, DTO returns String as today.\n- Views/summaries are DERIVED read-only layers, never the source of truth; never mutate completed transactions.\n- Reversals are subtracted, not zeroed; R-29 single-reversal partial-unique indexes prevent double-counting in trigger logic.\n- Staleness vs cost tradeoff: default MATVIEW CONCURRENTLY refreshed on short interval or day-close.\nNOT STARTED. Queued behind running SEC-M/L series + R-31. Manual QA: backend report/dashboard suites stay green; populated-DB latency drop (R-28 notes dev DB empty, absolute timings need seed data).",
+      "createdAt": "2026-09-10T00:37:34.062Z",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "doneAt": "2026-09-10T03:25:19.002Z"
+    },
+    {
+      "id": "R-31",
+      "title": "SEC-M-3 follow-up: frontend must send requestUuid on money-write POSTs (sales/rentals/expenses create/cancel/refund/return)",
+      "status": "done",
+      "assignee": "worker-sec-m3-frontend-r31",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [
+        "2026-09-10 god verify: vitest 277/26 PASS in worktree + main, build PASS; merged 96acfbd"
+      ],
+      "detail": "PLANNED 2026-09-10 (god). Backend M-3 (commit 3c559f9, merges a41f6fd+c15890b) made requestUuid REQUIRED on money-write POSTs (SALE_CHECKOUT/CANCEL/REFUND, RENTAL_BOOK/SETTLE/CANCEL, EXPENSE_CREATE/REVERSE). Frontend salesApi/rentalsApi/expensesApi do NOT send it yet -> checkout/rental/expense/cancel/refund flows now 400 from the UI. Fix: mint requestUuid (crypto.randomUUID via platform/requestKey.js createRequestKey()) in the 8 money-write service fns (createSale/cancelSale/refundSale, createRental/processRentalReturn/cancelRental, createExpense/cancelExpense), one fresh UUID per logical intent, reuse on retry within that intent, fresh on new intent. Update posIntake/rentals/expenses tests. NOT started.\n\nDONE 2026-09-10. Done + status msgs were DROPPED by harness as malformed-json (both under outbox/.sent/bad-*); recovered payloads confirmed COMPLETE: 8 money-write fns now carry requestUuid (create-style via payload.requestUuid || createRequestKey(); cancel/refund-style via optional 3rd options.requestUuid || createRequestKey()); screens mint one key per intent (POS checkoutKeyRef, Rentals create/return/cancel refs, Expenses save/cancel refs) reused across retries, reset on success/close. New moneyWriteApi.test.js (16 tests) + 3 posIntake assertions updated. Verification by god: vitest 277/26 (worktree + main), npm run build PASS. COMMIT 2fb73dd on agent branch, MERGED 96acfbd into framework/md-impoc. Worker archived.",
+      "doneAt": "2026-09-10T01:25:18.995Z"
+    },
+    {
+      "id": "R-24",
+      "title": "Security remediation umbrella - Critical..Low fixes (31 finding cards SEC-CR-1..SEC-L-8), NOT started",
+      "status": "done",
+      "assignee": "worker-sec-low-l1-l6",
+      "priority": "low",
+      "deps": [
+        "R-23"
+      ],
+      "humanQA": [
+        {
+          "q": "**The security review finished: BLOCK ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â 3 Critical, 10 High, 10 Medium, 8 Low, 5 Hardening (money-loss + full-takeover paths reachable by a low-privilege user today).** Tell me what to remediate, and I'll fan it out to the agents. Options:\n- **1. Critical only** ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â CR-1 double-refund CAS, CR-2 role-escalation lockdown, CR-3 JWT sub-binding/pin-algorithms (v1 go-live unblock; fastest)\n- **2. Critical + High** (recommended) ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â also fixes all IDOR/authz reads, empty-item sale, money-over-2^53, token-in-localStorage, login brute-force, session-lifecycle\n- **3. Critical + High + Medium** ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â also idempotency, doc-number races, picklist validation, error masking, dep upgrades\n- **4. Everything incl. Low/Hardening** ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â full sweep, slowest\n- **5. Review only** ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â nothing to fix in code for now; I keep findings on record\nAlso: want the report committed to the repo? (`framework/md-impoc` is untouched; `hive/SECURITY-FINDINGS.md` has it). Answer with the option number.",
+          "askedAt": "2026-09-07T00:00:00.000Z",
+          "a": "Cover everything Critical through Low; ignore the Hardening items (HN-*)."
+        },
+        "god closeout 2026-09-10: board standup correction - assignee moved worker-sec-low-l1-l6->worker-sec-l1-l6; umbrella done"
+      ],
+      "detail": "ALL 31 child security cards (SEC-CR-1..3, SEC-H-1..10, SEC-M-1..10, SEC-L-1..8) integrated by god 2026-09-10 (commits 0b585ee/7c1a365/981fa2f/648318c). Verified: backend jest 665/665 + frontend vitest 291/27. Security backlog EMPTY.",
+      "doneAt": "2026-09-10T01:26:19.355Z"
+    },
+    {
+      "id": "SEC-M-3",
+      "title": "M-3  No idempotency on money-writing POSTs (double-processing)",
+      "status": "done",
+      "assignee": "worker-sec-m-hardening-m3-m5-m7",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-10T00:30:17.369Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "NOT DONE. sales/rental-agreement/expenses routes create/cancel/refund; idempotency.service.js:12-40 wired only for barcodes. Fix: request-key idempotency (request_uuid) on create/cancel/refund. Standup 2026-09-09: reverted from stale 'doing' (phantom assignee worker-sec-m-idempotency never existed; no code changes on disk).",
+      "doneAt": "2026-09-10T00:30:17.369Z"
+    },
+    {
+      "id": "SEC-M-4",
+      "title": "M-4  Document-number generation races (S-####/R-#### max+1)",
+      "status": "done",
+      "assignee": "worker-money-out-r29",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-09T16:30:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DONE via R-29 (worker-money-out-r29, commit 9523749, merge c2b5c7e): createSale/createRental retry-on-collision (MAX_NUMBER_RETRIES=3) for nextSaleNumber/nextAgreementNumber races. Verified full backend suite 555/555 in main. Standup 2026-09-09: was stale 'doing' w/ phantom assignee; corrected to done (R-29 covered it).",
+      "doneAt": "2026-09-09T17:24:50.391Z"
+    },
+    {
+      "id": "SEC-M-5",
+      "title": "M-5  createdBy recorded but never scopes reads (no per-creator authz)",
+      "status": "done",
+      "assignee": "worker-sec-m-hardening-m3-m5-m7",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-10T00:30:17.369Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "NOT DONE. sales/rental-agreement/expenses services; created_by column on models. Fix: creator/tenant-scoped visibility entitlement. Standup 2026-09-09: reverted from stale 'doing' (phantom assignee worker-sec-m-hardening never existed; no code changes on disk).",
+      "doneAt": "2026-09-10T00:30:17.369Z"
+    },
+    {
+      "id": "SEC-M-6",
+      "title": "M-6  Delivery logs accept arbitrary receiptPayload JSON + free entityUuid",
+      "status": "done",
+      "assignee": "worker-sec-m-validation-m6-m8",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "NOT DONE. delivery.validation.js:17 z.unknown(); delivery.service.js:10-59. Fix: shape-validate + cap receiptPayload, validate entity refs. VERIFIED + INTEGRATED by god 2026-09-09: merged as d40104c (commit fb4b65b on agent/worker-sec-m-validation-m6-m8). Full backend suite 36 suites/634 passed in worktree; re-verified.  2026-09-09: reverted from stale 'doing' (phantom assignee worker-sec-m-validation never existed; delivery.validation.js still has z.unknown()).",
+      "doneAt": "2026-09-09T18:00:00.000Z"
+    },
+    {
+      "id": "SEC-M-7",
+      "title": "M-7  4xx error responses echo internal row details verbatim",
+      "status": "done",
+      "assignee": "worker-sec-m-hardening-m3-m5-m7",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-10T00:30:17.369Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "NOT DONE. error.middleware.js:19-24 passthrough <500; producers stock.service.js:499-505, sales.service.js:102-106, units.service.js:425-430, rental-agreement.service.js:99-101,387-389. Fix: message allow-list / generic 4xx; log details server-side. Standup 2026-09-09: reverted from stale 'doing' (phantom assignee worker-sec-m-hardening never existed; no code changes on disk).",
+      "doneAt": "2026-09-10T00:30:17.369Z"
+    },
+    {
+      "id": "SEC-M-8",
+      "title": "M-8  paymentMethod / customerSource free-form on financial ledger",
+      "status": "done",
+      "assignee": "worker-sec-m-validation-m6-m8",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "NOT DONE. sales.validation.js:13-14; rental-agreement.validation.js:18-19; receipts.service.js:115,179,267-268. N.B. R-20/R-22 added picklists + max-length(50) snapshots but NO picklist membership validation on the ledger write path. Fix: validate against payment_methods/customer_sources picklists. VERIFIED + INTEGRATED by god 2026-09-09: merged as d40104c (commit fb4b65b on agent/worker-sec-m-validation-m6-m8). Full backend suite 36 suites/634 passed in worktree; re-verified.  2026-09-09: reverted from stale 'doing' (phantom assignee worker-sec-m-validation never existed).",
+      "doneAt": "2026-09-09T18:00:00.000Z"
+    },
+    {
+      "id": "SEC-M-9",
+      "title": "M-9  Frontend dep: react-router-dom <7.18.0 (open redirect + deserializeErrors injection)",
+      "status": "done",
+      "assignee": "worker-sec-m-zod-updates",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-09T16:30:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DONE (batch M-1/M-2/M-9/M-10). frontend/package.json:28 upgraded ^6.28.0 -> ^7.18.0 (installed 7.18.3), resolving GHSA-wrjc-x8rr-h8h6 + GHSA-337j-9hxr-rhxg. Frontend 261/261 green. Standup 2026-09-09: was stale 'doing'; fix verified present in working tree (uncommitted alongside H-5/7/8 batch).",
+      "doneAt": "2026-09-09T17:24:50.391Z"
+    },
+    {
+      "id": "SEC-L-1",
+      "title": "L-1  Login timing enumerates usernames (argon2 verify only for existing users)",
+      "status": "done",
+      "assignee": "worker-sec-l1-l6",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [
+        "god verify 2026-09-10: dummy argon2 verify on unknown-user + inactive login paths; jest 665/665"
+      ],
+      "detail": "auth.service.js:8-36. Fix: always run dummy argon2 compare.\\n\\nPLANNED 2026-09-10 (god): see dispatch contract.",
+      "doneAt": "2026-09-10T01:23:13.084Z"
+    },
+    {
+      "id": "SEC-L-2",
+      "title": "L-2  Staff email/phone visible to any users.view holder",
+      "status": "done",
+      "assignee": "worker-sec-l1-l6",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [
+        "god verify 2026-09-10: users.view_pii (ADMIN-only seeded; MANAGER NOT granted - stricter than M-5 broad-read; no current frontend screen consumes email/phone, safe); PII redacted o null for non-holders"
+      ],
+      "detail": "user.controller.js:17-28 (hashes never exposed - positive). Fix: scope/redact PII per entitlement.\\n\\nPLANNED 2026-09-10 (god): see dispatch contract.",
+      "doneAt": "2026-09-10T01:23:13.084Z"
+    },
+    {
+      "id": "SEC-L-3",
+      "title": "L-3  Internal sequential customerId serialized into sale/rental DTOs",
+      "status": "done",
+      "assignee": "worker-sec-l1-l6",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [
+        "god verify 2026-09-10: customerId dropped from mapSaleDTO/mapAgreementDTO; no frontend usage of customerId confirmed"
+      ],
+      "detail": "sales.service.js:51; rental-agreement.service.js:123; violates internal-id invariant (units.service.js:298). Fix: uuid-only.\\n\\nPLANNED 2026-09-10 (god): see dispatch contract.",
+      "doneAt": "2026-09-10T01:23:13.084Z"
+    },
+    {
+      "id": "SEC-L-4",
+      "title": "L-4  Postman dev credentials committed (admin/password123)",
+      "status": "done",
+      "assignee": "worker-sec-l1-l6",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [
+        "god verify 2026-09-10: creds rotated to Impoc-Devseed-2026! DEV-ONLY across postman + DB_RESET docs"
+      ],
+      "detail": "postman/.env.template:6-7; .env.example:24-25; ENV_SETUP_GUIDE.md:22-23. Fix: rotate + mark dev-only (never sample).\\n\\nPLANNED 2026-09-10 (god): see dispatch contract.",
+      "doneAt": "2026-09-10T01:23:13.084Z"
+    },
+    {
+      "id": "SEC-L-5",
+      "title": "L-5  Op.iLike/Op.like wildcard inputs on search fields",
+      "status": "done",
+      "assignee": "worker-sec-l1-l6",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [
+        "god verify 2026-09-10: new escapeLike() helper applied to customers/units/stock LIKE searches"
+      ],
+      "detail": "customers.service.js:86-88; units.service.js:24; stock.service.js:642-646. Parameterized (not SQLi) but %/_ act wildcard -> inefficiency + fuzzy exposure. Fix: escape wildcards.\\n\\nPLANNED 2026-09-10 (god): see dispatch contract.",
+      "doneAt": "2026-09-10T01:23:13.084Z"
+    },
+    {
+      "id": "SEC-L-6",
+      "title": "L-6  req.user.id bare deref in scan controller (500 if user fetch fails)",
+      "status": "done",
+      "assignee": "worker-sec-l1-l6",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [
+        "god verify 2026-09-10: scanIntoStock actorUserId req.user?.id"
+      ],
+      "detail": "stock.controller.js:141. Fix: req.user?.id optional-chain (siblings already use it).\\n\\nPLANNED 2026-09-10 (god): see dispatch contract.",
+      "doneAt": "2026-09-10T01:23:13.084Z"
+    },
+    {
+      "id": "SEC-L-7",
+      "title": "L-7  Server error strings forwarded to the UI (frontend buildError passthrough)",
+      "status": "done",
+      "assignee": "worker-sec-l7-l8",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [
+        "2026-09-10 god verify: vitest 291/27 + build PASS in worktree+main; merged 981fa2f"
+      ],
+      "detail": "frontend/src/services/*Api.js buildError. Currently safe only while backend 4xx allow-list holds. Fix: keep in lockstep / client-side generic mapping.\\n\\nPLANNED 2026-09-10 (god): see dispatch contract.",
+      "doneAt": "2026-09-10T01:14:07.495Z"
+    },
+    {
+      "id": "SEC-L-8",
+      "title": "L-8  frontend/vite.config.js:14 dev server host:true binds 0.0.0.0",
+      "status": "done",
+      "assignee": "worker-sec-l7-l8",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [
+        "2026-09-10 god verify: vite host localhost; merged 981fa2f"
+      ],
+      "detail": "vite.config.js:14. Fix: host: localhost.\\n\\nPLANNED 2026-09-10 (god): see dispatch contract.",
+      "doneAt": "2026-09-10T01:14:07.495Z"
+    },
+    {
+      "id": "UX-CR-1",
+      "title": "UX-C1 no post-login landing route",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "critical",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-C1 no post-login landing route: / falls through * catch-all to 'Nothing here yet'; sign-out/sign-in always dumps there (app/App.jsx no default route, AppShell.jsx no auto-nav, app/navigation.js). Fix: <Route path=\"/\" element={<Navigate to={firstAccessiblePath} replace />} /> from permissions vs navigationRegistry, or auto-nav in AppShell on mount.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-CR-2",
+      "title": "UX-C2 POS total is not the largest element (rendered...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "critical",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-C2 POS total is not the largest element (rendered text-lg+<strong>, POSScreen.jsx:498-504; SaleReceipt.jsx:59-62) and money bypasses .typography-money* (no font-variant-numeric tabular-nums / right-align) defined in index.css:366-406. Fix: .typography-money-lg (28px bold tabular-nums) on grand total; .typography-money/-sm + text-right on line prices; total = single largest element in checkout card.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-CR-3",
+      "title": "UX-C3 rental return commits deposit/late/damage with...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "critical",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-C3 rental return commits deposit/late/damage with NO pre-submit refund preview: depositRefundedPaise shown only after Process return (ReturnUnitsDialog.jsx + RentalsScreen.jsx:379). Violates till rule financial actions must be visible+confirmable. Fix: live per-line + total refund/late/damage preview in the dialog before submit + final one-line confirm ('Refund Ã¢â€šÂ¹X - Process return').",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-H-1",
+      "title": "UX-H1 touch targets below 44px app-wide (library fai...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-H1 touch targets below 44px app-wide (library failure): Button sm=h-8(32px)/md=h-10(40px) components/ui/Button.jsx:27-32 + all size=\"sm\" callers (Users/Roles/FlatPicklistManager/ProductTypesManager/Vendors/Trips/TripDetail/Stocks/TemplateForm/Rentals/Expenses/RentalCreateDialog/Customers/Dashboard); chips ~20-24px, CustomerPicker rows ~32px, chip-removal x ~16px, AppShell mobile settings ~36px. Fix at primitive: sm->h-11, md->h-11/min-h-11; dense option keeps >=44px hit area via padding wrapper; sweep chips/rows min-h-[44px].",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-H-2",
+      "title": "UX-H2 money not tabular / right-aligned in list surf...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-H2 money not tabular / right-aligned in list surfaces: POSScreen.jsx:430-433, SaleReceipt.jsx, ReceiptPreview.jsx:101-140, RentalsScreen.jsx:251,316,335-379, ExpensesScreen.jsx:209, VendorsScreen.jsx:289-290, StocksScreen.jsx:184-199, VendorDetail.jsx. Fix: apply .typography-money*/tabular-nums + text-right to every monetary cell/row; restructure inline-prose money into aligned label/value rows (RentalsScreen.jsx:373-380).",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-H-3",
+      "title": "UX-H3 inventory lists are stacked cards, not ui/Table",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-H3 inventory lists are stacked cards, not ui/Table: TripsScreen.jsx:161, StocksScreen.jsx:161, UnitsScreen.jsx:202 (<ul> lists), VendorDetail.jsx; ui/Table primitive unused for these. No sticky header / frozen identity col / right-aligned numerics -> INVENTORY TABLES archetype unmet. Fix: adopt ui/Table (sticky thead, frozen first col, right-aligned money + tabular-nums).",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-H-4",
+      "title": "UX-H4 status/state signalled by colour alone",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-H4 status/state signalled by colour alone: TripsScreen.jsx:178, VendorDetail.jsx:155 (green/red text, no icon/+/-), TripDetailScreen.jsx:439 + StocksScreen.jsx:186 (complete = green text only). Violates colour-always-paired + never colour alone (colour-blind). Fix: pair colour with icon/symbol (up/down/check/!) and/or explicit text; replicate TripDetail 'Stock complete' pattern site-wide.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-H-5",
+      "title": "UX-H5 stock scan loop re-arms manually every unit (~...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-H5 stock scan loop re-arms manually every unit (~3-5 taps/unit): StockIntake.jsx:179,283-285 + BarcodeScanner.jsx:281-321 return to IDLE after each save, re-pick colour/size each unit. For lot of N ~3N taps. Fix: after commit auto re-arm camera + auto-submit when colour/size prefilled (repeat-commit loop); explicit back-to-IDLE affordance; default colour from last save.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-H-6",
+      "title": "UX-H6 bare interactive elements bypassing primitives...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-H6 bare interactive elements bypassing primitives -> lost focus-visible ring + semantics: AppShell nav rail/tab bar/mobile header (AppShell.jsx:180-196,216-234,258-266,304-318), TripsScreen.jsx:167, StockIntake.jsx:291,307,319,455, StockForm.jsx:261,344, UnitsScreen.jsx:133, PicklistManagementScreen.jsx:72-84, chip-removal x (UsersScreen.jsx:342-349, RolesScreen.jsx:273-279), CustomerPicker.jsx:150-157,189-223, consent chips CustomersScreen.jsx:190-204, Dashboard tabs Dashboard.jsx:428-439, div onClick backdrops StockIntake.jsx:439-440. Guardian lens: library failure (no NavItem/Tab/ToggleGroup primitive). Fix: add NavItem/Tab/ToggleGroup primitive with full focus-visible + aria-current/aria-selected/aria-pressed; migrate backdrops to accessible Dialog.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-H-7",
+      "title": "UX-H7 POS barcode lookup has no loading state (doubl...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-H7 POS barcode lookup has no loading state (double-scan race) + silent picklist-fetch failure: POSScreen.jsx barcode lookup in flight no spinner/disabled input; POSScreen.jsx:62-74 .catch(() => {}) swallows picklist errors; CustomerPicker.jsx:62. Fix: lookupLoading state (disable scan input + spinner); surface picklist failure via inline banner/toast.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-H-8",
+      "title": "UX-H8 rental line unitStatus forced neutral Badge (R...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-H8 rental line unitStatus forced neutral Badge (RentalsScreen.jsx:340) -> rented/overdue/lost line same visual weight as available; only raw word signals. Fix: map unitStatus to variants (danger late/lost, success returned, info rented), mirror agreement-level statusBadgeVariant (RentalsScreen.jsx:23-34); keep text present.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-1",
+      "title": "UX-M1 StockIntake save-failure fallback dumps to IDL...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M1 StockIntake save-failure fallback dumps to IDLE discarding barcode + selected colour/size (StockIntake.jsx:191-194). Fix: keep DECODED with entered values + inline retry for non-404/non-dup failures.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-2",
+      "title": "UX-M2 raw-hex leaks bypassing tokens",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M2 raw-hex leaks bypassing tokens: SignIn.jsx:65 rgba(183,29,54,0.1), Dashboard.jsx:387 rgba(179,38,30,0.1), StockIntake.jsx:228 rgba(179,38,30,0.1) -> var(--danger)/10 like other screens.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-3",
+      "title": "UX-M3 Table component TableHead not sticky + no froz...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M3 Table component TableHead not sticky + no frozen first column (components/ui/Table.jsx). Fix: sticky top-0 bg-[var(--surface-raised)] z-10 + sticky left on first col for long lists.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-4",
+      "title": "UX-M4 OS window.confirm() for destructive deletes",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M4 OS window.confirm() for destructive deletes: UsersScreen.jsx:130, RolesScreen.jsx:102, ProductTypesManager.jsx:105. Unstyleable + inconsistent with Dialog primitive. Fix: migrate to in-app confirmation Dialog.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-5",
+      "title": "UX-M5 Clear cart destructive with no confirm; New transaction bottom-only",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M5 POSScreen.jsx:508 'Clear cart' destructive (wipes customer/cart/receipt) with no confirm; receipt view 'New transaction' bottom-only. Fix: sticky top 'New transaction' on receipt view + 3s inline 'Confirm clear?' toggle on Clear.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-6",
+      "title": "UX-M6 Expenses loading is bare text, no skeleton",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M6 ExpensesScreen.jsx:185 bare 'Loading expenses...' text, no skeleton (inconsistent with Rentals/Customers/Dashboard skeleton pattern). Fix: match skeleton pattern.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-7",
+      "title": "UX-M7 Dashboard tabs lack tab semantics + arrow-key nav",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M7 Dashboard.jsx:428-439 tabs are bare buttons: no role=\"tab\"/aria-selected/arrow-key nav. Fix: role=tab + aria-selected + arrow-key navigation (or Tab primitive from UX-H-6).",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-8",
+      "title": "UX-M8 Consent chips ~20px, no focus-visible, no in-flight guard",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M8 CustomersScreen.jsx:190-204 consent chips ~20px hit area, no focus-visible ring, no in-flight guard (double-click risk). Fix: min-h-[44px], focus-visible, disable while saving.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-9",
+      "title": "UX-M9 BarcodeScanner.jsx camera/scanner errors surfa...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M9 BarcodeScanner.jsx camera/scanner errors surfaced only inside internal card; no accessible retry/stop. Fix: surface camera errors in StockIntake with accessible retry + real stop affordance.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-M-10",
+      "title": "UX-M10 arbitrary text-[13px] vs semantic typography ...",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-M10 arbitrary text-[13px] vs semantic typography tokens: TripDetailScreen.jsx:374,430,438; StocksScreen.jsx:179,184; UnitsScreen.jsx:219,227; VendorDetail.jsx:168. Fix: use semantic typography tokens.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-L-1",
+      "title": "UX-L1 inline style={{...}} padding",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-L1 inline style={{...}} padding: App.jsx:36-38,95-98; RouteGuard.jsx:51,77-84; ProductTypesManager.jsx:26 -> Tailwind utility classes.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-L-2",
+      "title": "UX-L2 duplicate STOCK_FULL blocks (StockIntake.jsx",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-L2 duplicate STOCK_FULL blocks (StockIntake.jsx:414 & :425); SaleReceipt.jsx:40 hover:bg-transparent override -> add noHover prop to TableRow.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-L-3",
+      "title": "UX-L3 ReceiptPreview/SaleReceipt no sale.lines guard",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-L3 ReceiptPreview.jsx:19 / SaleReceipt.jsx return null on missing data; add defensive sale?.lines guard to prevent crash on malformed data.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "UX-L-4",
+      "title": "UX-L4 Cancel in ARMED wipes prefilled state without confirm",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "low",
+      "deps": [],
+      "humanQA": [],
+      "detail": "UX-L4 StockIntake.jsx:108-117 Cancel in ARMED wipes prefilled state without confirmation -> add lightweight guard.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "R-26",
+      "title": "UI/UX remediation umbrella - Critical..Low fixes (25 finding cards UX-CR-1..UX-L-4), NOT started",
+      "status": "done",
+      "assignee": "worker-ux-combo",
+      "priority": "high",
+      "deps": [
+        "R-25"
+      ],
+      "humanQA": [
+        {
+          "q": "Which UI/UX findings to remediate? (waiting on fix-work go-ahead)",
+          "askedAt": "2026-09-07",
+          "a": "Cover everything Critical through Low; NOT started yet - cards parked."
+        }
+      ],
+      "detail": "Umbrella for UI/UX remediation. DEPEND: R-25 review (done, sends UX-* source report). Human: cover Critical..Low, work later.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "completedAt": "2026-09-10T02:31:23.154Z",
+      "integration": "merged 1182611 (framework/md-impoc) commit 5a5ae89"
+    },
+    {
+      "id": "R-30",
+      "title": "POS: allow editing cart item price after scan, validated against floor price",
+      "status": "done",
+      "assignee": "worker-ux-combo-r26-r30 + worker-r32-db-views-r30",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [
+        {
+          "q": "R-30 POS price edit both halves landed?",
+          "a": "Frontend half merged 1182611 (ux-combo); backend floor-guard half merged 4ed6479 (r32 worker): sellingPricePaise validated, below-floor -> 400 \"Price cannot be below floor price\". 669/669 green.",
+          "askedAt": "2026-09-10T02:45:00Z"
+        }
+      ],
+      "detail": "PLANNED (2026-09-09, god) - not started, human backlog. Want: in POS screen, after scanning+adding an item to cart, the unit price of that cart line must be editable, and the edited price must be validated against the floor price before checkout. RESEARCH FINDINGS: cart item in POSScreen.jsx:127-137 does NOT carry floorPricePaise (backend GET /units/by-barcode/:barcode DOES return it via units.service.js:314-316 mapUnitDTO - currently dropped at add-to-cart). Cart row price is read-only <span> at POSScreen.jsx:430-434; total memo at :94-99. Checkout (POSScreen.jsx:202-252) sends only { unitUuid } per item - no price; sales.validation.js:10-18 sellableUnitItemSchema accepts only unitUuid|barcode (z.object strips unknown keys), no price field and NO floor check; sales.service.js resolveSellableUnit (:82-114) loads selling+floor price but only enforces channel/status; SaleLine snapshot uses stored unit.sellingPricePaise (:173). IMPLEMENTATION PLAN: (1) frontend cart item add floorPricePaise; (2) cart row price becomes editable Input (components/ui, same primitive as barcode input) bound to item.sellingPricePaise, disable/flag when edited < floorPricePaise, pos-total auto-recompute; (3) handleCheckout sends sellingPricePaise per item; (4) backend createSaleBodySchema item adds optional sellingPricePaise.int().min(0); (5) floor guard: sellingPricePaise >= floorPricePaise (in sales.validation.js refine and/or resolveSellableUnit in sales.service.js, which already loads both); (6) consider SaleLine floor snapshot column for audit. TESTS TO EXTEND: frontend src/screens/__tests__/posIntake.test.jsx (price-edit + below-floor rejection + checkout payload now contains sellingPricePaise); backend tests/sales/sales.test.js (below-floor sale reject). BACKEND ONLY for floor guard; whole change is frontend+backend. Leave for later sprint - do NOT start.",
+      "startedAt": "2026-09-10T01:39:37.013Z",
+      "doneAt": "2026-09-10T03:25:19.002Z"
+    },
+    {
+      "id": "R-33",
+      "title": "Expense Type picklist + expense form category dropdown",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r33-expense-type-picklist",
+      "deps": [],
+      "origin": "user (2026-09-10)",
+      "details": "Add a new flat picklist \"Expense types\" (values Rent, Travel, Food, Misc; admin can add more later), and make the expense form Category field a dropdown fed by it. BACKEND (copy backend/src/modules/payment-methods/* + database/models/PaymentMethod.js as the template): - New module backend/src/modules/expense-types/ (service/controller/routes/validation), same CRUD shape as payment-methods (list active-first, create with dup guard, get-by-uuid, patch name/isActive). - New Sequelize model ExpenseType (table expense_types: id, uuid, name unique-active, is_active, timestamps, deleted_at) + register in database/models/index.js. - Migration create-expense-types (ESM export style: use export async function up/down, NOT module.exports — backend is type:module). - Idempotent seeder upserting Rent/Travel/Food/Misc (active). - Mount app.js: app.use(\"/api/picklists/expense-types\", expenseTypeRoutes). Reads = authenticate only; writes = authorize(PERMISSIONS.PICKLISTS.CREATE / .UPDATE). FRONTEND: - picklistsApi.js: add expenseTypes to RESOURCE_BASE + getExpenseTypes(); reuse generic createPicklistItem/updatePicklistItem(\"expenseTypes\", ...). - Admin PicklistManagementScreen.jsx: add TAB {key:\"expense-types\", label:\"Expense types\"} + a FlatPicklistManager pane (name column/field) like payment-methods. - ExpenseFormDialog.jsx: replace the free-text Category Input with the existing ui Select, options = active expense types (by name); keep required; keep value as the category NAME string (expense.category stays a string, no backend contract change). BOUNDARIES: expense.category stays a free-text string column; do NOT hard-enforce membership on the backend (keeps legacy rows + edits working) — the dropdown drives values. Preserve all existing routes/perms/tests. Leave changes UNCOMMITTED for god to verify+integrate. Backend jest + frontend vitest + build must be green; add tests mirroring payment-methods tests + an ExpenseFormDialog select test.",
+      "humanQA": [
+        {
+          "q": "R-33 integrated?",
+          "a": "Committed d815841 on framework/md-impoc. expense-types picklist + form Select. Backend 682/682, frontend 298/298, build green. Migration+seeder applied to dev; API returns Rent/Travel/Food/Misc.",
+          "askedAt": "2026-09-10T04:25:00Z"
+        }
+      ],
+      "doneAt": "2026-09-10T14:31:19.428Z"
+    },
+    {
+      "id": "R-34",
+      "title": "Collapsible desktop nav sections (AppShell)",
+      "status": "done",
+      "priority": "low",
+      "assignee": "god",
+      "deps": [],
+      "origin": "user (2026-09-10)",
+      "details": "Make the desktop left-rail nav SECTION groups (Inventory/POS/Rentals/Expenses/Admin/Dashboard) collapsible: click a section header to expand/collapse its items, chevron indicator, aria-expanded, state persisted in localStorage (try/catch). Section containing the active route stays expanded. Mobile flat tab bar unchanged. Add AppShell test. god implements directly (small self-contained AppShell.jsx change, no file conflict with R-33 worker).",
+      "humanQA": [
+        {
+          "q": "Collapsible nav done?",
+          "a": "AppShell.jsx: section headers are aria-expanded buttons with chevron; toggle persists in localStorage. Suite 295 green, build passes. Committed.",
+          "askedAt": "2026-09-10T04:10:00Z"
+        }
+      ],
+      "doneAt": "2026-09-10T14:31:19.428Z"
+    },
+    {
+      "id": "R-35",
+      "title": "POS UPI QR checkout flow (Checkout button + Mark received + configurable UPI id)",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r35-pos-upi-display",
+      "deps": [
+        "R-33"
+      ],
+      "origin": "user (2026-09-10)",
+      "details": "POS sale checkout: rename the 'Charge' button to 'Checkout' and add a two-step payment confirmation with a UPI (Unified Payments Interface) QR flow. SALE mode only (rental checkout unchanged this card).\n\nCURRENT (frontend/src/screens/pos/POSScreen.jsx): the 'Charge' button (line ~700) calls handleCheckout which creates the sale immediately and shows the receipt. Payment method comes from the payment-methods picklist Select (paymentMethod state, default 'Cash').\n\nNEW FLOW:\n1. Rename sale-mode button 'Charge' -> 'Checkout'. Keep 'No permission' when SALES.CREATE absent.\n2. Clicking Checkout opens a Payment step (a Dialog/panel) INSTEAD of creating the sale. The sale is created only on 'Mark received'. Move the current handleCheckout create-sale logic into the confirm handler; keep the SEC-M-3 checkoutKeyRef idempotency (one key per intent, reused on retry, reset after success/clear).\n3. If paymentMethod === 'UPI': show a UPI QR encoding the checkout amount. Show the amount clearly. Buttons: 'Mark received' (primary) + 'Cancel'. Customer scans -> cashier taps 'Mark received' -> create the sale -> replace the QR area with a 'Thank you' confirmation, then reveal the existing SaleReceipt + 'New transaction'.\n4. If paymentMethod === 'Cash' (or any non-UPI): no QR. Show the amount + 'Mark as received' + 'Cancel' -> create the sale -> 'Thank you' -> receipt.\n5. 'Cancel' in the payment step returns to the cart without creating a sale (idempotency key preserved so a re-open reuses it).\n\nUPI QR CONTENT: encode the standard deep link upi://pay with params: pa=<VPA> (required), pn=<payee, use SHOP_NAME 'SHREE Fashion Store' from components/ShopLogo.jsx or the account label>, am=<amount in rupees, 2dp from totalPaise>, cu=INR, tn=<note e.g. 'SHREE Fashion Store sale'>, tr=<txn ref>. Sale number does NOT exist yet (sale is created on Mark-received), so use the checkout idempotency key (checkoutKeyRef) as tr and in tn. Build the string in a tested pure helper (e.g. platform/upi.js buildUpiUri) and URL-encode each value.\n\nUPI ID CONFIGURABLE FROM PICKLIST: add a new flat picklist 'UPI accounts' (mirror the payment-methods module + R-33 expense-types), but each entry needs TWO fields: label + vpa (the VPA / UPI id, e.g. shree@okhdfcbank) + is_active. So the model/migration/validation carry a vpa column and FlatPicklistManager (or a small dedicated manager) must support the extra field/column. Mount /api/picklists/upi-accounts (read=authenticate, write=PICKLISTS.CREATE/UPDATE). Seeder optional (may seed a placeholder VPA or leave empty). POS reads the active UPI account(s): if one -> use it; if several -> small selector in the payment step; if none -> disable the UPI path / show 'Add a UPI account in Picklists' hint.\n\nQR RENDERING: no QR lib is installed. Add a pinned dependency (qrcode or qrcode.react) and verify it builds under vite 8 / react 19; render the upi:// string as a QR (canvas/svg/dataURL). Keep bundle impact reasonable.\n\nBACKEND: only the new upi-accounts picklist module (model+migration ESM export+validation+routes+controller, register in models/index.js, mount in app.js, run on impoc_dev). NO change to sale creation and NO payment-gateway verification — 'Mark received' is a manual human confirmation.\n\nTESTS: buildUpiUri unit test (params + encoding); PaymentDialog tests (UPI shows QR + Mark received -> thank you -> receipt; Cash shows no QR); backend upi-accounts module tests mirroring payment-methods. Frontend vitest + build + backend jest green.\n\nBOUNDARIES/SEQUENCING: SALE mode only. Depends on R-33 (soft): both edit picklistsApi.js + PicklistManagementScreen.jsx, so sequence AFTER R-33 integrates to avoid merge conflicts. Leave changes UNCOMMITTED for god to verify+integrate. PLAN ONLY for now — do not dispatch until the human says go.\n\n=== AMENDMENT (2026-09-10, user): add a PUBLIC customer-facing display page on a SEPARATE DEVICE (tablet/phone facing the customer). Chosen over same-browser BroadcastChannel, so it needs a public backend live channel. ===\n\nPAIRING: POS shows a short non-guessable display code (e.g. 6 chars), persisted per terminal in localStorage so it stays stable. The customer device opens /display/:code (or enters the code on /display).\n\nBACKEND (new ephemeral, in-memory — no DB): a POS-display channel keyed by code.\n- POST /api/pos-display/:code (AUTHENTICATED, SALES.CREATE) — POS publishes the current payment state {status:'idle'|'awaiting'|'received', method:'UPI'|'Cash', amountPaise, upiUri}. Keep the payload MINIMAL: status, method, amountPaise, upiUri only. NO customer PII, NO cart lines.\n- GET /api/pos-display/:code/stream (PUBLIC, NO AUTH) — Server-Sent Events stream the display subscribes to (EventSource). On connect, immediately send the current state (late-join); push every update. Heartbeat comments keep it alive; clean up subscriber on close. In-memory Map<code,{state,subscribers}> (lost on restart — fine, state is ephemeral).\n- SECURITY: only SUBSCRIBE is public and it exposes just amount + upiUri + status for an active checkout (payment-facing info a customer sees anyway). Publish is auth-gated so nobody can inject a fake QR. Code is random + state resets to idle after received/timeout to limit enumeration. Note this in the PR.\n\nFRONTEND:\n- Restructure App.jsx: today ALL routes sit inside RouteGuard+AppShell. Add a top-level Routes split so /display and /display/:code render OUTSIDE RouteGuard+AppShell (full-screen, no nav chrome, no auth). The guarded app stays the catch-all.\n- Display page (public): opens EventSource to /api/pos-display/:code/stream and renders states with framer-motion (already a dep): IDLE = pleasant ambient/branded animation ('waiting for next customer'); AWAITING+UPI = large UPI QR (rendered from the upiUri in the payload) + amount 'Scan to pay Rs X'; AWAITING+Cash = amount + 'Please pay at the counter' (no QR); RECEIVED = remove QR, thank-you animation, then auto-return to IDLE after a few seconds. Auto-reconnect on drop (EventSource default).\n- POS side (payment step from the base task): generate/show the display code (with a link/QR to open the display device), and POST the state to /api/pos-display/:code on every transition — checkout-UPI -> awaiting+UPI+amount+upiUri; checkout-cash -> awaiting+Cash+amount; mark-received -> received; cancel/clear/new transaction -> idle. POS still builds the upiUri (VPA from the UPI-accounts picklist) so the display needs no picklist/auth access — it just renders what it is sent.\n\nTESTS: SSE endpoint (publish updates a subscriber; late-join gets current state; publish requires auth, subscribe does not); display page renders each state from mocked EventSource messages; POS posts state on transitions.\n\nThis REPLACES the earlier 'BroadcastChannel same-browser' idea. Still PLAN ONLY — do not dispatch until the human says go.",
+      "umbrella": true,
+      "subtasks": [
+        "R-35a",
+        "R-35b",
+        "R-35c",
+        "R-35d",
+        "R-35e",
+        "R-35f"
+      ],
+      "doneAt": "2026-09-10T19:14:40.323Z",
+      "humanQA": [
+        {
+          "q": "R-35 POS UPI-QR checkout + public display integrated?",
+          "a": "Merged 20105d6 (feat d5107ff) into framework/md-impoc. Backend 709/709, frontend 332/332, build PASS, migration applied. Built by worker-r35-pos-upi-display (sonnet, isolated worktree). Manual browser smoke-test still recommended (POS Checkout->UPI->Mark received->Thank you->Receipt + /display/<code> 2nd tab).",
+          "askedAt": "2026-09-10T19:14:40.323Z"
+        }
+      ]
+    },
+    {
+      "id": "R-35a",
+      "title": "Backend: upi-accounts picklist module (label+vpa+is_active)",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r35-pos-upi-display",
+      "parent": "R-35",
+      "origin": "god (2026-09-11, R-35 breakdown)",
+      "deps": [],
+      "details": "model+ESM-export migration+zod validation+routes+controller; register models/index.js; mount /api/picklists/upi-accounts (GET=auth, POST/PATCH=PICKLISTS.CREATE/UPDATE); mirror payment-methods + R-33 expense-types; optional placeholder VPA seeder. Migration must use ESM export (const migration={...}; export const up=migration.up.bind(migration)) NOT module.exports (see R-32). | DONE 2026-09-11: upi-accounts picklist module. Files: models/UpiAccount.js, migration 20260911000001-create-upi-accounts.js + seeder (placeholder VPA), src/modules/upi-accounts/{service,controller,routes,validation}.js, models/index.js register, app.js mount, error.middleware allow-list. Routes GET/POST/PATCH /api/picklists/upi-accounts(/:uuid) (auth read; write PICKLISTS.CREATE/UPDATE). Tests upi-accounts.test.js 13. Migration applied to impoc_dev. Uncommitted in worker worktree.",
+      "createdAt": "2026-09-10T18:41:38.054Z",
+      "doneAt": "2026-09-10T18:51:28.608Z"
+    },
+    {
+      "id": "R-35b",
+      "title": "Backend: ephemeral in-memory pos-display SSE channel",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r35-pos-upi-display",
+      "parent": "R-35",
+      "origin": "god (2026-09-11, R-35 breakdown)",
+      "deps": [],
+      "details": "In-memory Map<code,{state,subscribers}> (no DB). POST /api/pos-display/:code (AUTH, SALES.CREATE) publishes {status,method,amountPaise,upiUri} minimal, no PII/lines. GET /api/pos-display/:code/stream (PUBLIC, no auth) = SSE: send current state on connect (late-join), push updates, heartbeat, cleanup on close. Reset to idle after received/timeout. | DONE 2026-09-11: pos-display ephemeral SSE channel (in-memory Map, no DB). Files src/modules/pos-display/{state,controller,routes,validation}.js, app.js mount. POST /api/pos-display/:code (auth+SALES.CREATE), GET /api/pos-display/:code/stream (PUBLIC no auth, SSE late-join + heartbeat + auto-reset-to-idle 8s after received). Tests pos-display.test.js 14 (real SSE via raw http server). Uncommitted.",
+      "createdAt": "2026-09-10T18:41:38.054Z",
+      "doneAt": "2026-09-10T18:51:28.608Z"
+    },
+    {
+      "id": "R-35c",
+      "title": "Frontend: buildUpiUri helper + QR dependency",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r35-pos-upi-display",
+      "parent": "R-35",
+      "origin": "god (2026-09-11, R-35 breakdown)",
+      "deps": [],
+      "details": "platform/upi.js buildUpiUri({vpa,payee,amountRupees,note,txnRef}) -> upi://pay?pa&pn&am&cu=INR&tn&tr, each value URL-encoded; amount=totalPaise/100 2dp; txnRef/note from checkoutKeyRef. Add pinned qrcode.react; verify builds under vite 8 / react 19. | DONE 2026-09-11: platform/upi.js buildUpiUri() pure helper (10 tests) + qrcode.react@4.2.0 pinned (React19 OK). Uncommitted->merged.",
+      "createdAt": "2026-09-10T18:41:38.054Z",
+      "doneAt": "2026-09-10T19:14:40.323Z"
+    },
+    {
+      "id": "R-35d",
+      "title": "Frontend: POS Checkout two-step Payment dialog",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r35-pos-upi-display",
+      "parent": "R-35",
+      "origin": "god (2026-09-11, R-35 breakdown)",
+      "deps": [],
+      "details": "Rename Charge->Checkout (keep No-permission when SALES.CREATE absent). Dialog: sale created ONLY on Mark received (move handleCheckout create logic there; preserve SEC-M-3 checkoutKeyRef). UPI -> QR + amount; Cash -> amount only; Mark received -> Thank you -> SaleReceipt + New transaction; Cancel -> back to cart keeping key. UPI accounts: one->use, several->selector, none->disable UPI + hint. | DONE 2026-09-11: POSScreen Charge->Checkout opens PaymentDialog; sale created only in handleMarkReceived (SEC-M-3 checkoutKeyRef preserved, Cancel keeps key). PaymentDialog.jsx (10 tests): UPI QR+amount(+selector if>1,hint if 0)/Cash amount only. Rental checkout untouched.",
+      "createdAt": "2026-09-10T18:41:38.054Z",
+      "doneAt": "2026-09-10T19:14:40.323Z"
+    },
+    {
+      "id": "R-35e",
+      "title": "Frontend: public /display page + App.jsx route split + POS posts state",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r35-pos-upi-display",
+      "parent": "R-35",
+      "origin": "god (2026-09-11, R-35 breakdown)",
+      "deps": [],
+      "details": "App.jsx top-level Routes split so /display and /display/:code render OUTSIDE RouteGuard+AppShell (full-screen, no auth); guarded app stays catch-all. Display opens EventSource, framer-motion states IDLE/AWAITING+UPI(QR)/AWAITING+Cash/RECEIVED(auto-return). POS shows/persists 6-char display code in localStorage per terminal + POSTs pos-display state on every transition (awaiting/received/idle). | DONE 2026-09-11: App.jsx top-level Routes split: /display + /display/:code render OUTSIDE RouteGuard+AppShell (public full-screen). PosDisplayScreen.jsx (8 tests) EventSource + framer-motion idle/awaiting(UPI-QR|Cash)/received. POS posts pos-display state on every transition (fire-and-forget). posDisplayCode/Stream/Api helpers; apiClient getApiBaseUrl(). UPI accounts tab via existing FlatPicklistManager. routing.test +2.",
+      "createdAt": "2026-09-10T18:41:38.054Z",
+      "doneAt": "2026-09-10T19:14:40.323Z"
+    },
+    {
+      "id": "R-35f",
+      "title": "Tests + verification + migration apply",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r35-pos-upi-display",
+      "parent": "R-35",
+      "origin": "god (2026-09-11, R-35 breakdown)",
+      "deps": [],
+      "details": "Tests: buildUpiUri; PaymentDialog (UPI QR + Mark received->thank you->receipt; Cash no QR); SSE (publish updates subscriber, late-join current state, publish needs auth/subscribe does not); display renders each state from mocked EventSource; POS posts on transitions; backend upi-accounts mirroring payment-methods. Verify: frontend npm run build + npx vitest run (298 baseline, no regress); backend jest (NODE_ENV=test, --experimental-vm-modules, --forceExit); apply new migration to impoc_dev. Report exact counts. | DONE 2026-09-11: Verified by god in worktree: frontend vitest 332/332 + build PASS; backend jest 709/709. Migration 20260911000001-create-upi-accounts applied to impoc_dev + seeder run.",
+      "createdAt": "2026-09-10T18:41:38.054Z",
+      "doneAt": "2026-09-10T19:14:40.323Z"
+    },
+    {
+      "id": "R-36",
+      "title": "System-wide modal/form polish: label spacing + themed modal scrollbar + dropdown z-index over modal",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r36-r37-r39-frontend-batch",
+      "deps": [],
+      "origin": "user (2026-09-10)",
+      "details": "System-wide fix to the shared UI primitives (touches every modal/form). THREE parts:\n\n1) LABEL<->CONTROL SPACING: labels sit almost touching their inputs (screenshot: Create trip modal, which uses generic <Input label=...>). Increase the label-to-control gap in the shared primitives: frontend/src/components/ui/Input.jsx wrapper 'space-y-1.5' -> 'space-y-2' (8px); frontend/src/components/ui/Select.jsx root 'flex flex-col gap-1.5' -> 'gap-2'. Check Textarea/any other labelled primitive and align them to the same gap. This fixes it everywhere at once (all forms use these).\n\n2) MODAL SCROLL + THEMED SCROLLBAR: Dialog.jsx already scrolls its body (overflow-y-auto, modal max-h-[85vh]) so content stays within the viewport height — keep that. But hide the DEFAULT scrollbar and use a nice themed one. Add a reusable utility class (e.g. .themed-scrollbar in index.css): ::-webkit-scrollbar {width:8px} / -thumb {rounded, var(--border-strong) or --ink-faint, transparent track, subtle hover} + Firefox 'scrollbar-width:thin; scrollbar-color: var(--...) transparent'. Apply it to the Dialog scroll body; reuse on other scroll areas (Select list, sidebar) for consistency. Must look right in the app theme.\n\n3) DROPDOWN OVER MODAL: a Select opened inside a modal is currently rendered inside the modal body (overflow-y-auto) at z-50, the SAME z as the Dialog (z-50) -> the popover gets CLIPPED by the modal's scroll container and can render under modal chrome. Fix so any dropdown shows over everything: render the Select popover via a PORTAL to document.body, positioned from the trigger's rect, with a z-index ABOVE the modal (define a small z scale: modal=50, popover/overlay=60+). Preserve outside-click close, Escape close, cmdk keyboard nav, focus, and reposition on scroll/resize. This unclips it and layers it correctly.\n\nBOUNDARIES: shared-component changes ripple to every modal/form. Run full frontend vitest + build; visually verify a modal with a Select (POS checkout / expense form) and a modal whose content overflows (scroll + themed bar). Add/adjust tests: Input/Select label-gap class assertion; Select popover portaled + higher z than Dialog. Leave UNCOMMITTED for god to verify+integrate. PLAN ONLY - do not start until the human says go.",
+      "humanQA": [
+        {
+          "q": "R-36 integrated?",
+          "a": "Merged 11a58ae. 298/298 vitest + build green (main). Built by claude+haiku batch worker.",
+          "askedAt": "2026-09-10T15:20:00Z"
+        }
+      ],
+      "doneAt": "2026-09-10T15:31:19.641Z"
+    },
+    {
+      "id": "R-37",
+      "title": "Reusable DataGrid (TanStack): no page-scroll + per-column sort/filter/search for every grid",
+      "status": "done",
+      "priority": "high",
+      "assignee": "worker-r37-finish-final (+ god integration)",
+      "deps": [],
+      "origin": "user (2026-09-10)",
+      "details": "PHASE 3 MERGED 2026-09-10: 10/11 grids migrated (Trips/Stocks/Units/Vendors/Roles/Permissions/FlatPicklist/Users/Customers/TripDetail). god fixed 2 phase-3 regressions (7cf1a7f: TripDetail hooks order + Table import). REMAINING: (1) VendorDetail main grid; (2) UnitsScreen Status column needs filter:{type:picklist, options from UNIT_STATUSES} + remove the leftover standalone status Select (~lines 206-212) — the missed status-filter bug; (3) Part B generic polish: filter-type REGISTRY (type->{control,filterFn}), picklist-options-from-distinct helper, How-to-add-a-grid doc. Keep @tanstack v8. 298/298 baseline. PHASE 2 MERGED 2026-09-10: DataGrid global-search removed; per-column typed filters (text/number/date/picklist-dropdown) via column.filter descriptor. 5 of 11 grids migrated: Trips, Stocks, Units, Vendors, Roles. 298/298 + build green. REMAINING 6 grids: UsersScreen (has role-assign dialog — preserve), PermissionsScreen, FlatPicklistManager, CustomersScreen, VendorDetail, TripDetailScreen (nested dialog tables — migrate only main grid). STILL PENDING (generic-API polish): a filter-type REGISTRY (type->control+filterFn, one-place extension), a helper to derive picklist options from distinct values, and a 'How to add a grid' doc/example. Keep @tanstack/react-table v8. GENERIC-API REQUIREMENT (user 2026-09-10): DataGrid must be fully declarative/config-driven — a future grid supplies only a columns config (key/header/accessor, enableSort, filter:{type,options?}, cell renderer) + rows; DataGrid owns sort/filter/scroll/sticky/scrollbar/empty/loading. Filter types in a small registry (type->control+filterFn) for one-place extension; helper to derive picklist options from distinct values; documented \"How to add a grid\" note + minimal example. Same column-config contract across all grids + future. --- FILTER REDESIGN (user 2026-09-10): (a) REMOVE the universal/global search box from the top of DataGrid. (b) Filtering is PER-COLUMN only; each column declares a filter TYPE and the UI renders accordingly: 'text' -> text input, 'number' -> number input, 'date' -> date filter, 'picklist' -> a DROPDOWN of that column's options (NOT a free-text search). Column def gains e.g. { filter: { type: 'text'|'number'|'date'|'picklist', options?: [{value,label}] } }; picklist columns supply options (distinct values or the backing picklist). Compact filter control under/attached to each filterable header; keep header-click sort. Apply the new filter model to the 3 already-migrated grids (Trips/Stocks/Units) too. NOTE: setTotal crash already fixed by god (commit 56ff324). --- PHASE 1 MERGED 2026-09-10: DataGrid (TanStack v8) wired + verified via 3 migrated grids — TripsScreen, StocksScreen, UnitsScreen (per-column sort/filter, global search, internal-only scroll, sticky header; 298/298 + build green). REMAINING (8 grids): VendorsScreen, VendorDetail, TripDetailScreen, CustomersScreen, admin UsersScreen, RolesScreen, PermissionsScreen, FlatPicklistManager — migrate same way (preserve renderers/actions/RBAC/empty+loading + no-page-scroll layout). Keep @tanstack/react-table at v8. UNBLOCKED 2026-09-10: @tanstack/react-table pinned to v8.21.3 (commit b947b3b) — DataGrid imports (useReactTable/getCoreRowModel/getSortedRowModel/getFilteredRowModel/flexRender) now resolve. DataGrid foundation is at frontend/src/components/ui/DataGrid.jsx. REMAINING = migrate the grids + no-page-scroll layout. STATUS 2026-09-10: FOUNDATION MERGED (commit 11a58ae) — shared <DataGrid> built on @tanstack/react-table@9.2.4 (frontend/src/components/ui/DataGrid.jsx): per-column sort/filter, global search, internal scroll (flex-1 min-h-0), sticky header, themed scrollbar, cell renderers. NOT wired into any screen yet. REMAINING: migrate the ~12 grids to <DataGrid> (TripsScreen, StocksScreen, UnitsScreen, VendorsScreen, VendorDetail, TripDetailScreen, CustomersScreen, admin UsersScreen/RolesScreen/PermissionsScreen/FlatPicklistManager) preserving renderers/actions/RBAC/empty+loading, + the 'no whole-page scroll' layout per screen, + a 'how to add a grid' note. --- ORIGINAL SPEC BELOW --- \n\nSystem-wide grid overhaul. Replace the hand-rolled table with a reusable DataGrid built on a good headless package, fix page scrolling, and give every grid per-column sort + filter + a global search. This becomes the standard for all current and FUTURE grids.\n\nPACKAGE: use @tanstack/react-table (headless; React 19 compatible; keeps our Tailwind/theme styling; supports sorting, column filters, global filter, column visibility, pagination). Pin an exact version. Do NOT use AG Grid / MUI DataGrid (heavy, bring their own styling that fights the theme). Build a shared <DataGrid> in frontend/src/components/ui that composes the existing Table primitives for styling.\n\n1) NO WHOLE-PAGE SCROLL: today the page scrolls because grid content overflows AppShell <main> (overflow-y-auto). Grid screens must fit the viewport: screen = flex column, header/toolbar fixed, the grid fills remaining height (flex-1 min-h-0) and scrolls ITS OWN body with a sticky header row. Only the grid body scrolls, never the page.\n\n2) SORT + FILTER + SEARCH per grid, over that grid's AVAILABLE columns: click a column header to sort (asc/desc/none, indicator); per-column filter (text/select as fits the column); one global search box over the grid. Column defs declare which columns are sortable/filterable and their cell renderer.\n\n3) REUSABLE + APPLIED EVERYWHERE: migrate ALL existing grids to <DataGrid> with per-screen column defs, preserving current cell renderers (money via formatPaise, Badges, the View/Open/action buttons, RBAC gating) and empty/loading states. Grids in: TripsScreen, StocksScreen, UnitsScreen, VendorsScreen, VendorDetail, TripDetailScreen, CustomersScreen, admin UsersScreen/RolesScreen/PermissionsScreen/FlatPicklistManager. (SaleReceipt is a static receipt table - leave or lightly wrap.) Write a short 'how to add a new grid' note so future grids use DataGrid by default.\n\nDATA MODE: baseline = CLIENT-side sort/filter/search/pagination (fixes the ask now, fine for current volumes). Design the DataGrid API so a grid can switch to SERVER-side (manual) mode later using the R-32 backend grid views + pagination endpoints (limit/offset already exist) for very large tables. Server-side sort/filter = optional phase 2, note per grid.\n\nSYNERGY: reuse R-36's themed scrollbar (.themed-scrollbar) on the grid body; align with R-32 (backend views/pagination) for the server-side path.\n\nBOUNDARIES: large shared change touching ~12 screens - the implementer may PHASE it (build DataGrid + fix scroll + migrate 2-3 representative grids first, then the rest) and god may split at dispatch. Keep all existing columns/actions/formatting/RBAC. Full frontend vitest + build green; add DataGrid tests (sort, filter, global search, sticky-header internal scroll) + keep/adapt existing screen tests. Leave UNCOMMITTED for god to verify+integrate. PLAN ONLY - do not start until the human says go.",
+      "humanQA": [
+        {
+          "q": "R-37 done?",
+          "a": "All 11 grids on shared DataGrid. Per-column typed filters (text/number/date/picklist) via FILTER_REGISTRY; derivePicklistOptions helper; How-to-add-a-grid doc. Units status picklist filter fixed. Merged; 298/298 + build green.",
+          "askedAt": "2026-09-10T16:45:00Z"
+        }
+      ],
+      "doneAt": "2026-09-10T16:31:19.647Z"
+    },
+    {
+      "id": "R-38",
+      "title": "App-wide themed scrollbar (restyle default browser scrollbar)",
+      "status": "done",
+      "priority": "low",
+      "assignee": "worker-r38b-themed-scrollbar-claude",
+      "deps": [],
+      "origin": "user (2026-09-10)",
+      "details": "App-wide: restyle the DEFAULT browser scrollbar to match our theme and look good. Applies to every scroll surface (page/main content, sidebar, modals, grids, dropdown lists, any overflow container).\n\nIMPLEMENTATION: add global scrollbar styling in frontend/src/index.css using theme tokens (NO new default scrollbar CSS exists today). \n- WebKit/Blink (Chrome/Edge/Safari): ::-webkit-scrollbar { width/height ~8-10px }, -thumb { rounded, var(--border-strong) or --ink-faint, subtle hover to a stronger tone }, -track { transparent or --surface-sunken }, -corner transparent.\n- Firefox: scrollbar-width: thin; scrollbar-color: <thumb> transparent.\n- Apply globally (html/body + a shared rule for scroll containers). Keep the scrollbar VISIBLE and usable (this is a restyle, not a hide). Thin, rounded, unobtrusive, good contrast in the app theme.\n\nREUSE / DEDUP: this is the single source of truth for scrollbar look. R-36's 'themed modal scrollbar' sub-item and R-37's grid-body scrollbar should REUSE this global style (or the same utility class) instead of defining their own. Note the overlap so whoever picks these up doesn't duplicate.\n\nBOUNDARIES: CSS-only, no JS. Verify in the running app across page/sidebar/modal/grid; light theme must look clean. Frontend build green. Leave UNCOMMITTED for god to verify+integrate. PLAN ONLY - do not start until the human says go.",
+      "humanQA": [
+        {
+          "q": "R-38 integrated?",
+          "a": "Merged b0dbc55 on framework/md-impoc. Global themed scrollbar (webkit + firefox, theme tokens) in index.css. Build passes. Built by claude+haiku worker (first use of new engine default).",
+          "askedAt": "2026-09-10T15:15:00Z"
+        }
+      ],
+      "doneAt": "2026-09-10T15:31:19.641Z"
+    },
+    {
+      "id": "R-39",
+      "title": "Collapsible sidebar rail: icon-only when collapsed, icon+label when expanded",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r36-r37-r39-frontend-batch",
+      "deps": [],
+      "origin": "user (2026-09-10)",
+      "details": "Make the desktop left SIDEBAR collapsible to an icon-only rail. Collapsed = show only each tab's ICON; expanded = show icon + tab name (current look). In frontend/src/app/AppShell.jsx (desktop <nav>, currently w-60).\n\nBEHAVIOUR:\n- Add a collapse/expand toggle (e.g. a chevron button in the sidebar header or footer). Persist the collapsed state in localStorage (try/catch), same pattern as R-34's nav-collapsed.\n- EXPANDED: current w-60 rail with section labels + item icon+label (unchanged).\n- COLLAPSED: narrow rail (~w-16), show item ICONS ONLY (hide item text + section text labels). Center the icons. Keep the active-route highlight on the icon. Show the tab name as a tooltip (title attr / accessible label) on hover so it stays usable. The brand/logo header and Sign Out collapse to icon form too.\n- Smooth width transition; content area reflows automatically (it is flex-1).\n\nINTERPLAY WITH R-34 (per-section collapse): R-34 lets section GROUPS collapse when expanded. When the whole rail is collapsed to icons, section grouping/headers don't apply - render a flat set of item icons (optionally a small divider between sections). Section-collapse UI only shows in the expanded rail.\n\nSCOPE: desktop rail only. Mobile bottom tab bar is unchanged (already icon+label compact). Accessibility: toggle has aria-expanded/label; collapsed items expose their name via title/aria-label.\n\nBOUNDARIES: AppShell.jsx (+ maybe NavItem) only. Update/add AppShell tests (collapsed hides labels + shows icons + toggle persists; expanded shows labels). Full frontend vitest + build green. Leave UNCOMMITTED for god to verify+integrate. PLAN ONLY - do not start until the human says go.",
+      "humanQA": [
+        {
+          "q": "R-39 integrated?",
+          "a": "Merged 11a58ae. 298/298 vitest + build green (main). Built by claude+haiku batch worker.",
+          "askedAt": "2026-09-10T15:20:00Z"
+        }
+      ],
+      "doneAt": "2026-09-10T15:31:19.641Z"
+    },
+    {
+      "id": "R-40",
+      "title": "Nav rail: edge circular toggle button + logout icon (R-39 polish)",
+      "status": "done",
+      "priority": "low",
+      "assignee": "worker-r40-r37-frontend",
+      "deps": [],
+      "origin": "user (2026-09-10)",
+      "details": "Polish the R-39 collapsible sidebar in frontend/src/app/AppShell.jsx (desktop <nav>): 1) Replace the current rail-collapse toggle (a separate button appended at the BOTTOM, ~lines 352-357, onClick={toggleRailCollapse}) with a small CIRCULAR button on the RIGHT EDGE of the sidebar, minimals.cc dashboard style (ref https://minimals.cc/dashboard). Make <nav> position:relative; place the button absolute on the right border (e.g. -right-3 top ~24-28px), rounded-full, bordered, bg var(--surface-raised), subtle shadow, small chevron that FLIPS: expanded -> ChevronLeft (collapse), collapsed -> ChevronRight (expand). Keep onClick={toggleRailCollapse}, aria-label Collapse/Expand, focus ring. Remove the old bottom toggle button. 2) Collapsed Sign Out button currently renders a plain arrow '→' (line ~349). Replace with a proper logout ICON: import { LogOut } from lucide-react and render <LogOut className='h-5 w-5'/> when railCollapsed (keep aria-label 'Sign out'). Import ChevronLeft/ChevronRight (and LogOut) from lucide-react. Desktop only; expanded layout unchanged otherwise. Add/adjust AppShell test if needed. Frontend build + vitest green. Leave UNCOMMITTED for god.",
+      "humanQA": [
+        {
+          "q": "R-40 done?",
+          "a": "Merged 752a2e0. Edge circular collapse toggle (chevron flips) + LogOut icon for collapsed sign-out. 298/298 + build green.",
+          "askedAt": "2026-09-10T15:40:00Z"
+        }
+      ],
+      "doneAt": "2026-09-10T15:31:19.641Z"
+    },
+    {
+      "id": "R-41",
+      "title": "Cross-platform barcode scanner rework (iOS/macOS/Windows) + post-login permission prompt",
+      "status": "done",
+      "priority": "high",
+      "assignee": "god",
+      "origin": "user (2026-09-10)",
+      "deps": [],
+      "humanQA": [
+        {
+          "q": "Scanner Windows fix?",
+          "a": "Removed DecodeHintType.TRY_HARDER in BarcodeScanner.jsx. Fixed; commit 06033fa; build + 298/298 green. User to verify on Windows Chrome.",
+          "askedAt": "2026-09-10T17:50:00Z"
+        },
+        {
+          "q": "R-41 cross-platform scanner confirmed?",
+          "a": "CLOSED by user 2026-09-11: scanner works on iOS, macOS and mobile. Windows Chrome built-in webcam still would not decode reliably; user accepts it and will attach an external camera on Windows. Marked done at user request. Final commits 9f23feb + 9ddd2cc. Build + 298/298 green.",
+          "askedAt": "2026-09-11T00:00:00Z"
+        }
+      ],
+      "doneAt": "2026-09-11T00:10:00Z",
+      "details": "DONE 2026-09-11 (user-accepted; works iOS/macOS/mobile, Windows via external camera). FULL RESOLUTION HISTORY: original bug — add-unit & add-to-cart Code 128 scanning failed on Windows Chrome (worked macOS/iOS), console 'MultiFormatReader: non-ReaderException ... Could not create a Canvas element' from HTMLCanvasElementLuminanceSource.rotate. Iterations: (1) 06033fa removed DecodeHintType.TRY_HARDER — TRY_HARDER made @zxing/browser 0.2.1 rotate each frame 90deg and that canvas-rotate path throws on Windows Chrome; fixed the crash (Code 128 is horizontal, rotated pass unneeded) but Windows still logged NotFoundException every frame (no decode). (2) 2c44e57 reworked capture to grabFrame/createImageBitmap + @zxing/library — still failed. (3) 0e5da45 switched decode(image)->decodeWithState(binary): decode() resets the CODE_128 hints so it scanned every format (QRCodeReader/FinderPatternFinder seen in console); decodeWithState keeps setHints. Still failed on Windows. (4) ddffbbf added black-frame detect + ImageCapture.takePhoto fallback — still failed. (5) 9f23feb ROOT-CAUSE FIX: user proved a reference site (minifier.org/barcode-scanner) scans fine on the SAME laptop, disproving a hardware/black-GPU-frame theory. The self-inflicted bug was ImageCapture.grabFrame(), which on Windows Chrome frequently returns a BLACK frame; canonical ctx.drawImage(video,0,0,w,h) from video.videoWidth/Height is fine. Rewrote the zxing decode loop to drawImage(video)->HTMLCanvasElementLuminanceSource->HybridBinarizer->BinaryBitmap->MultiFormatReader.decodeWithState(CODE_128), throttled ~10/s via setTimeout, removed ImageCapture/grabFrame/takePhoto entirely. (6) 9ddd2cc removed the one-time [scanner] capture/centerBlack diagnostic on close-out. PERMISSION PRIMER (shipped): frontend/src/platform/mediaPermissions.js primeMediaPermissions() requests camera once right after login (guarded, once per load, checks Permissions API 'granted' first, swallows denial), wired into AppShell mount. Native path: BarcodeDetector used only when getSupportedFormats includes 'code_128' (Windows Chrome does not, so it falls to the zxing loop). OUTCOME: reliable on iOS/macOS/mobile; Windows Chrome built-in webcam remained unreliable to decode even with the correct pipeline, user accepts and will use an external camera on Windows. Files: frontend/src/components/BarcodeScanner.jsx, frontend/src/platform/mediaPermissions.js, frontend/src/app/AppShell.jsx."
+    },
+    {
+      "id": "R-42",
+      "umbrella": true,
+      "title": "POS customer display polish: logo QR + animated border toggle + spoken thank-you",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r42-display-polish",
+      "origin": "user (2026-09-11)",
+      "deps": [
+        "R-35"
+      ],
+      "subtasks": [
+        "R-42a",
+        "R-42b",
+        "R-42c",
+        "R-42d"
+      ],
+      "details": "User request after R-35 shipped. Customer-facing display (frontend/src/screens/display/PosDisplayScreen.jsx) + POS payment QR (frontend/src/screens/pos/PaymentDialog.jsx). Three parts + tests, ONE worker. Decisions: (1) logo = monogram placeholder for now (user will supply a real logo later) via a single swappable LOGO_SRC constant; (2) BOTH border animations with a persisted toggle so the user finalizes one later; (3) spoken thank-you = generic if no name, first name if present -- user APPROVED sending customer FIRST NAME ONLY over the public display channel for this. Verify: frontend vitest (332 baseline) + build; backend jest (709 baseline). No migration (pos-display is in-memory). Leave UNCOMMITTED for god to verify+integrate. Full spec in sub-tickets.",
+      "createdAt": "2026-09-10T19:36:44.661Z",
+      "doneAt": "2026-09-10T19:52:28.736Z",
+      "humanQA": [
+        {
+          "q": "R-42 display polish integrated?",
+          "a": "Merged 71d3273 (feat f86945a). Logo QR (level H), pulse+marching border toggle, spoken thank-you (generic/first-name), tap-to-enable-sound. frontend 342/342, backend 712/712, build clean. Sonnet worker. Manual phone QR-scan + audio check advised.",
+          "askedAt": "2026-09-10T19:52:28.736Z"
+        }
+      ]
+    },
+    {
+      "id": "R-42a",
+      "title": "QR with center logo (still scannable)",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r42-display-polish",
+      "parent": "R-42",
+      "origin": "god (2026-09-11, R-42 breakdown)",
+      "deps": [],
+      "details": "Both display + POS QRs (PosDisplayScreen.jsx ~L116 size 280; PaymentDialog.jsx ~L105 size 200) use qrcode.react QRCodeSVG imageSettings to embed a center logo + level=\"H\" (high error correction) so the UPI QR STILL SCANS. Logo ~18-20% of QR with light padding/excavate. For now the logo = a monogram placeholder (inline SVG data-URI \"S\" on brand bg, or /favicon.svg) exposed as a SINGLE swappable constant (e.g. LOGO_SRC / a prop) so dropping in /logo.png later is a one-line change. MUST manually confirm scannability note in the done report. Do NOT touch the small 56px display-link QR in PaymentDialog (functional). | DONE 2026-09-11: QR center logo via new platform/qrLogo.js (LOGO_SRC swappable monogram data-URI + qrLogoSettings). level=H + imageSettings on 280px display QR + 200px POS QR; 56px link QR untouched. Scannability: level H ~30% recovery vs ~19% logo excavate (standard headroom) - real phone scan advised before customer use.",
+      "createdAt": "2026-09-10T19:36:44.661Z",
+      "doneAt": "2026-09-10T19:52:28.736Z"
+    },
+    {
+      "id": "R-42b",
+      "title": "Animated border toggle (pulse/glow vs marching light)",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r42-display-polish",
+      "parent": "R-42",
+      "origin": "god (2026-09-11, R-42 breakdown)",
+      "deps": [],
+      "details": "Around the display QR (PosDisplayScreen awaiting state), implement TWO border styles: (1) gentle pulse/glow, (2) marching/running light around the perimeter. A small UNOBTRUSIVE toggle on the display page (e.g. top corner, subtle) switches between them, persisted in localStorage per display device (try/catch, same pattern as posDisplayCode). Default to pulse. framer-motion (dep) or CSS. Keep the customer view clean -- toggle must not clutter. | DONE 2026-09-11: platform/displayBorderStyle.js (localStorage pos-display-border-style). index.css .qr-border--pulse (glow) + .qr-border--marching (rotating conic ring), both honour prefers-reduced-motion. Small top-left toggle pill on display, default pulse.",
+      "createdAt": "2026-09-10T19:36:44.661Z",
+      "doneAt": "2026-09-10T19:52:28.736Z"
+    },
+    {
+      "id": "R-42c",
+      "title": "Spoken thank-you on received + first-name on channel",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r42-display-polish",
+      "parent": "R-42",
+      "origin": "god (2026-09-11, R-42 breakdown)",
+      "deps": [],
+      "details": "On the display page, when status transitions INTO received, speak via Web Speech API (window.speechSynthesis, no dep): \"Thank you for shopping with us!\" if no name; \"Thank you for shopping with us, <firstName>!\" if present. BACKEND: extend pos-display payload + validation with an OPTIONAL customerFirstName (first token only); POST it from POS at checkout (POSScreen). Update the no-PII comment in pos-display.state.js to note first-name-only is now carried (user-approved). AUDIO GESTURE: browsers block audio before a user gesture -> add a one-time \"Tap to enable sound\" affordance on the display; after first tap audio is unlocked for the session; degrade silently if speech unavailable. DEDUPE: speak only on a LIVE transition non-received->received; do NOT speak when the first SSE message on connect/late-join is already received (avoid speaking to a display that joins mid-received). Reconnect must not re-speak the same event. | DONE 2026-09-11: speechSynthesis on live non-received->received only. Payload optional customerFirstName end-to-end (validation S+ max 50 single token); state.js no-PII comment updated; POSScreen posts first token in received publish. Top-right Tap-to-enable-sound pill (session unlock). Late-join dedupe gated on real SSE messageCount (bug found+fixed: initial idle mount was miscounted).",
+      "createdAt": "2026-09-10T19:36:44.661Z",
+      "doneAt": "2026-09-10T19:52:28.736Z"
+    },
+    {
+      "id": "R-42d",
+      "title": "Tests + verify",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r42-display-polish",
+      "parent": "R-42",
+      "origin": "god (2026-09-11, R-42 breakdown)",
+      "deps": [],
+      "details": "Tests: QR renders with level=H + imageSettings/logo present and value=upiUri intact; border toggle switches style + persists to localStorage; speech (mock speechSynthesis) -> transition-to-received with firstName includes first name, without -> generic, no speak on late-join-initial-received, no speak before audio unlock; backend pos-display accepts optional customerFirstName and round-trips it (and still rejects unknown fields); POS posts customerFirstName. Verify frontend npm run build + npx vitest run (332 baseline, no regress) and backend jest (709 baseline, NODE_ENV=test --experimental-vm-modules --forceExit). Report exact counts + the manual QR-scan confirmation. | DONE 2026-09-11: god-verified in worktree: frontend vitest 342/342 (+10) + build clean; backend jest 712/712 (+3). One pre-existing backend test updated for always-present customerFirstName:null. Note publishStateSchema not .strict() -> zod strips unknown keys (never leaks).",
+      "createdAt": "2026-09-10T19:36:44.661Z",
+      "doneAt": "2026-09-10T19:52:28.736Z"
+    },
+    {
+      "id": "R-43",
+      "title": "Intake scan: colour/size form skipped for units 2+ (auto-commit on prefill)",
+      "status": "done",
+      "priority": "high",
+      "assignee": "god",
+      "origin": "user (2026-09-11)",
+      "deps": [],
+      "doneAt": "2026-09-10T20:05:05.262Z",
+      "details": "USER BUG: on the Start-scan (StockIntake) screen, first unit shows the colour/size form and auto-commits when both picked (good); but units 2+ auto-committed with the PREVIOUS unit picks the instant the barcode decoded, so the form was never shown. ROOT CAUSE: the UX-H5 commit-repeat effect fired as soon as colourUuid && sizeUuid were set, and the prefill effect fills both from lastSaved immediately on decode. FIX (god, direct, frontend-only, commit b89d196): gate auto-commit on pickedSinceDecodeRef (set true only when operator changes colour/size, reset on every decode); prefilled values stay as editable defaults confirmed via Save unit or a fresh pick. Size-run fast mode + first-unit flow unchanged. Updated stockIntake.test.jsx (the test that asserted the old auto-commit-on-prefill now asserts form-shown + Save-to-commit). frontend vitest 342/342 + build clean. Files: frontend/src/screens/inventory/StockIntake.jsx, frontend/src/screens/__tests__/stockIntake.test.jsx.",
+      "humanQA": [
+        {
+          "q": "Intake scan colour/size fix confirmed?",
+          "a": "User confirmed working 2026-09-11 after cdcf655 (blank each unit, no carry-over, no one-field auto-submit). Commits b89d196 + cdcf655.",
+          "askedAt": "2026-09-10T20:14:55.298Z"
+        }
+      ]
+    },
+    {
+      "id": "R-44",
+      "title": "Mobile responsiveness pass (page-by-page, interactive)",
+      "status": "done",
+      "priority": "high",
+      "assignee": "worker-mobile-responsive-uiux",
+      "origin": "user (2026-09-11)",
+      "deps": [],
+      "createdAt": "2026-09-10T20:24:14.062Z",
+      "details": "User testing on a real phone, reporting issues page by page; desktop is correct. Worker = worker-mobile-responsive-uiux (sonnet, isolate:FALSE so it edits the MAIN tree and the user dev server hot-reloads; god commits per confirmed batch). Consumes md-framework/skills/uiux/*. BATCH 1: (1) Trips grid not scrollable on mobile; (2) toast too big on mobile (Toast.jsx:60 fixed right-4 top-4 w-full max-w-sm p-4); (3) TripDetail (Trips->vendor) not scrollable; (4) StockForm (add stock) not scrollable; (5) systemic -- sweep all screens. Root cause = the h-full min-h-0 overflow-hidden internal-scroll height chain not bounding under the mobile AppShell (h-dvh flex-col + main flex-1 overflow-y-auto + bottom tab bar). Worker reports via inform after each batch and stays alive (no act:done) until god closes the pass. Must leave the uncommitted SHREE->Shree rename untouched. Verify build + vitest 342 each batch. | BATCH 1 DONE (uncommitted, awaiting device confirm): ROOT CAUSE = content-area div + <main> lacked min-h-0 in the mobile h-dvh COLUMN flex, so main could not shrink below content height and no overflow-auto ever engaged (desktop root is a row -> unaffected). Fix = add min-h-0 to those 2 AppShell nodes. Also Toast.jsx mobile sizing (inset-x-4 top-4 w-auto p-3; desktop unchanged via sm:) and StockIntake root min-h-screen->min-h-dvh. 3 files ~7 lines. build clean + 342/342. Worker alive, waiting for next page. | Growing uncommitted mobile batch (user driving worker directly): AppShell.jsx (min-h-0 + main padding + safe-area tab bar + removed mobile side double-pad), Toast.jsx (mobile sizing), StockIntake.jsx + PosDisplayScreen.jsx (min-h-screen->min-h-dvh), POSScreen.jsx (cart row stacks on mobile, icon-only Remove; desktop byte-identical via sm:contents). All build clean + 342/342, uncommitted until user confirms the whole mobile pass. NOTE AppShell also carries the SHREE->Shree rename lines (commit those with this batch). | +ExpensesScreen.jsx converted <ul> -> DataGrid (mobile Actions overflow; kept external Status/Category/Date filter bar). Uncommitted batch now: AppShell, Toast, StockIntake, PosDisplayScreen, POSScreen, ExpensesScreen. 342/342 + build. | +Input.jsx GLOBAL label-to-field gap (~12px, not mobile-gated; per user). Uncommitted batch now 7 files: AppShell, Toast, StockIntake, PosDisplayScreen, POSScreen, ExpensesScreen, Input. 342/342 + build. (Batch mixes mobile-scroll fixes with a couple of global spacing/grid changes the user directed.) | +SignIn.jsx (logo row wraps/text-lg below 640px so monogram stops touching card border); Input gap trimmed to ~10px. Batch now 8 files (adds SignIn.jsx). 342/342 + build.",
+      "doneAt": "2026-09-11T02:51:46.840Z",
+      "humanQA": [
+        {
+          "q": "Mobile responsiveness pass done?",
+          "a": "User confirmed on-device. Committed a0b06f3 (8 files) on framework/md-impoc. Root cause: mobile AppShell content div + main lacked min-h-0 (column flex). Plus toast sizing, min-h-dvh, safe-area tab-bar clearance, side-gutter dedupe, POS cart stacking, Expenses->DataGrid, Input label gap, SignIn logo. Also carried the AppShell SHREE->Shree rename lines. 342/342 + build. Built by worker-mobile-responsive-uiux (sonnet, main tree).",
+          "askedAt": "2026-09-11T02:51:46.840Z"
+        }
+      ]
+    },
+    {
+      "id": "R-45",
+      "title": "Redesign receipt: styled HTML receipt from reference image (monogram logo for now)",
+      "status": "done",
+      "priority": "high",
+      "assignee": "worker-receipt-redesign",
+      "origin": "user (2026-09-11)",
+      "deps": [],
+      "createdAt": "2026-09-10T20:24:34.105Z",
+      "details": "User 2026-09-11: current receipt is plain black-and-white; recreate it as a STYLED HTML receipt matching an attached reference image. Use the monogram placeholder logo for now (real logo later, one-line swap like R-42 qrLogo LOGO_SRC). Plan: a UI/UX specialist worker builds the HTML receipt. BLOCKER: the reference image did not reach god (no attachment; not in repo) -- need it before dispatch. IMPORTANT distinction to confirm with user: a colour/styled HTML design suits the DIGITAL + email/A4-print receipt; the 58/80mm THERMAL-printer receipt must stay plain monospaced text (thermal printers cannot render colour/logos/rich HTML). Relevant code: backend/src/modules/receipts/receipts.service.js (digital payload + 58/80mm text; GET /api/receipts/preview|print), frontend SaleReceipt.jsx, ReceiptPreview.jsx, ReceiptPrintDialog.jsx, ReceiptSection.jsx, receiptApi.js. Feeds R-47 (receipt delivery sends whatever this renders). Once image is in hand, spawn a UI/UX worker to build the HTML receipt + wire it into the digital/print path; verify build + vitest; leave uncommitted for god. | 2026-09-11 UNBLOCKED: reference image = elegant A4 boutique bill (cream/brown, lotus+shree monogram, FASHION STORE wordmark + LOOK BEAUTIFUL EVERYDAY tagline, S.No/Description/Qty/Rate/Amount table + Total, Amount in Words, Thank-you + Signature footer, lotus corner art). Saved to frontend/doc/receipt-ref.jpeg. Deliverable = self-contained colourful HTML receipt from the receipt payload, monogram SVG placeholder swappable via a LOGO_SRC-style constant, wired into the in-app preview/print path (reusable server-side for R-47 email). Colourful, non-thermal. Dispatched worker-receipt-redesign.",
+      "humanQA": [
+        {
+          "q": "**I need the receipt reference image — it did not reach me** (no attachment came through, and it is not in the repo).\n\nRe-share it either way:\n- paste/attach it again here in chat, or\n- drop the file at `frontend/doc/receipt-ref.png` and tell me.\n\nAlso confirm: the new colour/styled HTML design is for the **digital + email / A4-print** receipt; the **58/80mm thermal-printer** receipt stays plain text (thermal printers cannot render colour or logos). OK?",
+          "a": "Image received (saved to frontend/doc/receipt-ref.jpeg). User confirmed: colourful, NO thermal printer -> only the digital/HTML receipt is redesigned; 58/80mm text left as-is. Dispatched worker-receipt-redesign (sonnet, isolate:false).",
+          "askedAt": "2026-09-11T14:35:55.734Z"
+        },
+        {
+          "q": "Branded receipt signed off + integrated?",
+          "a": "User approved after A5 + table-fix iteration. Committed 121afca on framework/md-impoc. Colourful A5 HTML receipt from receipt payload; monogram placeholder swappable via RECEIPT_LOGO_SRC; in-app Branded receipt button (iframe dialog); server-side buildBrandedReceiptHtml ready for R-47. frontend 357, backend 718, build clean. Built by worker-receipt-redesign (sonnet).",
+          "askedAt": "2026-09-11T15:22:55.967Z"
+        }
+      ],
+      "doneAt": "2026-09-11T15:22:55.967Z"
+    },
+    {
+      "id": "R-46",
+      "title": "Campaigns module: Instagram + WhatsApp publishing & broadcast + insights",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "origin": "user (2026-09-11)",
+      "deps": [],
+      "createdAt": "2026-09-11T02:14:13.308Z",
+      "details": "PLAN ONLY -- do not start; scope + accounts + 3 open decisions must close first. Origin: user 2026-09-11.\n\nGOAL: a Campaigns module to (a) publish posts + stories to Instagram, (b) send offers/sales messages to WhatsApp, and (c) show insights on how each post/story/message performs.\n\nFEASIBILITY (verified vs 2026 Meta docs + provider info):\n- Instagram feed posts / carousel / Reels: FEASIBLE via Instagram Content Publishing API (3-step container: create media container from a PUBLIC media URL -> poll ready -> publish). Rate limit ~100 API posts / rolling 24h per account.\n- Instagram Stories: FEASIBLE via the same Content Publishing API (stories supported since 2023).\n- Instagram insights (per media: reach/impressions/likes/comments/saves/shares; stories: reach/impressions/exits/replies/taps fwd-back; account-level): FEASIBLE via Graph API Insights.\n- WhatsApp offers/sales one-to-many to customers: FEASIBLE via the OFFICIAL WhatsApp Cloud API using approved MARKETING message templates to OPTED-IN customers. Billed per DELIVERED message (marketing templates have no volume discount; priced by recipient country). Aligns with our existing consent flags + delivery_logs table.\n- WhatsApp message insights (sent/delivered/read + aggregates): FEASIBLE via status webhooks + WhatsApp Business analytics.\n- NOT POSSIBLE OFFICIALLY (must be called out to the user): \"stories/posts on WhatsApp\" = WhatsApp Status has NO API. \"WhatsApp broadcast CHANNELS\" has NO official Meta API -- only unofficial 3rd-party providers (Whapi.Cloud, Maytapi, WAHA) that run a reverse-engineered WhatsApp client, against WhatsApp ToS, with real risk of the business number being BANNED. Recommendation: do NOT put the primary number on that. The compliant \"broadcast\" is Cloud API marketing templates to opted-in customers (above).\n\nWHAT WE NEED (Meta approvals are the long pole -- days to weeks, human-driven):\nAccounts/verification: Meta Business Account + Business Verification; Facebook Page + Instagram Professional account linked; Meta Developer App with Instagram + WhatsApp products; App Review for permissions (instagram_business_content_publish, instagram insights, pages_show_list, pages_read_engagement, business_management -- note old instagram_basic/instagram_content_publish deprecated Jan 2025); WhatsApp Business Account (WABA) + a DEDICATED phone number not already used in the WhatsApp app + payment method + pre-approved templates; long-lived/system-user tokens + secure secret storage + refresh handling.\nInfra on our side: PUBLIC media hosting (IG fetches media from a public URL) -- S3/Cloudinary/own bucket; a PUBLIC HTTPS webhook endpoint for Meta callbacks (we have tunnels.json for dev); a scheduler/job queue for scheduled posts + insights polling.\n\nPROPOSED ARCHITECTURE (Express/Sequelize/Postgres + React):\n- Data model: Campaign (name, objective, status draft/scheduled/publishing/live/done) -> CampaignPost (one row per channel: instagram_feed | instagram_story | whatsapp_template; payload, scheduledAt, externalId, status) -> CampaignMetric (metric_type, value, fetched_at snapshots for trends); CampaignAsset (media); WhatsApp recipient list drawn from customers with whatsapp consent. Reuse delivery_logs for WhatsApp sends.\n- Provider-adapter layer: one interface (publish(post), fetchInsights(post)) with InstagramAdapter (Graph API) + WhatsAppAdapter (Cloud API + webhook). Isolates Meta specifics; a future BSP swap (Twilio/360dialog) = one adapter.\n- Insights ingestion: IG = scheduled poll of Graph Insights; WhatsApp = webhook for status + analytics API for aggregates; store snapshots in CampaignMetric.\n- Frontend: Campaigns section (list via our DataGrid), a composer (pick channels, upload media, write caption/template, schedule), an insights dashboard (reuse reports/chart patterns).\n- Compliance: WhatsApp marketing only to whatsapp-consented customers; opt-out handling; template-approval workflow.\n\nSUGGESTED PHASING:\n- Phase 0: accounts + verification + app review (gates everything; start early).\n- Phase 1: Instagram posts + stories + insights (cleanest official path).\n- Phase 2: WhatsApp marketing broadcast to opted-in customers + delivery/read insights.\n- Channels: decide separately; official only if/when Meta ships a Channels API, else unofficial-with-ban-risk (not recommended).\n\nCOST NOTE: IG publishing is free but rate-limited (100/24h). WhatsApp marketing is an ongoing per-delivered-message cost, priced by country, no volume discount.\n\nOPEN DECISIONS (needed before this can move):\n1) WhatsApp scope: accept the OFFICIAL Cloud API path (opt-in, paid per message, no Status, no Channels)? Or is Channels a hard requirement (only via risky unofficial tools)?\n2) Which accounts already exist (Meta Business, Instagram Professional, WABA)? Changes the timeline.\n3) Instagram: both posts + stories? Which insight metrics matter most (reach/impressions/saves/replies/link clicks)?\n\nSOURCES: getphyllo.com Instagram API guide 2026; postproxy.dev post-to-instagram-via-api 2026; whapi.cloud whatsapp-channel-api-automation; messagecentral.com whatsapp-business-api-complete-guide; blueticks.co whatsapp marketing pricing 2026.\n"
+    },
+    {
+      "id": "R-47",
+      "title": "Receipt delivery module: send receipt at checkout via email / WhatsApp / SMS (consent-gated)",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "origin": "user (2026-09-11)",
+      "deps": [
+        "R-45"
+      ],
+      "createdAt": "2026-09-11T02:27:59.909Z",
+      "details": "PLAN ONLY -- do not start; 5 open decisions must close first. Origin: user 2026-09-11. Priority: HIGH -- user calls this the next most important module. Soft-depends R-45 (receipt content) + shares WhatsApp infra with R-46.\n\nGOAL: at checkout, automatically send the receipt to the customer on the channels they are subscribed to -- EMAIL, WHATSAPP, and MOBILE NUMBER (SMS).\n\nSTRONG REUSE (system was designed for this in Schema V2): delivery_logs table already exists (channel, status, provider ids, receipt_payload JSONB) = the send ledger; receipt renderer already emits a self-contained DIGITAL payload \"for future WhatsApp/email/SMS\" + 58/80mm text (GET /api/receipts/preview|print); customers table carries email/phone + CONSENT flags (email/whatsapp/sms). This module mainly WIRES real providers into that skeleton.\n\nPER CHANNEL (feasibility + needs, verified vs 2026 provider/Meta info):\n- EMAIL (lowest friction, Phase 1): HTML receipt + optional PDF attachment. Provider = SMTP (nodemailer) or transactional API (SES / SendGrid / Postmark / Resend). Needs a verified sending domain (SPF/DKIM). No regulatory gate.\n- WHATSAPP (Phase 2, shares R-46 setup): receipts are UTILITY messages -> approved UTILITY template (cheaper than marketing) with a link or a PDF DOCUMENT header. Needs WhatsApp Business Account (WABA) + number + approved template + customer opt-in (we store whatsapp consent). Billed per delivered message (utility rate). Use the OFFICIAL WhatsApp Cloud API (NOT unofficial channel tools).\n- SMS / mobile number (Phase 3, highest friction): 160 chars can't hold a receipt -> send a short line + a LINK to a hosted receipt page. Provider = Twilio / MSG91 / Gupshup etc. INDIA CATCH: SMS requires DLT registration (sender ID + template registered with the telecom regulator) before sending -- a real approval gate.\n\nARCHITECTURE:\n1. ASYNC dispatch at checkout -- do NOT block the sale. After the sale commits, enqueue one delivery job per channel the customer is BOTH opted into AND has contact info for. Checkout returns instantly; a slow/down provider must never fail checkout.\n2. Provider-adapter layer: EmailAdapter, WhatsAppAdapter (shared with R-46), SmsAdapter behind one send(receiptPayload, recipient) interface.\n3. delivery_logs as the ledger (already exists): record each attempt + status transitions queued->sent->delivered->failed via provider webhooks; retry failures with backoff.\n4. Public hosted receipt page: a tokenized /receipt/:token route (reuse R-35 public-route-split so it renders outside RouteGuard/AppShell) so SMS/WhatsApp/email can link to a real receipt. Token must be unguessable + optionally expiring; exposes only that one receipt, no PII beyond the receipt itself.\n5. Idempotency: key each send to sale + channel so a checkout retry (sales already carry requestUuid) never double-sends.\n6. Optional PDF renderer (server-side html->pdf) for email attachment / WhatsApp document, if we attach rather than link.\n\nINFRA NEEDED: email provider/SMTP + verified domain; WhatsApp WABA + number + approved utility template (same account as R-46); SMS provider + India DLT registration; a JOB QUEUE (BullMQ/pg-boss) for async + retries; a PUBLIC HTTPS webhook for delivery-status callbacks (tunnels.json exists for dev); secure secret storage; optional PDF renderer.\n\nFRONTEND: receipt/checkout screen shows which channels will send (based on consent + contact) and their live status; a delivery-status view (reuse delivery_logs); possibly a manual \"resend\" action; if cashier-choice is chosen (decision 1), channel checkboxes on the receipt screen.\n\nSUGGESTED PHASING:\n- Phase 1: EMAIL + hosted tokenized receipt page + async queue + delivery_logs status tracking + resend. (No regulatory gate -> ships soonest.)\n- Phase 2: WHATSAPP receipt (utility template) -- gated on WABA setup (shared with R-46).\n- Phase 3: SMS -- gated on provider + India DLT registration.\n\nRELATIONSHIP: R-45 (update receipt) = the content this sends, so settle receipt content first (soft dep). R-46 (Campaigns) shares the WhatsApp/WABA setup + provider-adapter pattern -- build the WhatsApp adapter once, reuse for both. delivery_logs + consent already exist from Schema V2 (T-18).\n\nOPEN DECISIONS (needed before this can move):\n1) Auto-send at checkout on every consented channel, OR let the cashier pick channels on the receipt screen?\n2) Format: link to a hosted receipt page, PDF attachment, or both? (email can PDF; SMS/WhatsApp best as a link or WhatsApp document.)\n3) SMS: include now (needs India DLT registration) or defer to Phase 3?\n4) Providers: any preference (email provider, SMS provider) or leave to us?\n5) Accounts already in hand (email sending domain, WABA)? -- affects timeline.\n\nSOURCES (from R-46 research): messagecentral.com whatsapp-business-api-complete-guide 2026; blueticks.co whatsapp pricing 2026 (utility vs marketing categories); getphyllo.com / postproxy.dev (Meta Graph/Cloud API).\n | FOSS-vs-scratch ANALYSIS (god, 2026-09-11): sending is NOT free for 2/3 channels -- WhatsApp compliant send = Meta Cloud API (paid + WABA; FOSS whatsapp-web.js is the unofficial reverse-engineered client = ban risk, avoid), SMS = paid gateway + India DLT; only EMAIL is near-free (Nodemailer MIT + free/cheap provider SES/Brevo/Resend). Orchestration layer = the real build-vs-adopt: Option A adopt Novu (MIT open-core, self-host, 60+ providers, multi-channel, but a SEPARATE service w/ own infra + ops = heavy for a single-shop POS); Option B (RECOMMENDED) build thin ourselves with small FOSS libs -- pg-boss (MIT, Postgres-backed queue on our EXISTING Postgres, no Redis, retries/backoff built in) + Nodemailer + thin REST adapters for WhatsApp Cloud API + SMS, reusing existing delivery_logs + R-45 branded receipt HTML + a tokenized /receipt/:token page. Recommendation Option B (Novu only if a full notification center is later wanted). DEFERRED by user 2026-09-11 (not planning immediately). Still needs the 5 open decisions + approach pick (A/B) before dispatch."
+    }
+  ]
+}
