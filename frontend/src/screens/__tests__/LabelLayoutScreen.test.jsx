@@ -103,6 +103,7 @@ describe('LabelLayoutScreen (R-50)', () => {
     await waitFor(() => expect(screen.getByLabelText(/barcode width/i)).toHaveValue(35));
     fireEvent.click(screen.getByRole('button', { name: /preview pdf/i }));
 
-    await waitFor(() => expect(window.open).toHaveBeenCalledWith('blob:preview', '_blank', 'noopener'));
+    // blob creation + window.open run after an awaited fetch; allow headroom under full-suite load
+    await waitFor(() => expect(window.open).toHaveBeenCalledWith('blob:preview', '_blank', 'noopener'), { timeout: 4000 });
   });
 });
