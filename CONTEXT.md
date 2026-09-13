@@ -31,12 +31,13 @@ npm install --legacy-peer-deps   # (pre-existing @testing-library/react peer con
 npm run dev                 # https://localhost:5173 (basic-ssl); dev:host for LAN access
 ```
 
-- **Tests:** frontend `npx vitest run` (370 passing); backend `NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules npx jest --forceExit` (732 passing).
+- **Tests:** frontend `npx vitest run` (379 passing); backend `NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules npx jest --forceExit` (738 passing).
 - **Env:** `backend/.env` needs DB creds, `JWT_SECRET`, `SEED_ADMIN_PASSWORD`, `STORE_NAME/ADDRESS/PHONE`. `.env` files are gitignored — never commit them.
 
 ## Current state (2026-09-13)
 
-- **137 tickets done.** Latest (2026-09-13): **R-48** barcode values `SHREE` + base-36 timestamp + base-36 counter (15 chars, e.g. `SHREE0D4N5H000V`, unique even if `barcode_seq` is reset; columns widened to 32); **R-49** Print labels stays usable after a download (toast + fresh request key) and the label's price box takes the space under the barcode; **R-50** barcode sheet configurator — single-row `barcode_layouts` table (mm), "Configure barcode sheet" section on Print labels with live SVG preview + server-rendered `GET /api/barcodes/preview`; the generator no longer reads `app_settings` barcode keys. Plus friendly wording for backend-down/5xx errors (`apiClient.friendlyServerMessage`). Before that: UPI-QR checkout + customer display (R-35), POS display polish (R-42), barcode scanner (R-41), mobile responsiveness (R-44), intake fix (R-43), colourful A5 receipt (R-45).
+- **138 tickets done.** Latest (2026-09-13): **R-51** GST on purchases — CGST/SGST % on stocks, CGST/SGST ₹ on vendor bills (total paid is GST-inclusive; no reconciliation), live “cost per unit incl. GST” hint on the stock form (migration `20260913000004`); **R-48** barcode values `SHREE` + base-36 timestamp + base-36 counter (15 chars, e.g. `SHREE0D4N5H000V`, unique even if `barcode_seq` is reset; columns widened to 32); **R-49** Print labels stays usable after a download (toast + fresh request key) and the label's price box takes the space under the barcode; **R-50** barcode sheet configurator — single-row `barcode_layouts` table (mm), "Configure barcode sheet" section on Print labels with live SVG preview + server-rendered `GET /api/barcodes/preview`; the generator no longer reads `app_settings` barcode keys. Plus friendly wording for backend-down/5xx errors (`apiClient.friendlyServerMessage`). Before that: UPI-QR checkout + customer display (R-35), POS display polish (R-42), barcode scanner (R-41), mobile responsiveness (R-44), intake fix (R-43), colourful A5 receipt (R-45).
+- **Parked by user (revisit ~2026-10-13):** **R-52** — hide / remove / keep the Buying templates module, after a month of production use. No changes made there.
 - **Open (planned, not started):**
   - **R-46 Campaigns** — Instagram + WhatsApp publishing + insights. Feasibility done: IG posts/stories + insights are official-API buildable; WhatsApp Status and WhatsApp *Channels* have **no official API** (only ban-risk unofficial tools); compliant WhatsApp = Cloud API marketing templates to opted-in customers.
   - **R-47 Receipt delivery** — send the receipt at checkout via email / WhatsApp / SMS. Recommended build: thin adapters + `pg-boss` (Postgres queue, no new infra) + Nodemailer, reusing `delivery_logs` + the R-45 receipt HTML + a tokenized `/receipt/:token` page. Email is near-free; WhatsApp/SMS are paid + gated (WhatsApp Cloud API + WABA; SMS + India DLT).
@@ -44,6 +45,7 @@ npm run dev                 # https://localhost:5173 (basic-ssl); dev:host for L
 
 ## Key conventions & gotchas
 
+- **GST (R-51):** stock rates are percents (`cgstRatePct`/`sgstRatePct`), bill GST is paise (`cgstPaise`/`sgstPaise`); `total_paid_paise` is GST-inclusive and is never reconciled against them. Landed cost is computed client-side only.
 - **Money:** BIGINT paise end-to-end; DTOs return strings; never coerce to JS `Number` for large values.
 - **Migrations:** ESM export style (`const migration = {...}; export const up = migration.up.bind(migration)`) — CommonJS `module.exports` breaks under `type: module`.
 - **Internal-scroll layout:** every flex ancestor needs `min-h-0` for an internal-scroll child to bound (a column flex hides the bug on desktop but breaks mobile).

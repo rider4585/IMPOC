@@ -303,3 +303,13 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 - Also confirms R-48's caveat is moot: the 15-char SHREE code scans at the 35 mm default width.
 - Board: 137 done / 0 doing / 2 todo (R-46 Campaigns, R-47 Receipt delivery — both plan-only on user decisions).
 - Everything from this session is still UNCOMMITTED on `context`; user has not asked to commit. Keep `.claude/launch.json` + `frontend/vite.http.config.js` out of any commit.
+
+## [2026-09-13 ~10:30Z] R-51 GST on purchases BUILT (awaiting user test); R-52 buying-templates decision BLOCKED
+- LOCKS: stock GST = percent rates (DECIMAL(5,2)); bill GST = paise amounts; total_paid is GST-INCLUSIVE and never reconciled against them (user rule — don't add variance math). Landed cost hint is client-only (platform/gst.js); backend stores, never computes.
+- Templates module is frozen: no GST fields there; R-52 asks Hide/Remove/Keep. Don't touch template.* until answered.
+- Any new column on stocks/sale_lines/rental_lines/trip_vendors that a v_*_grid view reads → drop/re-create views in the migration AND mirror in tests/utils/test-setup.js gridViews (test DB uses sync(), not migrations) — this bit me here (list endpoint read v_stocks_grid without the new columns).
+- Uncommitted: R-51 code + these docs.
+
+## [2026-09-13 ~11:00Z] R-51 CLOSED (user-tested); R-52 parked ~1 month
+- User will trial the system in production (~until 2026-10-13) before deciding the templates module. Don't nudge before then; the humanQA answer is on the card.
+- Board: 138 done / 1 blocked (R-52) / 2 todo (R-46, R-47). R-51 uncommitted.

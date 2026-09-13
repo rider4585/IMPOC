@@ -835,3 +835,26 @@ Safe to close. Floor clear (only god; all workers archived), inbox drained, 0 pe
 
 # SHIFT CLOSE (2026-09-13, claude direct session — no hive workers)
 This session shipped on the `context` branch (ALL UNCOMMITTED, awaiting user's go): R-48 barcode values SHREE+timestamp+counter (+ column widening migration), friendly server-down/5xx wording (no ticket), R-49 Print labels no-refresh flow + label layout, R-50 barcode sheet configurator (single-row `barcode_layouts`, embedded on Print labels, live preview + PDF preview). Backend jest 732/732, frontend vitest 370/370, build clean. Dev DB `IMPOC` wiped + re-migrated (37 migrations) + seeded. OPEN = R-46, R-47 (plan-only, parked on user decisions). Local-only helpers not to commit: `.claude/launch.json`, `frontend/vite.http.config.js`.
+
+---
+
+# R-51 — GST ON PURCHASES (2026-09-13, DONE — user-tested) · R-52 — BUYING TEMPLATES DECISION (parked ~1 month)
+
+**Why (user):** vendors charge GST; bills show CGST+SGST rate per line and final CGST/SGST ₹ at the subtotal. Nothing was recorded. The inventory manager needs the true per-unit cost when choosing a selling price.
+
+**Decisions (user):** stock level = **percent rates** (`cgstRatePct`, `sgstRatePct`); bill level (Add vendor to trip) = **rupee amounts** (`cgstPaise`, `sgstPaise`); **Total paid is entered GST-inclusive → no variance/reconciliation**; buying templates get **no changes** (user is retiring that module → R-52); landed-cost hint is **client-side only**.
+
+**Data:** migration `20260913000004` — `stocks.cgst_rate_pct` / `sgst_rate_pct` DECIMAL(5,2) NOT NULL DEFAULT 0 + CHECK 0..100; `trip_vendors.cgst_paise` / `sgst_paise` BIGINT NOT NULL DEFAULT 0 + CHECK ≥ 0. Existing rows = 0. Grid views dropped/re-created (R-48 pattern); `v_stocks_grid` now exposes the rates (mirrored in `tests/utils/test-setup.js`).
+
+**Backend:** models Stock/TripVendor; zod `gstRateSchema` (0..100, ≤2 decimals) on stock create/update, `cgstPaise/sgstPaise` (paise, optional, default 0) on both trip-vendor bill schemas; services pass-through; DTOs return rates as numbers, paise as strings. `tests/intake/gst.test.js` (6). jest **738/738**.
+
+**Frontend:** `platform/gst.js` — `landedCostPerUnit({buying, whole, quantity, cgst, sgst})` → base/gst/total paise (whole ÷ qty fallback, paisa rounding) + `parsePercent`. StockForm: `CGST (%)` / `SGST (%)` inputs beside buying price; hint under **Selling price**: “Cost per unit incl. GST: ₹1,050.00 (buying ₹1,000.00 + GST 5% = ₹50.00)”, live. TripDetail: `CGST (₹)` / `SGST (₹)` on the bill dialog, “GST incl. (₹)” column in the vendors grid. Stocks grid: “GST 2.5% + 2.5%” under per-unit price. vitest **379/379**, build OK.
+
+**R-52 (blocked, humanQA on card):** Hide / Remove / Keep the Buying templates module. No work until the user answers.
+
+**CLOSED 2026-09-13:** user tested stock rates + hint, vendor bill GST and both grids — 'working great'. **R-52:** user will run production for ~1 month first, then decide (revisit ~2026-10-13).
+
+---
+
+# SHIFT CLOSE #2 (2026-09-13, claude direct session)
+R-51 done (user-tested). R-52 parked until ~mid-Oct 2026 by user choice (production trial first). Board: 138 done / 0 doing / 1 blocked (R-52) / 2 todo (R-46, R-47). R-51 code + docs UNCOMMITTED on `context` at close — commit code to both branches (docs to `context` only) when the user says so.
