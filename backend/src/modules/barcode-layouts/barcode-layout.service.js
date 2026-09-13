@@ -1,8 +1,9 @@
-import { BarcodeLayout, User } from '../../../database/models/index.js';
+import { BarcodeLayout, BarcodeLayoutTemplate, User } from '../../../database/models/index.js';
 
 import { DEFAULT_LAYOUT, computeSheetGeometry } from './barcode-layout.geometry.js';
 
 const NUMERIC_FIELDS = [
+    'pageCustomWidthMm', 'pageCustomHeightMm',
     'columns', 'rows',
     'marginTopMm', 'marginRightMm', 'marginBottomMm', 'marginLeftMm',
     'gapHorizontalMm', 'gapVerticalMm',
@@ -61,4 +62,61 @@ export async function updateLayout(data, userUuid) {
     await row.update({ ...data, updatedBy: user?.id ?? null });
 
     return toPlainLayout(row);
+}
+
+/* ------------------------------------------------------------------ */
+/* Templates (R-56): named snapshots; applying one is a client-side act */
+
+/** DTO for a template row. */
+export function toTemplateDTO(row) {
+    return {
+        uuid: row.uuid,
+        name: row.name,
+        layout: row.layout,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+    };
+}
+
+export async function listTemplates() {
+    const rows = await BarcodeLayoutTemplate.findAll({ order: [['name', 'ASC']] });
+    return rows.map(toTemplateDTO);
+}
+
+/**
+ * Snapshot a (validated) layout under `name`. 409 when a live template already
+ * uses the name (case-insensitive).
+ */
+export async function createTemplate({ name, layout }, userUuid) {
+    const geometry = computeSheetGeometry(layout);
+    if (geometry.problems.length > 0) {
+        const error = new Error(`Layout does not fit: ${geometry.problems[0]}`);
+        error.statusCode = 400;
+        throw error;
+    }
+    const clash = await BarcodeLayoutTemplate.findOne({
+        where: BarcodeLayoutTemplate.sequelize.where(
+            BarcodeLayoutTemplate.sequelize.fn('lower', BarcodeLayoutTemplate.sequelize.col('name')),
+            name.trim().toLowerCase()
+        ),
+    });
+    if (clash) {
+        const error = new Error('Layout template already exists');
+        error.statusCode = 409;
+        throw error;
+    }
+    const user = userUuid ? await User.findOne({ where: { uuid: userUuid }, attributes: ['id'] }) : null;
+    const row = await BarcodeLayoutTemplate.create({ name: name.trim(), layout, createdBy: user?.id ?? null });
+    return toTemplateDTO(row);
+}
+
+export async function deleteTemplate(uuid) {
+    const row = await BarcodeLayoutTemplate.findOne({ where: { uuid } });
+    if (!row) {
+        const error = new Error('Layout template not found');
+        error.statusCode = 404;
+        throw error;
+    }
+    await row.destroy();
+    return { uuid };
 }

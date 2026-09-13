@@ -17,6 +17,9 @@ vi.mock('../../services/barcodeLayoutApi.js', () => ({
   getBarcodeLayout: vi.fn(async () => ({})),
   saveBarcodeLayout: vi.fn(),
   fetchLayoutPreviewPdf: vi.fn(),
+  getBarcodeLayoutTemplates: vi.fn(async () => []),
+  createBarcodeLayoutTemplate: vi.fn(),
+  deleteBarcodeLayoutTemplate: vi.fn(),
 }));
 
 // Import after mocking
