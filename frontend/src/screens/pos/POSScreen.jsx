@@ -30,6 +30,7 @@ import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
 import { SaleReceipt } from './SaleReceipt.jsx';
 import { PaymentDialog } from './PaymentDialog.jsx';
 import { SHOP_NAME } from '../../components/ShopLogo.jsx';
+import { BARCODE_MAX_LENGTH } from '../../constants/barcode.js';
 
 function todayISO() {
   const d = new Date();
@@ -696,7 +697,7 @@ export function POSScreen() {
                 onKeyDown={handleBarcodeKeyDown}
                 placeholder="Scan barcode, then press Enter"
                 autoFocus
-                maxLength={12}
+                maxLength={BARCODE_MAX_LENGTH}
                 disabled={lookupLoading}
               />
               {lookupLoading && (

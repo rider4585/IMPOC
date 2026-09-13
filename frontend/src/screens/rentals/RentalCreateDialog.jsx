@@ -3,6 +3,7 @@ import { Dialog, Button, Input, Card, CardContent, useToast } from '../../compon
 import { getUnitByBarcode } from '../../services/unitsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { CustomerPicker } from '../../components/customers/CustomerPicker.jsx';
+import { BARCODE_MAX_LENGTH } from '../../constants/barcode.js';
 
 function todayISO() {
   const d = new Date();
@@ -136,7 +137,7 @@ export function RentalCreateDialog({ open, onClose, onSave, saving }) {
                   }
                 }}
                 placeholder="RENTAL unit barcode"
-                maxLength={12}
+                maxLength={BARCODE_MAX_LENGTH}
                 className="min-w-[200px] flex-1"
               />
               <Button variant="outline" onClick={handleAddByBarcode}>

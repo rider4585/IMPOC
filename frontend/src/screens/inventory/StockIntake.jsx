@@ -9,6 +9,7 @@ import { formatPaise } from '../../platform/money.js';
 import { wakingRequest } from '../../platform/wakingRequest.js';
 import { createRequestKey } from '../../platform/requestKey.js';
 import BarcodeScanner from '../../components/BarcodeScanner.jsx';
+import { BARCODE_MAX_LENGTH } from '../../constants/barcode.js';
 
 const STATES = { IDLE: 'idle', ARMED: 'armed', DECODED: 'decoded', SAVING: 'saving', STOCK_FULL: 'stock_full' };
 
@@ -551,7 +552,7 @@ export function StockIntake() {
                 value={manualBarcode}
                 onChange={(e) => setManualBarcode(e.target.value)}
                 placeholder="Type the barcode number"
-                maxLength={12}
+                maxLength={BARCODE_MAX_LENGTH}
                 className="flex-1 rounded-md border border-[var(--border-strong)] px-3 py-2 text-sm"
                 autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter') handleManualSubmit(); }}
