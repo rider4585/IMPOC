@@ -10,6 +10,11 @@ import * as vendorsService from '../../services/vendorsApi.js';
 vi.mock('../../auth/useAuth.js');
 vi.mock('../../services/tripsApi.js');
 vi.mock('../../services/vendorsApi.js');
+// R-55: the photo flow resizes through canvas/createImageBitmap, which jsdom lacks; return a stable JPEG data-URL
+vi.mock('../../platform/imageResize.js', () => ({
+  resizeImageToDataUrl: vi.fn(async () => 'data:image/jpeg;base64,UklGRg=='),
+  dataUrlBytes: () => 8,
+}));
 vi.mock('../../services/picklistsApi.js', () => ({
   getProductTypes: vi.fn().mockResolvedValue([]),
 }));
@@ -238,7 +243,7 @@ describe('TripDetailScreen — single-mode searchable combobox add-vendor with b
     expect(screen.getAllByText(/Paid ₹5,000.00/).length).toBeGreaterThan(0);
   });
 
-  it('uploads a receipt image via FileReader → dataURL with preview + remove, posts it, and shows a clickable thumbnail', async () => {
+  it('R-55: picks a receipt photo from the gallery, reviews it (Use photo), can remove + re-add, posts it, and shows a clickable thumbnail', async () => {
     tripsService.addTripVendor.mockImplementation(async (tripUuid, payload) => {
       tripState = makeTrip([{
         uuid: 'tv1',
@@ -264,16 +269,24 @@ describe('TripDetailScreen — single-mode searchable combobox add-vendor with b
     fireEvent.click(await screen.findByRole('option', { name: /Sharma Fabrics/ }));
 
     const file = new File(['fake-png-bytes'], 'receipt.png', { type: 'image/png' });
-    fireEvent.change(within(dialog).getByTestId('receipt-file-input'), { target: { files: [file] } });
+    const pickFromGallery = async () => {
+      fireEvent.change(within(dialog).getByTestId('gallery-input'), { target: { files: [file] } });
+      // Review step: nothing is attached until "Use photo"
+      const reviewImg = await screen.findByTestId('review-image');
+      expect(reviewImg).toHaveAttribute('src', 'data:image/jpeg;base64,UklGRg==');
+      expect(within(dialog).queryByRole('img', { name: /bill receipt preview/i })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('use-photo'));
+    };
 
+    await pickFromGallery();
     const preview = await within(dialog).findByRole('img', { name: /bill receipt preview/i });
-    expect(preview).toHaveAttribute('src', expect.stringMatching(/^data:image\/png;base64,/));
     const dataUrl = preview.getAttribute('src');
+    expect(dataUrl).toBe('data:image/jpeg;base64,UklGRg==');
 
     fireEvent.click(within(dialog).getByTestId('clear-receipt'));
     expect(within(dialog).queryByRole('img', { name: /bill receipt preview/i })).not.toBeInTheDocument();
 
-    fireEvent.change(within(dialog).getByTestId('receipt-file-input'), { target: { files: [file] } });
+    await pickFromGallery();
     await within(dialog).findByRole('img', { name: /bill receipt preview/i });
 
     fireEvent.change(within(dialog).getByLabelText(/bill reference/i), { target: { value: 'B-777' } });
