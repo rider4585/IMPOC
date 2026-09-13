@@ -171,11 +171,15 @@ if ($frontendChanged) {
 # 6. Restart -----------------------------------------------------------------------
 Step 'Restarting the server'
 Push-Location $Backend
-pm2 restart impoc --update-env 2>&1 | Out-Null
+# pm2 writes "[PM2][ERROR] ..." to stderr when the process is missing; under
+# $ErrorActionPreference = 'Stop' a redirected stderr line becomes a terminating
+# error (Windows PowerShell 5.1). Run pm2 through cmd so only exit codes matter.
+cmd /c "pm2 restart impoc --update-env >nul 2>&1"
 if ($LASTEXITCODE -ne 0) {
-    pm2 start ecosystem.config.cjs 2>&1 | Out-Null
+    cmd /c "pm2 start ecosystem.config.cjs"
+    if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'pm2 start failed. Run "pm2 logs impoc" to see why.' }
 }
-pm2 save --force 2>&1 | Out-Null
+cmd /c "pm2 save --force >nul 2>&1" | Out-Null
 Pop-Location
 
 $port = if ($envVars['PORT']) { $envVars['PORT'] } else { 3000 }
