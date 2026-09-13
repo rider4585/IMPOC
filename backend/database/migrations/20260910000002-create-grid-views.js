@@ -295,10 +295,11 @@ WHERE st.deleted_at IS NULL`,
     ],
 
     async up(queryInterface) {
-        for (const view of this.VIEWS) {
-            await queryInterface.sequelize.query(`DROP VIEW IF EXISTS ${view.name}`);
-            await queryInterface.sequelize.query(view.sql);
-        }
+        // Column-aware: on a fresh database this runs BEFORE later migrations add
+        // optional columns (R-51 GST), so those projections are left out here and
+        // the views are re-created with them once the columns exist.
+        await dropGridViews(queryInterface);
+        await createGridViews(queryInterface);
     },
 
     async down(queryInterface) {
@@ -311,3 +312,37 @@ WHERE st.deleted_at IS NULL`,
 export const up = migration.up.bind(migration);
 export const down = migration.down.bind(migration);
 export const VIEWS = migration.VIEWS;
+
+/*
+ * Later migrations (R-48, R-51, …) drop and re-create these views around an
+ * ALTER COLUMN. Their `down` runs while columns added by LATER migrations may
+ * already be gone, so re-creating from the current SQL would fail. This helper
+ * builds each view with only the optional columns that exist right now.
+ */
+const OPTIONAL_VIEW_COLUMNS = [
+    // [table, column, regex of the projection line to drop when the column is missing]
+    ['stocks', 'cgst_rate_pct', /^\s*st\.cgst_rate_pct AS "cgstRatePct",\n/m],
+    ['stocks', 'sgst_rate_pct', /^\s*st\.sgst_rate_pct AS "sgstRatePct",\n/m],
+];
+
+export async function dropGridViews(queryInterface) {
+    for (const view of migration.VIEWS) {
+        await queryInterface.sequelize.query(`DROP VIEW IF EXISTS ${view.name}`);
+    }
+}
+
+export async function createGridViews(queryInterface) {
+    const missing = [];
+    for (const [table, column, pattern] of OPTIONAL_VIEW_COLUMNS) {
+        const [rows] = await queryInterface.sequelize.query(
+            'SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?',
+            { replacements: [table, column] },
+        );
+        if (rows.length === 0) missing.push(pattern);
+    }
+    for (const view of migration.VIEWS) {
+        let sql = view.sql;
+        for (const pattern of missing) sql = sql.replace(pattern, '');
+        await queryInterface.sequelize.query(sql);
+    }
+}

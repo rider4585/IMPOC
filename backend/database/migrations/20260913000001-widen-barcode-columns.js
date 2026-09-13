@@ -1,6 +1,6 @@
 'use strict';
 
-import { VIEWS as GRID_VIEWS } from './20260910000002-create-grid-views.js';
+import { dropGridViews, createGridViews } from './20260910000002-create-grid-views.js';
 
 /**
  * R-48: barcode values become 'SHREE' + timestamp + counter (15 chars) instead
@@ -23,15 +23,11 @@ const BARCODE_COLUMNS = [
 
 const migration = {
     async dropViews(queryInterface) {
-        for (const view of GRID_VIEWS) {
-            await queryInterface.sequelize.query(`DROP VIEW IF EXISTS ${view.name}`);
-        }
+        await dropGridViews(queryInterface);
     },
 
     async createViews(queryInterface) {
-        for (const view of GRID_VIEWS) {
-            await queryInterface.sequelize.query(view.sql);
-        }
+        await createGridViews(queryInterface);
     },
 
     async setLength(queryInterface, length) {
@@ -55,9 +51,11 @@ const migration = {
     },
 
     async down(queryInterface) {
-        // Narrowing back to 12 fails if any R-48 barcode exists - intended: those labels are printed.
+        // Deliberately NOT narrowing back to 12: 15-char R-48 barcodes are printed and
+        // stuck on stock, and a narrower column would truncate them (Postgres refuses
+        // anyway once such rows exist, which broke `db:refresh`). The wider column is
+        // harmless for older code, so a rollback only re-creates the views.
         await this.dropViews(queryInterface);
-        await this.setLength(queryInterface, 12);
         await this.createViews(queryInterface);
     },
 };
