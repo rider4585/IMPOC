@@ -5,14 +5,25 @@ import * as requestKeyModule from '../../platform/requestKey.js';
 import * as wakingRequestModule from '../../platform/wakingRequest.js';
 import apiClient from '../../platform/apiClient.js';
 import { BARCODE_ROUTES } from '../../platform/routes.js';
+import { ToastProvider } from '../../components/ui/index.js';
 
 // Mock modules
 vi.mock('../../platform/requestKey.js');
 vi.mock('../../platform/wakingRequest.js');
 vi.mock('../../platform/apiClient.js');
+// The embedded sheet configurator (R-50) needs auth + its API; keep both inert here
+vi.mock('../../auth/useAuth.js', () => ({ useAuth: () => ({ permissions: ['inventory.barcode_generate'] }) }));
+vi.mock('../../services/barcodeLayoutApi.js', () => ({
+  getBarcodeLayout: vi.fn(async () => ({})),
+  saveBarcodeLayout: vi.fn(),
+  fetchLayoutPreviewPdf: vi.fn(),
+}));
 
 // Import after mocking
 import { BarcodePrintScreen } from '../BarcodePrintScreen.jsx';
+
+// Toasts render through ToastProvider (R-49), so every render needs the provider
+const renderScreen = () => render(React.createElement(ToastProvider, null, React.createElement(BarcodePrintScreen)));
 
 describe('BarcodePrintScreen (Story 1.17)', () => {
   beforeEach(() => {
@@ -23,24 +34,24 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
 
   describe('Initial render and form validation', () => {
     it('renders barcode print screen with title and form', () => {
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       expect(screen.getByRole('heading', { name: /print labels/i })).toBeInTheDocument();
       expect(screen.getByLabelText(/number of pages/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /request sheet/i })).toBeInTheDocument();
     });
 
     it('mints a request key on mount', () => {
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       expect(requestKeyModule.createRequestKey).toHaveBeenCalledTimes(1);
     });
 
     it('submit button is disabled when pages is empty', () => {
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       expect(screen.getByRole('button', { name: /request sheet/i })).toBeDisabled();
     });
 
     it('submit button is disabled when pages is zero or negative', () => {
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -52,7 +63,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
     });
 
     it('submit button is enabled when pages is valid', () => {
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -69,7 +80,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
       };
       apiClient.get.mockResolvedValueOnce(mockResponse);
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -98,7 +109,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
       global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
       global.URL.revokeObjectURL = vi.fn();
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -106,7 +117,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(screen.getByText(/sheet generated/i)).toBeInTheDocument();
+        expect(screen.getByText(/^sheet generated$/i)).toBeInTheDocument();
       });
     });
 
@@ -121,7 +132,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
       };
       apiClient.get.mockResolvedValueOnce(mockResponse);
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -129,32 +140,74 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(screen.getByText(/already generated in your last attempt/i)).toBeInTheDocument();
+        expect(screen.getByText(/sheet already generated/i)).toBeInTheDocument();
       });
     });
 
-    it('shows success message and resets after PDF download', async () => {
+    it('keeps the form visible and mints a fresh request key after a PDF download (R-49)', async () => {
       const mockResponse = {
         data: new ArrayBuffer(100),
         headers: { 'content-type': 'application/pdf' },
       };
-      apiClient.get.mockResolvedValueOnce(mockResponse);
+      apiClient.get.mockResolvedValue(mockResponse);
 
       global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
       global.URL.revokeObjectURL = vi.fn();
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
+      // The mount key is already minted; every mint from here on is the "next sheet" key
+      requestKeyModule.createRequestKey.mockReturnValue('second-request-key-uuid');
+
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
       fireEvent.change(input, { target: { value: '5' } });
       fireEvent.click(button);
 
-      // After success, form should be hidden and success message shown
       await waitFor(() => {
-        expect(screen.queryByLabelText(/number of pages/i)).not.toBeInTheDocument();
-        expect(screen.getByText(/sheet generated/i)).toBeInTheDocument();
+        expect(screen.getByText(/^sheet generated$/i)).toBeInTheDocument();
       });
+      expect(apiClient.get).toHaveBeenLastCalledWith(
+        BARCODE_ROUTES.GENERATE,
+        expect.objectContaining({ params: { pages: 5, requestUuid: 'test-request-key-uuid' } })
+      );
+
+      // Form stays usable for the next sheet - no page refresh needed
+      const nextInput = screen.getByLabelText(/number of pages/i);
+      expect(nextInput.value).toBe('');
+      expect(screen.getByRole('button', { name: /request sheet/i })).toBeInTheDocument();
+
+      // A completed request consumes its key: mount key + one fresh key
+      expect(requestKeyModule.createRequestKey).toHaveBeenCalledTimes(2);
+
+      // The next request carries the NEW key, so the server does not replay
+      fireEvent.change(nextInput, { target: { value: '2' } });
+      fireEvent.click(screen.getByRole('button', { name: /request sheet/i }));
+      await waitFor(() => {
+        expect(apiClient.get).toHaveBeenLastCalledWith(
+          BARCODE_ROUTES.GENERATE,
+          expect.objectContaining({ params: { pages: 2, requestUuid: 'second-request-key-uuid' } })
+        );
+      });
+    });
+  });
+
+  describe('Sheet configurator (R-50)', () => {
+    it('is hidden by default and expands below the form on "Configure barcode sheet"', async () => {
+      renderScreen();
+      expect(screen.queryByTestId('label-layout')).not.toBeInTheDocument();
+
+      const toggle = screen.getByRole('button', { name: /configure barcode sheet/i });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      fireEvent.click(toggle);
+
+      expect(await screen.findByTestId('label-layout')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /configure barcode sheet/i })).toBeInTheDocument();
+      // The print form stays available above it
+      expect(screen.getByLabelText(/number of pages/i)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /hide sheet configuration/i }));
+      expect(screen.queryByTestId('label-layout')).not.toBeInTheDocument();
     });
   });
 
@@ -165,7 +218,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
         requestKey: 'test-key',
       });
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -183,7 +236,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
         requestKey: 'test-key',
       });
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -203,7 +256,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
         requestKey: 'test-key',
       });
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -227,7 +280,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
       global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
       global.URL.revokeObjectURL = vi.fn();
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       let button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -258,7 +311,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
         },
       });
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -276,7 +329,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
         message: 'Server error',
       });
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
@@ -301,17 +354,16 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
       global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
       global.URL.revokeObjectURL = vi.fn();
 
-      render(React.createElement(BarcodePrintScreen));
+      renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
       const button = screen.getByRole('button', { name: /request sheet/i });
 
       fireEvent.change(input, { target: { value: '7' } });
       fireEvent.click(button);
 
-      // Verify success message contains page count
+      // Verify the success toast description contains the page count
       await waitFor(() => {
-        const successMsg = screen.getByText(/sheet generated/i);
-        expect(successMsg.textContent).toMatch(/7/);
+        expect(screen.getByText(/7 page\(s\) downloaded/i)).toBeInTheDocument();
       });
     });
 

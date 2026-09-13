@@ -1,6 +1,7 @@
 import {
     generateBarcodes,
     generateBarcodeTestSheet,
+    generateBarcodePreview,
 } from './barcode.service.js';
 
 import {
@@ -182,5 +183,24 @@ export const generateBarcodeTestSheetPdf = async (
         return res.send(pdfBuffer);
     } catch (error) {
         return next(error);
+    }
+};
+
+/**
+ * GET /api/barcodes/preview — one sample page with the saved layout (R-50).
+ * Inline (not attachment) so the Label layout page can show it in a tab.
+ */
+export const previewBarcodeSheetPdf = async (req, res, next) => {
+    try {
+        const { pdfBuffer } = await generateBarcodePreview();
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="label-layout-preview.pdf"');
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.setHeader('Cache-Control', 'no-store');
+
+        return res.send(pdfBuffer);
+    } catch (error) {
+        next(error);
     }
 };

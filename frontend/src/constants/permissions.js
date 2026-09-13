@@ -17,6 +17,7 @@ export const PERMISSIONS = Object.freeze({
     UPDATE: 'inventory.update',
     DELETE: 'inventory.delete',
     BARCODE_GENERATE: 'inventory.barcode_generate',
+    BARCODE_LAYOUT_MANAGE: 'inventory.barcode_layout_manage',
   },
 
   PICKLISTS: {

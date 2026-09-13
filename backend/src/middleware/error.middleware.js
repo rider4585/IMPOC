@@ -83,6 +83,7 @@ const SAFE_4XX_MESSAGES = Object.freeze([
     'Pages cannot exceed',
     'required geometry setting',
     'Invalid page count',
+    'Layout does not fit',
     // Validation safety nets
     'Request UUID must be a valid UUID',
     'Invalid UUID format',

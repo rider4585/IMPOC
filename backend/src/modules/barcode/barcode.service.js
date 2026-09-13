@@ -2,9 +2,11 @@ import { v4 as uuidv4 } from 'uuid';
 
 import {
     BARCODE_CONFIG,
+    BARCODE_FORMAT,
 } from './barcode.constants.js';
 
-import { generateBarcodePdf } from './barcode.generator.js';
+import { generateBarcodePdf, generateSampleSheetPdf } from './barcode.generator.js';
+import { getLayout } from '../barcode-layouts/barcode-layout.service.js';
 import { generateBarcodeTestPdf } from './barcode.test-generator.js';
 
 import {
@@ -15,44 +17,58 @@ import {
 
 import { GESTURE_TYPES } from '../../constants/gesture-type.js';
 
-import * as appSettings from '../app-settings/app-settings.service.js';
-import { ConfigurationError, DatabaseError } from '../app-settings/app-settings.service.js';
+
+/**
+ * Format one barcode value: SHREE + TS6 + CNT4 (see BARCODE_FORMAT).
+ *
+ * @param {bigint|number|string} seqValue - value drawn from barcode_seq (>= 1)
+ * @param {number} nowMs - wall-clock ms used for the timestamp part
+ * @returns {string} 15-char uppercase alphanumeric barcode value
+ */
+export const formatBarcodeValue = (seqValue, nowMs = Date.now()) => {
+    const { prefix, epochMs, timestampLength, counterLength, radix } = BARCODE_FORMAT;
+
+    const seq = BigInt(seqValue);
+    if (seq < 1n) {
+        throw new Error('Invalid sequence value from database');
+    }
+
+    const seconds = Math.floor((nowMs - epochMs) / 1000);
+    if (!Number.isFinite(seconds) || seconds < 0) {
+        throw new Error('System clock is before the barcode epoch');
+    }
+
+    const timestamp = seconds.toString(radix).toUpperCase().padStart(timestampLength, '0');
+    if (timestamp.length > timestampLength) {
+        throw new Error('Barcode timestamp exceeds its fixed width');
+    }
+
+    const counterModulus = BigInt(radix) ** BigInt(counterLength);
+    const counter = (seq % counterModulus)
+        .toString(radix)
+        .toUpperCase()
+        .padStart(counterLength, '0');
+
+    return `${prefix}${timestamp}${counter}`;
+};
 
 /**
  * Generate barcode values (IDs).
  *
  * Draws N distinct values from the barcode_seq sequence in a single round-trip.
- * Loads grid dimensions from app_settings to calculate total barcodes.
- * Each value is formatted as a 12-digit zero-padded string for Code 128 subset-C encoding.
+ * Loads grid dimensions from the saved label layout to calculate total barcodes.
+ * Each value is formatted via formatBarcodeValue (SHREE + timestamp + counter),
+ * so labels stay unique even if barcode_seq is ever reset (R-48).
  * No in-process caching — fresh read on every call.
  *
  * @param {number} pages - Number of pages
  * @param {Transaction} transaction - Sequelize transaction to ensure atomicity with request_keys row
- * @returns {Promise<string[]>} Array of 12-digit zero-padded barcode values
- * @throws {Error} If grid dimensions are missing from app_settings or counter exceeds 12-digit max
+ * @returns {Promise<string[]>} Array of barcode values
+ * @throws {Error} If the grid dimensions are invalid
  */
 const generateBarcodeValues = async (pages, transaction) => {
-    let columns, rows;
-    try {
-        columns = await appSettings.get('barcode_grid_columns');
-        rows = await appSettings.get('barcode_grid_rows');
-    } catch (error) {
-        // Handle configuration errors (missing grid dimension settings)
-        if (error instanceof ConfigurationError) {
-            throw new Error(
-                `Cannot generate barcodes: ${error.message}. ` +
-                'Ensure barcode_grid_columns and barcode_grid_rows are seeded in app_settings.',
-            );
-        }
-        // Handle database errors (connection, timeout, etc.)
-        if (error instanceof DatabaseError) {
-            throw error;
-        }
-        // Patch 2: Default error handler for unexpected errors
-        throw new Error(
-            `Unexpected error while loading barcode grid dimensions: ${error.message}`,
-        );
-    }
+    // Grid size comes from the saved label layout (R-50), read inside the transaction
+    const { columns, rows } = await getLayout(transaction);
 
     if (columns <= 0 || rows <= 0) {
         throw new Error('Invalid grid dimensions: columns and rows must be positive integers');
@@ -74,25 +90,15 @@ const generateBarcodeValues = async (pages, transaction) => {
         }
     );
 
-    // Extract sequence values, validate, and format as 12-digit zero-padded strings
-    const barcodeValues = result.map(row => {
-        const seqValue = row.nextval;
+    // One timestamp per batch: the counter part keeps values distinct within it
+    const nowMs = Date.now();
 
-        // Validate that the sequence value is valid (not null, must be >= 1)
-        if (seqValue == null || seqValue < 1) {
+    return result.map(row => {
+        if (row.nextval == null) {
             throw new Error('Invalid sequence value from database');
         }
-
-        // Validate that the counter does not exceed 12 digits (max: 999999999999)
-        if (seqValue > 999999999999) {
-            throw new Error('Barcode value exceeds 12-digit maximum');
-        }
-
-        // Format as 12-digit zero-padded string for Code 128 subset-C encoding
-        return String(seqValue).padStart(12, '0');
+        return formatBarcodeValue(row.nextval, nowMs);
     });
-
-    return barcodeValues;
 };
 
 export const generateBarcodes = async (pages, requestUuid, userUuid) => {
@@ -232,4 +238,14 @@ export const generateBarcodeTestSheet = async (requestUuid, userUuid) => {
         await transaction.rollback();
         throw error;
     }
+};
+
+
+/**
+ * Sample sheet for the Label layout page (R-50): one page of dummy values
+ * rendered with the SAVED layout. No sequence draw, no request_keys row.
+ */
+export const generateBarcodePreview = async () => {
+    const pdfBuffer = await generateSampleSheetPdf();
+    return { pdfBuffer };
 };

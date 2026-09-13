@@ -1,85 +1,40 @@
 import { describe, it, expect, beforeAll, afterAll, jest } from '@jest/globals';
 import { v4 as uuidv4 } from 'uuid';
 
-import {
-    generateBarcodes,
-} from '../src/modules/barcode/barcode.service.js';
-
-import {
-    generateBarcodePdf,
-} from '../src/modules/barcode/barcode.generator.js';
+import { generateBarcodes } from '../src/modules/barcode/barcode.service.js';
+import { generateBarcodePdf } from '../src/modules/barcode/barcode.generator.js';
 
 import {
     sequelize,
     User,
-    AppSettings,
+    BarcodeLayout,
 } from '../database/models/index.js';
 
-import {
-    ConfigurationError,
-    DatabaseError,
-} from '../src/modules/app-settings/app-settings.service.js';
+import { DEFAULT_LAYOUT } from '../src/modules/barcode-layouts/barcode-layout.geometry.js';
 
 /**
- * Seed barcode geometry settings into app_settings table.
- * Required by barcode.generator.js (used by generateBarcodes).
- */
-const seedBarcodeGeometry = async () => {
-    const MM_TO_POINTS = 72 / 25.4;
-    const mmToPoints = (mm) => (mm * MM_TO_POINTS).toFixed(2);
-
-    const geometrySettings = [
-        { key: 'barcode_width_pt', value_text: mmToPoints(35), value_type: 'TEXT' },
-        { key: 'barcode_height_pt', value_text: mmToPoints(8), value_type: 'TEXT' },
-        { key: 'barcode_text_font_size_pt', value_text: '5', value_type: 'TEXT' },
-        { key: 'barcode_clear_space_pt', value_text: '15', value_type: 'TEXT' },
-        { key: 'barcode_margin_top_pt', value_text: mmToPoints(8), value_type: 'TEXT' },
-        { key: 'barcode_margin_right_pt', value_text: mmToPoints(8), value_type: 'TEXT' },
-        { key: 'barcode_margin_bottom_pt', value_text: mmToPoints(8), value_type: 'TEXT' },
-        { key: 'barcode_margin_left_pt', value_text: mmToPoints(8), value_type: 'TEXT' },
-        { key: 'barcode_gap_horizontal_pt', value_text: mmToPoints(5), value_type: 'TEXT' },
-        { key: 'barcode_gap_vertical_pt', value_text: mmToPoints(6), value_type: 'TEXT' },
-        { key: 'barcode_grid_columns', value_int: 3, value_type: 'INT' },
-        { key: 'barcode_grid_rows', value_int: 5, value_type: 'INT' },
-    ];
-
-    for (const setting of geometrySettings) {
-        await sequelize.query(
-            'INSERT INTO app_settings (key, value_text, value_int, value_type, created_at, updated_at) ' +
-            'VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ' +
-            'ON CONFLICT (key) DO NOTHING',
-            {
-                replacements: [
-                    setting.key,
-                    setting.value_text || null,
-                    setting.value_int || null,
-                    setting.value_type,
-                ],
-                type: sequelize.QueryTypes.INSERT,
-            }
-        );
-    }
-};
-
-/**
- * Patch 4: Error classification test suite.
+ * Error classification for barcode generation.
  *
- * Verifies that ConfigurationError and DatabaseError are properly thrown
- * when required geometry settings are missing or database errors occur.
+ * R-50 moved the sheet geometry from loose app_settings keys to the single
+ * barcode_layouts row, so "missing geometry setting" can no longer happen —
+ * a missing row is created from DEFAULT_LAYOUT. What remains:
+ *  - a saved layout that cannot be printed -> clear "Cannot generate" error
+ *  - database failures during generation -> propagated
  */
-describe('barcode — error classification (Patch 4)', () => {
+describe('barcode — error classification', () => {
     let testUser;
 
     beforeAll(async () => {
         await sequelize.sync({ force: true });
-        await seedBarcodeGeometry();
-
+        await sequelize.query(
+            'CREATE SEQUENCE IF NOT EXISTS public.barcode_seq AS bigint INCREMENT BY 1 START WITH 1 NO CYCLE CACHE 1 OWNED BY NONE;'
+        );
         testUser = await User.create({
-            username: 'test-error-classification-user',
-            email: 'test-error-classification@example.com',
-            passwordHash: 'hashed-password',
-            firstName: 'Test',
-            lastName: 'Error',
+            username: 'error-test-user',
+            email: 'error-test@example.com',
+            passwordHash: 'hashed',
+            firstName: 'Error',
+            lastName: 'Test',
             status: 'ACTIVE',
         });
     });
@@ -88,160 +43,36 @@ describe('barcode — error classification (Patch 4)', () => {
         await sequelize.close();
     });
 
-    describe('ConfigurationError: missing geometry setting', () => {
-        it('generateBarcodePdf throws ConfigurationError when barcode_width_pt is NULL', async () => {
-            // Patch 4a: Deliberately remove one geometry setting
-            await sequelize.query(
-                'UPDATE app_settings SET value_text = NULL WHERE key = ?',
-                {
-                    replacements: ['barcode_width_pt'],
-                    type: sequelize.QueryTypes.UPDATE,
-                }
-            );
-
-            try {
-                await generateBarcodePdf(['000000000001']);
-                expect.fail('Expected ConfigurationError to be thrown');
-            } catch (error) {
-                // Patch 4c: Verify ConfigurationError is thrown with expected message
-                expect(error).toBeInstanceOf(Error);
-                expect(error.message).toContain("required geometry setting 'barcode_width_pt' not found");
-            }
-
-            // Restore the setting
-            const MM_TO_POINTS = 72 / 25.4;
-            const mmToPoints = (mm) => (mm * MM_TO_POINTS).toFixed(2);
-            await sequelize.query(
-                'UPDATE app_settings SET value_text = ? WHERE key = ?',
-                {
-                    replacements: [mmToPoints(35), 'barcode_width_pt'],
-                    type: sequelize.QueryTypes.UPDATE,
-                }
-            );
-        });
-
-        it('generateBarcodePdf throws ConfigurationError when barcode_grid_columns is missing', async () => {
-            // Patch 4a: Deliberately remove barcode_grid_columns
-            await sequelize.query(
-                'DELETE FROM app_settings WHERE key = ?',
-                {
-                    replacements: ['barcode_grid_columns'],
-                    type: sequelize.QueryTypes.DELETE,
-                }
-            );
-
-            try {
-                await generateBarcodePdf(['000000000001']);
-                expect.fail('Expected ConfigurationError to be thrown');
-            } catch (error) {
-                // Patch 4c: Verify ConfigurationError is thrown with expected message
-                expect(error).toBeInstanceOf(Error);
-                expect(error.message).toContain("required geometry setting 'barcode_grid_columns' not found");
-            }
-
-            // Restore the setting
-            await sequelize.query(
-                'INSERT INTO app_settings (key, value_text, value_int, value_type, created_at, updated_at) ' +
-                'VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
-                {
-                    replacements: ['barcode_grid_columns', null, 3, 'INT'],
-                    type: sequelize.QueryTypes.INSERT,
-                }
-            );
-        });
-
-        it('generateBarcodes throws ConfigurationError when barcode_margin_top_pt is NULL', async () => {
-            // Patch 4a: Deliberately set barcode_margin_top_pt to NULL
-            await sequelize.query(
-                'UPDATE app_settings SET value_text = NULL WHERE key = ?',
-                {
-                    replacements: ['barcode_margin_top_pt'],
-                    type: sequelize.QueryTypes.UPDATE,
-                }
-            );
-
-            try {
-                await generateBarcodes(1, uuidv4(), testUser.uuid);
-                expect.fail('Expected ConfigurationError to be thrown');
-            } catch (error) {
-                // Patch 4c: Verify ConfigurationError is thrown with expected message
-                expect(error).toBeInstanceOf(Error);
-                expect(error.message).toContain("required geometry setting 'barcode_margin_top_pt' not found");
-            }
-
-            // Restore the setting
-            const MM_TO_POINTS = 72 / 25.4;
-            const mmToPoints = (mm) => (mm * MM_TO_POINTS).toFixed(2);
-            await sequelize.query(
-                'UPDATE app_settings SET value_text = ? WHERE key = ?',
-                {
-                    replacements: [mmToPoints(8), 'barcode_margin_top_pt'],
-                    type: sequelize.QueryTypes.UPDATE,
-                }
-            );
-        });
+    it('creates the default layout row when none exists and renders fine', async () => {
+        expect(await BarcodeLayout.count()).toBe(0);
+        const pdf = await generateBarcodePdf(['SHREE0000000001']);
+        expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+        expect(await BarcodeLayout.count()).toBe(1);
     });
 
-    describe('DatabaseError: database operation failures', () => {
-        it('DatabaseError is thrown when database becomes unavailable during barcode generation', async () => {
-            // Patch 4d: Mock database error by making sequelize.query reject
-            const querySpy = jest.spyOn(sequelize, 'query');
-            const mockError = new Error('Connection timeout');
-            mockError.code = 'ECONNREFUSED';
+    it('throws a clear error when the saved layout cannot be printed', async () => {
+        // Bypass the API validation and corrupt the row directly (e.g. a manual DB edit)
+        await BarcodeLayout.update({ gapHorizontalMm: 500 }, { where: { id: 1 } });
 
-            // Mock the query to throw an error on the nextval call
-            querySpy.mockImplementationOnce(async () => {
-                throw mockError;
-            });
-
-            try {
-                await generateBarcodes(1, uuidv4(), testUser.uuid);
-                expect.fail('Expected error to be thrown');
-            } catch (error) {
-                // Patch 4d: Verify error is propagated
-                expect(error).toBeInstanceOf(Error);
-                // The error should mention database or connection
-                expect(error.message.toLowerCase()).toMatch(/connection|database|timeout/);
-            } finally {
-                querySpy.mockRestore();
-            }
-        });
+        try {
+            await expect(generateBarcodePdf(['SHREE0000000001'])).rejects.toThrow(/Cannot generate barcode sheet: .*does not fit/);
+        } finally {
+            await BarcodeLayout.update({ ...DEFAULT_LAYOUT }, { where: { id: 1 } });
+        }
     });
 
-    describe('Unexpected error handling (Patch 2)', () => {
-        it('validateCalculatedLabelDimensions error is wrapped during PDF generation', async () => {
-            // Patch 2: Test that non-standard errors are caught and wrapped
-            // Create a scenario where geometry is valid but label dimensions are invalid
-            // by setting gap values that are too large
-
-            // First, set excessively large gap values
-            await sequelize.query(
-                'UPDATE app_settings SET value_text = ? WHERE key = ?',
-                {
-                    replacements: ['500', 'barcode_gap_horizontal_pt'],
-                    type: sequelize.QueryTypes.UPDATE,
-                }
-            );
-
-            try {
-                await generateBarcodePdf(['000000000001']);
-                expect.fail('Expected error to be thrown');
-            } catch (error) {
-                // Patch 2: Verify error is thrown (either as configuration or wrapped)
-                expect(error).toBeInstanceOf(Error);
-                expect(error.message).toMatch(/Invalid label dimensions|Check page margins/);
-            } finally {
-                // Restore the setting
-                const MM_TO_POINTS = 72 / 25.4;
-                const mmToPoints = (mm) => (mm * MM_TO_POINTS).toFixed(2);
-                await sequelize.query(
-                    'UPDATE app_settings SET value_text = ? WHERE key = ?',
-                    {
-                        replacements: [mmToPoints(5), 'barcode_gap_horizontal_pt'],
-                        type: sequelize.QueryTypes.UPDATE,
-                    }
-                );
-            }
+    it('propagates a database failure during the sequence draw', async () => {
+        const querySpy = jest.spyOn(sequelize, 'query');
+        const mockError = new Error('Connection timeout');
+        mockError.code = 'ECONNREFUSED';
+        querySpy.mockImplementationOnce(async () => {
+            throw mockError;
         });
+
+        try {
+            await expect(generateBarcodes(1, uuidv4(), testUser.uuid)).rejects.toThrow(/connection|database|timeout/i);
+        } finally {
+            querySpy.mockRestore();
+        }
     });
 });

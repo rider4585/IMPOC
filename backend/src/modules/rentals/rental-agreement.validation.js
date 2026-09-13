@@ -12,7 +12,7 @@ const uuidSchema = z.string().uuid('Invalid UUID format');
 const itemSchema = z
     .object({
         unitUuid: uuidSchema.optional(),
-        barcode: z.string().trim().min(1).max(12).optional(),
+        barcode: z.string().trim().min(1).max(32).optional(),
     })
     .refine(
         ({ unitUuid, barcode }) => Boolean(unitUuid) !== Boolean(barcode),
@@ -61,7 +61,7 @@ export const returnBodySchema = z.object({
     items: z.array(
         z.object({
             unitUuid: uuidSchema.optional(),
-            barcode: z.string().trim().min(1).max(12).optional(),
+            barcode: z.string().trim().min(1).max(32).optional(),
             gradeUuid: uuidSchema.optional(),
             damageChargePaise: z.number().int().nonnegative('Damage charge must be >= 0').optional(),
             notes: z.string().trim().max(2000).optional(),

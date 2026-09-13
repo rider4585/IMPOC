@@ -1,35 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Input, Card, CardHeader, CardContent, CardTitle } from '../components/ui';
+import React, { useState } from 'react';
+import { Button, Input, Card, CardHeader, CardContent, CardTitle, useToast } from '../components/ui';
 import { createRequestKey } from '../platform/requestKey.js';
 import { wakingRequest } from '../platform/wakingRequest.js';
 import apiClient from '../platform/apiClient.js';
 import { BARCODE_ROUTES } from '../platform/routes.js';
+import LabelLayoutScreen from './LabelLayoutScreen.jsx';
 
 /**
  * Barcode Print Screen (Story 1.17)
  *
  * Allows inventory managers to request N-page barcode sheets through the app.
  * Features:
- * - Mints one requestKey on mount; reuses across retries; fresh key on re-entry
+ * - Mints one requestKey on mount; reuses across retries of the SAME attempt;
+ *   a fresh key is minted after every completed request (SEC-M-3 mint-on-intent),
+ *   so the operator can request the next sheet without refreshing (R-49)
  * - Calls GET /api/barcodes/generate?pages={n}&requestUuid={key} via platform/apiClient
- * - First attempt: receives PDF binary → downloads as barcodes.pdf
- * - Replay: receives JSON → shows "already generated" message, no download
+ * - First attempt: receives PDF binary → downloads as barcodes.pdf + success toast
+ * - Replay: receives JSON → info toast, no download
+ * - Form stays visible and usable after success/replay
  * - Shows waking banner at 1200ms; failure state at 90s with Try again button
  * - Displays server error messages inline
+ * - "Configure barcode sheet" expands the R-50 label layout configurator below the card
  */
 export function BarcodePrintScreen() {
   const [pages, setPages] = useState('');
-  const [requestKey, setRequestKey] = useState(null);
+  // Minted once when the screen is entered (lazy initialiser), re-minted per completed request
+  const [requestKey, setRequestKey] = useState(() => createRequestKey());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState('idle'); // idle, waking, failed, success, replay
-  const [successPages, setSuccessPages] = useState(null);
+  const [status, setStatus] = useState('idle'); // idle, waking, failed
+  const toast = useToast();
+  const [showConfig, setShowConfig] = useState(false);
 
-  // Mint a fresh requestKey when the screen is entered
-  useEffect(() => {
-    const key = createRequestKey();
-    setRequestKey(key);
-  }, []);
+  // A completed request (PDF or replay) consumes its key: the next sheet is a
+  // new intent and must carry a new requestUuid, otherwise the server replays.
+  const finishAttempt = () => {
+    setRequestKey(createRequestKey());
+    setPages('');
+    setStatus('idle');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -87,18 +96,24 @@ export function BarcodePrintScreen() {
         link.click();
         window.URL.revokeObjectURL(url);
 
-        // Show success message with page count
-        setSuccessPages(parseInt(pages, 10));
-        setStatus('success');
-        setPages('');
+        toast.success({
+          title: 'Sheet generated',
+          description: `${parseInt(pages, 10)} page(s) downloaded as barcodes.pdf.`,
+        });
+        finishAttempt();
       } else {
-        // Replay: JSON response
-        setStatus('replay');
-        setPages('');
+        // Replay: JSON response - the server already produced this sheet
+        toast.info({
+          title: 'Sheet already generated',
+          description: 'Nothing new was printed - use the copy you already have.',
+        });
+        finishAttempt();
       }
     } catch (err) {
       // Handle validation errors, permission errors, and other server errors
-      let message = err.response?.data?.message || err.message || 'An error occurred. Please try again.';
+      let message = err.isServerUnavailable
+        ? err.message
+        : err.response?.data?.message || err.message || 'An error occurred. Please try again.';
       // Ensure message is a plain string
       if (typeof message !== 'string') {
         message = String(message);
@@ -119,7 +134,7 @@ export function BarcodePrintScreen() {
   };
 
   return (
-    <div className="flex min-h-full items-center justify-center p-4">
+    <div className={`flex min-h-full flex-col items-center gap-6 p-4 ${showConfig ? 'justify-start md:p-6' : 'justify-center'}`}>
       <Card className="w-full max-w-[400px]">
         <CardHeader className="items-center">
           <CardTitle>Print Labels</CardTitle>
@@ -137,20 +152,6 @@ export function BarcodePrintScreen() {
             </div>
           )}
 
-          {/* Success message  -  shown after PDF download */}
-          {status === 'success' && successPages && (
-            <div className="mb-6 rounded-md border-l-4 border-[var(--success)] bg-[rgba(47,110,79,0.1)] p-4 font-medium leading-relaxed text-[var(--success)]">
-              Sheet generated  -  {successPages} page(s).
-            </div>
-          )}
-
-          {/* Replay message  -  shown when the same requestUuid is submitted again */}
-          {status === 'replay' && (
-            <div className="mb-6 rounded-md border-l-4 border-[var(--money-held)] bg-[rgba(91,75,138,0.1)] p-4 leading-relaxed text-[var(--ink)]">
-              This sheet was already generated in your last attempt. Nothing new was printed  -  use the copy you already have.
-            </div>
-          )}
-
           {/* Error message  -  shown inline on validation or server errors */}
           {error && (
             <div className="mb-6 rounded-md border-l-4 border-[var(--danger)] bg-[var(--danger)]/10 p-4 text-sm leading-relaxed text-[var(--danger)]">
@@ -158,31 +159,41 @@ export function BarcodePrintScreen() {
             </div>
           )}
 
-          {/* Form  -  always visible and interactive, even during waking state */}
-          {status !== 'success' && status !== 'replay' ? (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <Input
-                label="Number of pages"
-                id="pages"
-                type="number"
-                min="1"
-                placeholder="Enter number of pages"
-                value={pages}
-                onChange={(e) => setPages(e.target.value)}
-                disabled={isLoading}
-                required
-              />
+          {/* Form  -  always visible and interactive (waking state included, and after a download) */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <Input
+              label="Number of pages"
+              id="pages"
+              type="number"
+              min="1"
+              placeholder="Enter number of pages"
+              value={pages}
+              onChange={(e) => setPages(e.target.value)}
+              disabled={isLoading}
+              required
+            />
 
-              {/* Submit button  -  disabled during initial loading, always present */}
-              <Button
-                type="submit"
-                disabled={isLoading || !pages || parseInt(pages, 10) < 1}
-                className="mt-1"
-              >
-                {isLoading ? 'Requesting...' : 'Request Sheet'}
-              </Button>
-            </form>
-          ) : null}
+            {/* Submit button  -  disabled during initial loading, always present */}
+            <Button
+              type="submit"
+              disabled={isLoading || !pages || parseInt(pages, 10) < 1}
+              className="mt-1"
+            >
+              {isLoading ? 'Requesting...' : 'Request Sheet'}
+            </Button>
+          </form>
+
+          {/* Sheet configurator toggle (R-50) */}
+          <Button
+            type="button"
+            variant="link"
+            className="mt-4 w-full"
+            aria-expanded={showConfig}
+            aria-controls="label-layout-section"
+            onClick={() => setShowConfig((v) => !v)}
+          >
+            {showConfig ? 'Hide sheet configuration' : 'Configure barcode sheet'}
+          </Button>
 
           {/* Retry button  -  shown when request times out at 90s */}
           {status === 'failed' && (
@@ -196,6 +207,12 @@ export function BarcodePrintScreen() {
           )}
         </CardContent>
       </Card>
+
+      {showConfig && (
+        <div id="label-layout-section" className="w-full max-w-[1200px]">
+          <LabelLayoutScreen />
+        </div>
+      )}
     </div>
   );
 }

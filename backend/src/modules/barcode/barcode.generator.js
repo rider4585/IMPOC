@@ -1,12 +1,8 @@
 import bwipjs from 'bwip-js';
 import PDFDocument from 'pdfkit';
 
-import {
-    PDF_CONFIG,
-} from './barcode.constants.js';
-
-import * as appSettings from '../app-settings/app-settings.service.js';
-import { ConfigurationError, DatabaseError } from '../app-settings/app-settings.service.js';
+import { getLayout } from '../barcode-layouts/barcode-layout.service.js';
+import { computeSheetGeometry } from '../barcode-layouts/barcode-layout.geometry.js';
 
 /**
  * Generate a Code 128 barcode image.
@@ -22,47 +18,6 @@ const generateBarcodeImage = async (value) => {
         height: 20,    // Source height in barcode units (structural)
         includetext: false,
     });
-};
-
-
-/**
- * Calculate the size of every label on the page.
- *
- * @param {PDFDocument} doc - The PDF document
- * @param {Object} geometry - Geometry configuration from app_settings
- * @returns {Object} { labelWidth, labelHeight }
- */
-const calculateLabelSize = (doc, geometry) => {
-    const {
-        columns,
-        rows,
-        margin,
-        gap,
-    } = geometry;
-
-    const pageWidth = doc.page.width;
-    const pageHeight = doc.page.height;
-
-    const labelWidth =
-        (
-            pageWidth -
-            margin.left -
-            margin.right -
-            gap.horizontal * (columns - 1)
-        ) / columns;
-
-    const labelHeight =
-        (
-            pageHeight -
-            margin.top -
-            margin.bottom -
-            gap.vertical * (rows - 1)
-        ) / rows;
-
-    return {
-        labelWidth,
-        labelHeight,
-    };
 };
 
 
@@ -90,279 +45,91 @@ const drawLabel = async (
         label,
         barcode,
         text,
-        infoBox,
+        divider,
+        codeAreaHeight,
     } = geometry;
 
+    // Outer label border
+    if (label.borderWidth > 0) {
+        doc
+            .lineWidth(label.borderWidth)
+            .roundedRect(x, y, labelWidth, labelHeight, label.borderRadius)
+            .stroke();
+    }
 
-    /*
-     * --------------------------------------------------
-     * Calculate sections
-     * --------------------------------------------------
-     *
-     * The info box has a fixed small height.
-     *
-     * Everything above it becomes the barcode section.
-     */
+    // Divider between the barcode strip and the hand-written info box (R-49/R-50)
+    if (divider.show) {
+        const dividerY = y + codeAreaHeight;
+        doc
+            .lineWidth(Math.max(label.borderWidth, 0.5))
+            .moveTo(x, dividerY)
+            .lineTo(x + labelWidth, dividerY)
+            .stroke();
+    }
 
-    const infoBoxHeight = infoBox.height;
+    // Barcode, centred horizontally, at the configured physical size
+    const barcodeImage = await generateBarcodeImage(value);
+    const barcodeX = x + (labelWidth - barcode.width) / 2;
+    const barcodeY = y + label.paddingTop;
 
-    const codeAreaHeight =
-        labelHeight - infoBoxHeight;
+    doc.image(barcodeImage, barcodeX, barcodeY, {
+        width: barcode.width,
+        height: barcode.height,
+    });
 
-
-    /*
-     * --------------------------------------------------
-     * Outer label border
-     * --------------------------------------------------
-     */
-
-    doc
-        .lineWidth(label.borderWidth)
-        .roundedRect(
-            x,
-            y,
-            labelWidth,
-            labelHeight,
-            label.borderRadius,
-        )
-        .stroke();
-
-
-    /*
-     * --------------------------------------------------
-     * Divider line
-     * --------------------------------------------------
-     */
-
-    const dividerY =
-        y + codeAreaHeight;
-
-    doc
-        .lineWidth(label.dividerHeight)
-        .moveTo(x, dividerY)
-        .lineTo(x + labelWidth, dividerY)
-        .stroke();
-
-
-    /*
-     * --------------------------------------------------
-     * Generate barcode
-     * --------------------------------------------------
-     */
-
-    const barcodeImage =
-        await generateBarcodeImage(value);
-
-
-    /*
-     * --------------------------------------------------
-     * Barcode dimensions
-     * --------------------------------------------------
-     */
-
-    const availableWidth =
-        labelWidth -
-        label.paddingX * 2;
-
-    const availableHeight =
-        codeAreaHeight -
-        label.paddingTop -
-        label.paddingBottom;
-
-
-    /*
-     * --------------------------------------------------
-     * Barcode dimensions from app_settings
-     * --------------------------------------------------
-     * Use configured dimensions (35mm × 8mm = 99.21 × 22.68 points)
-     * loaded from app_settings. These define the physical size
-     * of the rendered barcode on paper.
-     */
-
-    const barcodeWidth = barcode.widthPt;
-    const barcodeHeight = barcode.heightPt;
-
-
-    /*
-     * --------------------------------------------------
-     * Center barcode horizontally
-     * --------------------------------------------------
-     */
-
-    const barcodeX =
-        x +
-        (labelWidth - barcodeWidth) / 2;
-
-
-    /*
-     * Position barcode toward the upper portion
-     * of the label.
-     */
-
-    const barcodeY =
-        y +
-        label.paddingTop;
-
-
-    doc.image(
-        barcodeImage,
-        barcodeX,
-        barcodeY,
-        {
-            width: barcodeWidth,
-            height: barcodeHeight,
-        },
-    );
-
-
-    /*
-     * --------------------------------------------------
-     * Human-readable barcode number
-     * --------------------------------------------------
-     */
-
-    const textY =
-        barcodeY +
-        barcodeHeight +
-        text.textMarginTop;
-
-
-    doc
-        .fontSize(text.fontSize)
-        .text(
-            value,
-            x + label.paddingX,
-            textY,
-            {
-                width:
-                    labelWidth -
-                    label.paddingX * 2,
-
+    // Human-readable value under the bars
+    if (text.show) {
+        doc
+            .fontSize(text.fontSize)
+            .text(value, x + label.paddingX, barcodeY + barcode.height + text.marginTop, {
+                width: labelWidth - label.paddingX * 2,
                 align: 'center',
-
                 lineBreak: false,
-            },
-        );
+            });
+    }
 
-
-    /*
-     * --------------------------------------------------
-     * Information box
-     * --------------------------------------------------
-     *
-     * This section intentionally remains empty.
-     *
-     * The user can manually write:
-     *
-     * ₹ 1299
-     * Size: M
-     * etc.
-     *
-     * We only draw the border/divider.
-     * --------------------------------------------------
-     */
+    // The info box below the divider stays empty on purpose: the shop writes
+    // the price / size by hand.
 };
 
 
 /**
  * Generate complete barcode PDF.
  *
- * Loads all geometry from app_settings at render time (no caching).
- * Throws an error if any required geometry setting is missing.
+ * Geometry comes from the single barcode_layouts row (R-50), read fresh on
+ * every render (no caching) so a layout edit applies to the next sheet.
  *
  * @param {string[]} barcodeValues - Array of barcode values to render
- * @param {Transaction} transaction - Sequelize transaction for consistent geometry reads
+ * @param {Transaction} transaction - Sequelize transaction for a consistent layout read
+ * @param {Object} [layoutOverride] - Layout to render instead of the saved row (preview)
  * @returns {Promise<Buffer>} PDF buffer
- * @throws {Error} If any required geometry key is missing from app_settings
  */
 export const generateBarcodePdf = async (
     barcodeValues,
     transaction = null,
+    layoutOverride = null,
 ) => {
     // Validate input
     if (!Array.isArray(barcodeValues) || barcodeValues.length === 0) {
         throw new Error('barcodeValues must be a non-empty array');
     }
 
-    /*
-     * --------------------------------------------------
-     * Load geometry from app_settings
-     * --------------------------------------------------
-     * Every value is read fresh from the database on every render.
-     * No in-process caching.
-     */
+    const layout = layoutOverride || await getLayout(transaction);
+    const geometry = computeSheetGeometry(layout);
 
-    let geometry;
-    try {
-        // Validate grid dimensions before loading
-        const columns = await appSettings.get('barcode_grid_columns', transaction);
-        const rows = await appSettings.get('barcode_grid_rows', transaction);
-
-        if (!Number.isInteger(columns) || columns < 1 || columns > 10) {
-            throw new Error(`Invalid barcode_grid_columns: ${columns}. Must be integer between 1 and 10.`);
-        }
-        if (!Number.isInteger(rows) || rows < 1 || rows > 10) {
-            throw new Error(`Invalid barcode_grid_rows: ${rows}. Must be integer between 1 and 10.`);
-        }
-
-        geometry = {
-            columns,
-            rows,
-            margin: {
-                top: parseFloat(await appSettings.get('barcode_margin_top_pt', transaction)),
-                right: parseFloat(await appSettings.get('barcode_margin_right_pt', transaction)),
-                bottom: parseFloat(await appSettings.get('barcode_margin_bottom_pt', transaction)),
-                left: parseFloat(await appSettings.get('barcode_margin_left_pt', transaction)),
-            },
-            gap: {
-                horizontal: parseFloat(await appSettings.get('barcode_gap_horizontal_pt', transaction)),
-                vertical: parseFloat(await appSettings.get('barcode_gap_vertical_pt', transaction)),
-            },
-            label: {
-                borderWidth: 1,              // Structural constant
-                borderRadius: 3,             // Structural constant
-                paddingX: 10,                // Structural constant
-                paddingTop: 8,               // Structural constant
-                paddingBottom: 6,            // Structural constant
-                dividerHeight: 1,            // Structural constant
-            },
-            barcode: {
-                widthPt: parseFloat(await appSettings.get('barcode_width_pt', transaction)),
-                heightPt: parseFloat(await appSettings.get('barcode_height_pt', transaction)),
-            },
-            text: {
-                fontSize: parseFloat(await appSettings.get('barcode_text_font_size_pt', transaction)),
-                clearSpacePt: parseFloat(await appSettings.get('barcode_clear_space_pt', transaction)),
-                textMarginTop: 4,            // Structural constant
-            },
-            infoBox: {
-                height: 14,                  // Structural constant
-            },
-        };
-    } catch (error) {
-        // Handle configuration errors (missing geometry setting)
-        if (error instanceof ConfigurationError) {
-            throw new Error(
-                `Cannot generate barcode sheet: ${error.message}. ` +
-                'Ensure all barcode geometry keys are seeded in app_settings.',
-            );
-        }
-        // Handle database errors (connection, timeout, etc.)
-        if (error instanceof DatabaseError) {
-            throw error;
-        }
-        // Patch 2: Default error handler for unexpected errors
-        throw new Error(
-            `Unexpected error while loading barcode geometry: ${error.message}`,
-        );
+    if (geometry.problems.length > 0) {
+        throw new Error(`Cannot generate barcode sheet: ${geometry.problems[0]}`);
     }
 
     try {
         // Patch 3: Wrap PDF document creation and streaming in try-catch
-        const doc = new PDFDocument({
-            size: PDF_CONFIG.size,
-            layout: PDF_CONFIG.layout,
+        const pageOptions = {
+            size: [geometry.page.width, geometry.page.height],
             margin: 0,
+        };
+
+        const doc = new PDFDocument({
+            ...pageOptions,
             autoFirstPage: true,
 
             info: {
@@ -417,18 +184,8 @@ export const generateBarcodePdf = async (
             gap,
         } = geometry;
 
-        const {
-            labelWidth,
-            labelHeight,
-        } = calculateLabelSize(doc, geometry);
-
-        // Validate calculated label dimensions
-        if (labelWidth <= 0 || labelHeight <= 0) {
-            throw new Error(
-                `Invalid label dimensions: width=${labelWidth}, height=${labelHeight}. ` +
-                'Check page margins and gaps against page size.',
-            );
-        }
+        const labelWidth = geometry.label.width;
+        const labelHeight = geometry.label.height;
 
         const barcodesPerPage =
             columns * rows;
@@ -454,11 +211,7 @@ export const generateBarcodePdf = async (
                 index > 0 &&
                 index % barcodesPerPage === 0
             ) {
-                doc.addPage({
-                    size: PDF_CONFIG.size,
-                    layout: PDF_CONFIG.layout,
-                    margin: 0,
-                });
+                doc.addPage(pageOptions);
             }
 
 
@@ -524,16 +277,22 @@ export const generateBarcodePdf = async (
 
         return pdfPromise;
     } catch (pdfError) {
-        // Patch 3: Distinguish between configuration/database/PDF generation errors
-        if (pdfError instanceof ConfigurationError) {
-            throw pdfError;
-        }
-        if (pdfError instanceof DatabaseError) {
-            throw pdfError;
-        }
-        // Wrap other PDF generation errors
         throw new Error(
             `PDF generation failed: ${pdfError.message}`,
         );
     }
+};
+
+/**
+ * One sample page rendered with the given (or saved) layout and dummy values.
+ * Draws nothing from barcode_seq and writes no request_keys row (R-50 preview).
+ */
+export const generateSampleSheetPdf = async (layoutOverride = null) => {
+    const layout = layoutOverride || await getLayout();
+    const { perPage, problems } = computeSheetGeometry(layout);
+    if (problems.length > 0) {
+        throw new Error(`Cannot generate barcode sheet: ${problems[0]}`);
+    }
+    const values = Array.from({ length: perPage }, (_, i) => `SHREE000000${String(i + 1).padStart(4, '0')}`);
+    return generateBarcodePdf(values, null, layout);
 };

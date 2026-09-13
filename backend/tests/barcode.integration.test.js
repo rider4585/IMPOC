@@ -17,6 +17,8 @@ import {
 
 import { GESTURE_TYPES } from '../src/constants/gesture-type.js';
 import { generateAccessToken } from '../src/modules/auth/token.service.js';
+import { formatBarcodeValue } from '../src/modules/barcode/barcode.service.js';
+import { BARCODE_FORMAT } from '../src/modules/barcode/barcode.constants.js';
 
 /**
  * Seed barcode geometry settings into app_settings table.
@@ -410,39 +412,22 @@ describe('Barcode Generation Integration Tests', () => {
 
         expect(rowCount).toBe(1);
     });
-    it('should verify barcode values are correctly formatted 12-digit strings', async () => {
-        // This test validates that barcode values follow the correct format
-        // by testing the formatting logic directly
-        const testCases = [
-            { input: 1, expected: '000000000001' },
-            { input: 42, expected: '000000000042' },
-            { input: 12345, expected: '000000012345' },
-            { input: 999999999999, expected: '999999999999' },
-        ];
+    it('should format barcode values as SHREE + timestamp + counter (R-48)', () => {
+        const nowMs = Date.UTC(2026, 8, 13, 5, 0, 0);
+        const value = formatBarcodeValue(1, nowMs);
 
-        testCases.forEach(({ input, expected }) => {
-            const formatted = String(input).padStart(12, '0');
-            expect(formatted).toBe(expected);
-            expect(formatted).toMatch(/^\d{12}$/);
-            expect(formatted.length).toBe(12);
-        });
+        expect(value).toMatch(/^SHREE[0-9A-Z]{6}[0-9A-Z]{4}$/);
+        expect(value.length).toBe(BARCODE_FORMAT.length);
+        expect(value.endsWith('0001')).toBe(true);
     });
 
-    it('should validate that sequence counter cannot exceed 12 digits', async () => {
-        // Verify that the maximum valid 12-digit value is 999999999999
-        const maxValid = 999999999999;
-        const exceedsMax = 1000000000000;
+    it('should keep barcode values unique across a sequence reset', () => {
+        // Labels printed before a reset...
+        const before = [1, 2, 3].map((seq) => formatBarcodeValue(seq, Date.UTC(2026, 8, 13, 5, 0, 0)));
+        // ...and the same counter values drawn again one second later.
+        const after = [1, 2, 3].map((seq) => formatBarcodeValue(seq, Date.UTC(2026, 8, 13, 5, 0, 1)));
 
-        // Max valid value formats as 12 digits
-        const maxFormatted = String(maxValid).padStart(12, '0');
-        expect(maxFormatted.length).toBe(12);
-
-        // Value exceeding max would be 13+ digits (validation should reject this)
-        const exceedFormatted = String(exceedsMax).padStart(12, '0');
-        expect(exceedFormatted.length).toBeGreaterThan(12);
-
-        // Verify validation logic: if (seqValue > 999999999999) throw error
-        expect(maxValid > 999999999999).toBe(false);
-        expect(exceedsMax > 999999999999).toBe(true);
+        const all = new Set([...before, ...after]);
+        expect(all.size).toBe(6);
     });
 });
