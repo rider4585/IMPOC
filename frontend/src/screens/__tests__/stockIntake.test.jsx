@@ -192,4 +192,37 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
       { barcode: '100002', colourUuid: 'c2', sizeUuid: 's2' }
     );
   });
+
+  describe('R-57: add a colour / size inline from the dropdown', () => {
+    it('with picklists.create, typing an unknown colour offers "+ Add colour", creates it, selects it and commits', async () => {
+      setup();
+      authModule.useAuth.mockReturnValue({ permissions: [...CREATOR, 'picklists.create'] });
+      picklistsService.createPicklistItem.mockResolvedValue({ uuid: 'c-new', name: 'Maroon', isActive: true });
+      renderIntake();
+      await waitFor(() => expect(screen.getByText(/0 of 3/)).toBeInTheDocument());
+      await enterDecodedState('100001');
+
+      // Search is built in: typing filters; an unknown name shows the create row
+      await selectCombo('Colour', /\+ Add colour "Maroon"/, 'Maroon');
+      await waitFor(() => expect(picklistsService.createPicklistItem).toHaveBeenCalledWith('colours', { name: 'Maroon' }));
+      await waitFor(() => expect(screen.getByLabelText('Colour')).toHaveTextContent('Maroon'));
+
+      await selectCombo('Size', 'M', 'M');
+      await waitFor(() => expect(tripsService.scanBarcodeIntoStock).toHaveBeenCalledWith('t1', 'S1', { barcode: '100001', colourUuid: 'c-new', sizeUuid: 's1' }));
+    });
+
+    it('without picklists.create there is no create row (search still works)', async () => {
+      setup();
+      renderIntake();
+      await waitFor(() => expect(screen.getByText(/0 of 3/)).toBeInTheDocument());
+      await enterDecodedState('100001');
+
+      fireEvent.click(screen.getByLabelText('Colour'));
+      const search = await screen.findByRole('combobox', { name: /^colour$/i });
+      fireEvent.change(search, { target: { value: 'Maroon' } });
+      expect(screen.queryByRole('option', { name: /add colour/i })).not.toBeInTheDocument();
+      fireEvent.change(search, { target: { value: 'Blu' } });
+      expect(await screen.findByRole('option', { name: 'Blue' })).toBeInTheDocument();
+    });
+  });
 });

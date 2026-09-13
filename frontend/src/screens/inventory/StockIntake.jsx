@@ -4,7 +4,7 @@ import { Button, SearchableSelect, useToast } from '../../components/ui';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getStock, scanBarcodeIntoStock } from '../../services/tripsApi.js';
-import { getColours, getSizes, getProductTypes } from '../../services/picklistsApi.js';
+import { getColours, getSizes, getProductTypes, createPicklistItem } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { wakingRequest } from '../../platform/wakingRequest.js';
 import { createRequestKey } from '../../platform/requestKey.js';
@@ -20,6 +20,8 @@ export function StockIntake() {
   const toast = useToast();
   const can = useCallback((p) => permissions && permissions.includes(p), [permissions]);
   const canScan = can(PERMISSIONS.INVENTORY.CREATE);
+  // R-57: operators who may manage picklists can add a missing colour/size right in the dropdown
+  const canAddPicklist = can(PERMISSIONS.PICKLISTS.CREATE);
 
   const [stock, setStock] = useState(null);
   const [colours, setColours] = useState([]);
@@ -28,10 +30,42 @@ export function StockIntake() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+
   const [state, setState] = useState(STATES.IDLE);
   const [scannedBarcode, setScannedBarcode] = useState('');
   const [colourUuid, setColourUuid] = useState('');
   const [sizeUuid, setSizeUuid] = useState('');
+
+  /**
+   * R-57: create a colour/size from the dropdown's "+ Add" row, add it to the
+   * local list and select it. A 409 (already exists, e.g. different casing)
+   * just selects the existing one.
+   */
+  const addPicklistOption = useCallback(
+    async (resource, name) => {
+      const singular = resource === 'colours' ? 'Colour' : 'Size';
+      const list = resource === 'colours' ? colours : sizes;
+      const setList = resource === 'colours' ? setColours : setSizes;
+      const select = resource === 'colours' ? setColourUuid : setSizeUuid;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+
+      const existing = list.find((item) => item.name.trim().toLowerCase() === trimmed.toLowerCase());
+      if (existing) {
+        select(existing.uuid);
+        return;
+      }
+      try {
+        const created = await createPicklistItem(resource, { name: trimmed });
+        setList((prev) => [...prev, created]);
+        select(created.uuid);
+        toast.success({ title: `${singular} added`, description: created.name });
+      } catch (err) {
+        toast.error({ title: `Could not add ${singular.toLowerCase()}`, description: err.message });
+      }
+    },
+    [colours, sizes, toast]
+  );
   const [refusalInfo, setRefusalInfo] = useState(null);
   const [waking, setWaking] = useState(false);
   const [lastSavedColour, setLastSavedColour] = useState('');
@@ -492,6 +526,10 @@ export function StockIntake() {
                     options={colours
                       .filter((c) => c.isActive !== false)
                       .map((c) => ({ value: c.uuid, label: c.name }))}
+                    creatable={canAddPicklist}
+                    createLabel={(q) => `+ Add colour "${q}"`}
+                    onCreate={(q) => addPicklistOption('colours', q)}
+                    dataTestid="intake-colour"
                   />
 
                   <SearchableSelect
@@ -504,6 +542,10 @@ export function StockIntake() {
                     options={sizes
                       .filter((s) => s.isActive !== false)
                       .map((s) => ({ value: s.uuid, label: s.name }))}
+                    creatable={canAddPicklist}
+                    createLabel={(q) => `+ Add size "${q}"`}
+                    onCreate={(q) => addPicklistOption('sizes', q)}
+                    dataTestid="intake-size"
                   />
                 </div>
 
