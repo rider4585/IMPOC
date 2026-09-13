@@ -313,3 +313,12 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 ## [2026-09-13 ~11:00Z] R-51 CLOSED (user-tested); R-52 parked ~1 month
 - User will trial the system in production (~until 2026-10-13) before deciding the templates module. Don't nudge before then; the humanQA answer is on the card.
 - Board: 138 done / 1 blocked (R-52) / 2 todo (R-46, R-47). R-51 uncommitted.
+
+## [2026-09-13 ~13:00Z] R-53 digital pet BUILT (awaiting user look)
+- Sheet grid is 192x208 (8x9) — NOT the 232x251 in the user's original demo. validatePetConfig() + a test pin it; if the user re-exports the PNG, re-measure (Pillow in scratchpad/pylibs) and update PET_SHEET.
+- All tuning lives in PET_ANIMATIONS (weight, holdMs). User's rule: last three rows hold long. Dev page: /pet/pet-engine.html (vite dev only; imports /src module).
+- /display is public → browser-verifiable without login (used javascript_tool to log data-animation transitions).
+- Uncommitted: R-53 + LabelLayout test headroom tweak + docs.
+
+- FOLLOW-UP R-48 (2026-09-13): three barcode inputs (POS add item, rental create, stock intake) still had maxLength=12 -> 15-char codes were truncated on the client. Now `BARCODE_MAX_LENGTH` (32) from frontend/src/constants/barcode.js. Grep for hard-coded 12s whenever the barcode shape changes.
+- R-53 rev: fps per row derived from Pillow inter-frame diff (method in board). Poke = window pointerdown → scheduler.poke(); NO document.hidden guard on poke (the in-app browser pane reports hidden=true while visible — cost me a false negative).

@@ -858,3 +858,25 @@ This session shipped on the `context` branch (ALL UNCOMMITTED, awaiting user's g
 
 # SHIFT CLOSE #2 (2026-09-13, claude direct session)
 R-51 done (user-tested). R-52 parked until ~mid-Oct 2026 by user choice (production trial first). Board: 138 done / 0 doing / 1 blocked (R-52) / 2 todo (R-46, R-47). R-51 code + docs UNCOMMITTED on `context` at close — commit code to both branches (docs to `context` only) when the user says so.
+
+---
+
+# R-53 — DIGITAL PET ON THE CUSTOMER DISPLAY (2026-09-13, DONE — user-accepted)
+
+**Trigger (user):** a hand-drawn blue-bird mascot (`pet/test.png` spritesheet + `pet/pet-engine.html` canvas demo). Show it on `/display/:code` while idle, playing random animations for defined durations; the **last three rows** (blink / coding / reading) should run much longer than the others. Move the files into the frontend.
+
+**Sheet analysis (pixel-measured):** 1536×1872 RGBA, **8×9 grid → 192×208 px cells**, every sprite inside its cell, frames per row `[6,8,8,4,5,8,6,6,6]`. Rows: 0 idle · 1 fly (right) · 2 walk (left) · 3 cheer (one-shot) · 4 sleepy · 5 worried (one-shot) · 6 blink · 7 coding · 8 reading. The demo's cell size (232×251) was for a different export — corrected.
+
+**Where things live now:** `frontend/public/pet/pet-sheet.png` (image) · `frontend/src/platform/petEngine.js` (SpriteEngine + `PET_SHEET` + `PET_ANIMATIONS` + `pickWeighted` + `createPetScheduler` + `validatePetConfig`) · `frontend/src/components/DigitalPet.jsx` · `frontend/public/pet/pet-engine.html` (dev-only tuning page; imports the module from `/src`, so one copy of the engine). The root `pet/` folder is gone.
+
+**Scheduler:** weighted random, never the same animation twice in a row; looping anims are held for a random time in their `holdMs` range (idle 4–8 s, fly/walk 3–6 s, sleepy 4–7 s, **blink 12–20 s, coding/reading 15–25 s**); one-shots (cheer, worried) play once then move on. Injectable RNG/timers → deterministic tests. Component pauses when the tab is hidden; `prefers-reduced-motion` → slow idle only.
+
+**Verified:** vitest **390/390** (+12), build OK; live on `/display/1234`: blink 12.6 s → walk 3.6 s → blink 19.2 s → cheer → idle.
+
+**Tuning:** weights/holds are the two numbers per row in `PET_ANIMATIONS`; open `http://localhost:5173/pet/pet-engine.html` under `vite dev` to try animations and the scheduler by hand.
+
+**R-48 follow-up (2026-09-13, no ticket — user request):** POS 'Scan or enter barcode', rental-create and stock-intake inputs capped at `maxLength={12}` and silently truncated the new 15-char codes. All three now use `BARCODE_MAX_LENGTH` (32) from `frontend/src/constants/barcode.js`. vitest 390/390.
+
+**R-53 revision (user, same day):** per-row **fps from the sheet** — measured mean inter-frame pixel change: fly/walk (~0.12, even steps) → 12 fps; idle 0.07 → 6; blink 0.10 → 4; key-pose rows sleepy 0.22 → 3, coding 0.22 → 4, worried 0.21 → 5, reading 0.15 → 5; cheer 8 (one-shot). **Poke:** any click/touch on the display → `scheduler.poke()` plays row 0 (idle/attention) for 4 s (`PET_POKE`), repeated taps restart the hold, then the random cycle resumes. Verified live. vitest 393/393.
+**R-53 polish (user):** idle view shows only the bird + shop name (waiting line removed). Pet canvas is now viewport-capped (`min(384px, 88vw, 50vh·192/208)`, height auto) — the fixed 384 px canvas was clipping on phones; frames in the PNG are intact (bbox check: none touch a cell edge).
+**R-53 closed (user):** the half sparkle in coding frame 2 is in the PNG itself (verified: transparent gap before the 192-px boundary, no sprite touches any boundary) — not a grid issue; accepted as-is.
