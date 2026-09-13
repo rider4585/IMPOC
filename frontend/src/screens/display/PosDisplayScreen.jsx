@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import DigitalPet from '../../components/DigitalPet.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import { getPosDisplayStreamUrl } from '../../platform/posDisplayStream.js';
 import { formatPaise } from '../../platform/money.js';
@@ -139,18 +140,11 @@ function IdleView() {
       className="flex flex-col items-center gap-4"
       data-testid="display-idle"
     >
-      <motion.div
-        animate={{ scale: [1, 1.06, 1] }}
-        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-        className="flex h-24 w-24 items-center justify-center rounded-full bg-[var(--primary)]/15 text-[var(--primary)]"
-        aria-hidden="true"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 9V6a2 2 0 012-2h3M15 4h3a2 2 0 012 2v3M21 15v3a2 2 0 01-2 2h-3M9 20H6a2 2 0 01-2-2v-3" />
-        </svg>
-      </motion.div>
+      {/* R-53: the shop mascot cycles through random animations while nobody is paying */}
+      <div className="flex w-full items-end justify-center" aria-hidden="true">
+        <DigitalPet scale={2} />
+      </div>
       <h1 className="typography-heading text-[var(--ink)]">{SHOP_NAME}</h1>
-      <p className="text-[var(--ink-muted)]">Waiting for the next customer…</p>
     </motion.div>
   );
 }
