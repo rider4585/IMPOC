@@ -1,0 +1,195 @@
+<#
+.SYNOPSIS
+    Update IMPOC on the shop laptop: pull -> install -> migrate -> build -> restart.
+
+.DESCRIPTION
+    Double-click deploy\windows\update.cmd (no admin needed), or:
+
+        .\deploy\windows\update.ps1 [-Branch main] [-SkipBackup]
+
+    Steps:
+      1. Refuse to run if there are local edits to tracked files (the laptop
+         must only ever follow the public GitHub repo).
+      2. git pull --ff-only. Stops early if nothing changed.
+      3. Back up the database with pg_dump (before migrations touch it).
+      4. npm install in backend, run migrations.
+      5. npm install + build the frontend into dist.new, then swap it in,
+         so a failed build leaves the running site untouched.
+      6. pm2 restart impoc and wait for the web server to answer.
+
+    On any failure the script stops with a message; the previous build and a
+    fresh DB backup are still in place.
+
+.PARAMETER Branch
+    Branch to follow. Default: the branch currently checked out.
+
+.PARAMETER SkipBackup
+    Do not take a pg_dump before migrating.
+#>
+[CmdletBinding()]
+param(
+    [string]$Branch,
+    [switch]$SkipBackup
+)
+
+$ErrorActionPreference = 'Stop'
+$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
+$Backend  = Join-Path $RepoRoot 'backend'
+$Frontend = Join-Path $RepoRoot 'frontend'
+$LogFile  = Join-Path $Backend 'logs\update.log'
+New-Item -ItemType Directory -Force -Path (Split-Path $LogFile) | Out-Null
+
+function Log($msg, $color = 'Gray') {
+    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $msg"
+    Write-Host $line -ForegroundColor $color
+    Add-Content -Path $LogFile -Value $line
+}
+function Step($msg) { Log "==> $msg" 'Cyan' }
+function Ok($msg)   { Log "    OK  $msg" 'Green' }
+function Fail($msg) { Log "ERROR: $msg" 'Red'; Write-Host "`nUpdate stopped. Nothing else was changed." -ForegroundColor Red; exit 1 }
+
+function Read-DotEnv([string]$path) {
+    $map = @{}
+    if (Test-Path $path) {
+        Get-Content $path | ForEach-Object {
+            if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$') { $map[$matches[1]] = $matches[2] }
+        }
+    }
+    return $map
+}
+
+$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
+            [Environment]::GetEnvironmentVariable('Path', 'User')
+
+foreach ($tool in 'git', 'node', 'npm', 'pm2') {
+    if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { Fail "$tool not found on PATH. Run setup.cmd first." }
+}
+
+Log '--- IMPOC update ---'
+Push-Location $RepoRoot
+
+# 1. Clean working tree -------------------------------------------------------
+Step 'Checking for local changes'
+$dirty = git status --porcelain --untracked-files=no
+if ($dirty) {
+    Pop-Location
+    Fail "Tracked files were edited on this laptop:`n$dirty`nThe shop laptop must only follow GitHub. Run 'git checkout -- .' to discard them, then re-run."
+}
+if (-not $Branch) { $Branch = (git rev-parse --abbrev-ref HEAD).Trim() }
+Ok "clean tree on branch '$Branch'"
+
+# 2. Pull ----------------------------------------------------------------------
+Step "Pulling latest '$Branch' from GitHub"
+$before = (git rev-parse HEAD).Trim()
+git fetch origin $Branch --quiet
+if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'git fetch failed. Is the laptop online?' }
+git checkout $Branch --quiet
+git pull --ff-only origin $Branch
+if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'git pull failed (not a fast-forward). Fix the branch by hand.' }
+$after = (git rev-parse HEAD).Trim()
+
+if ($before -eq $after) {
+    Ok 'already up to date - nothing to do'
+    Pop-Location
+    exit 0
+}
+Ok "updated $($before.Substring(0,7)) -> $($after.Substring(0,7))"
+git --no-pager log --oneline "$before..$after" | ForEach-Object { Log "      $_" }
+
+$changed = git diff --name-only $before $after
+$backendChanged   = $changed | Where-Object { $_ -like 'backend/*' }
+$frontendChanged  = $changed | Where-Object { $_ -like 'frontend/*' }
+$migrationsChanged = $changed | Where-Object { $_ -like 'backend/database/migrations/*' }
+Pop-Location
+
+# 3. DB backup ----------------------------------------------------------------
+$envVars = Read-DotEnv (Join-Path $Backend '.env')
+if (-not $SkipBackup -and $migrationsChanged) {
+    Step 'Backing up the database before migrating'
+    $pgDump = Get-Command pg_dump -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+    if (-not $pgDump) {
+        $pgDump = Get-ChildItem 'C:\Program Files\PostgreSQL\*\bin\pg_dump.exe' -ErrorAction SilentlyContinue |
+                  Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+    }
+    if ($pgDump) {
+        $backupDir = Join-Path $RepoRoot 'backups'
+        New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+        $file = Join-Path $backupDir ("pre-update-{0}-{1}.dump" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $after.Substring(0,7))
+        $env:PGPASSWORD = $envVars['DB_PASSWORD']
+        & $pgDump -U $envVars['DB_USER'] -h $envVars['DB_HOST'] -p $envVars['DB_PORT'] -Fc -f $file $envVars['DB_NAME']
+        if ($LASTEXITCODE -ne 0) { Fail 'pg_dump failed. Use -SkipBackup to update anyway.' }
+        Ok "saved $file"
+    } else {
+        Log '    !!  pg_dump.exe not found - skipping backup' 'Yellow'
+    }
+}
+
+# 4. Backend -------------------------------------------------------------------
+if ($backendChanged) {
+    Step 'Installing backend dependencies'
+    Push-Location $Backend
+    npm install --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'npm install (backend) failed.' }
+
+    Step 'Running database migrations'
+    npm run db:migrate
+    if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'Migrations failed. Restore the backup from the backups folder if needed.' }
+    Pop-Location
+    Ok 'backend ready'
+} else {
+    Ok 'backend unchanged - skipped install/migrate'
+}
+
+# 5. Frontend build ----------------------------------------------------------------
+if ($frontendChanged) {
+    Step 'Building the frontend'
+    Push-Location $Frontend
+    if (-not (Test-Path '.env.production')) {
+        [IO.File]::WriteAllText((Join-Path $Frontend '.env.production'), "VITE_API_BASE_URL=/api`n",
+            (New-Object Text.UTF8Encoding($false)))
+    }
+    npm install --legacy-peer-deps --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'npm install (frontend) failed.' }
+
+    $distNew = Join-Path $Frontend 'dist.new'
+    $distOld = Join-Path $Frontend 'dist.old'
+    $dist    = Join-Path $Frontend 'dist'
+    if (Test-Path $distNew) { Remove-Item $distNew -Recurse -Force }
+    npx vite build --outDir dist.new
+    if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'Frontend build failed. The old build is still being served.' }
+
+    if (Test-Path $distOld) { Remove-Item $distOld -Recurse -Force }
+    if (Test-Path $dist)    { Rename-Item $dist 'dist.old' }
+    Rename-Item $distNew 'dist'
+    if (Test-Path $distOld) { Remove-Item $distOld -Recurse -Force }
+    Pop-Location
+    Ok 'new frontend build in place'
+} else {
+    Ok 'frontend unchanged - skipped build'
+}
+
+# 6. Restart -----------------------------------------------------------------------
+Step 'Restarting the server'
+Push-Location $Backend
+pm2 restart impoc --update-env 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    pm2 start ecosystem.config.cjs 2>&1 | Out-Null
+}
+pm2 save --force 2>&1 | Out-Null
+Pop-Location
+
+$port = if ($envVars['PORT']) { $envVars['PORT'] } else { 3000 }
+$url  = "http://localhost:$port"
+$up = $false
+for ($i = 0; $i -lt 30; $i++) {
+    try {
+        if ((Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200) { $up = $true; break }
+    } catch { }
+    Start-Sleep -Seconds 2
+}
+if ($up) {
+    Ok "server answering at $url"
+    Log "--- update complete: now at $($after.Substring(0,7)) ---" 'Green'
+} else {
+    Fail "server did not answer at $url within 60s. Check: pm2 logs impoc"
+}
