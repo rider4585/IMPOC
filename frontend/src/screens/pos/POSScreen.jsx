@@ -17,7 +17,7 @@ import { PERMISSIONS } from '../../constants/permissions.js';
 import { getUnitByBarcode } from '../../services/unitsApi.js';
 import { createSale } from '../../services/salesApi.js';
 import { createRental } from '../../services/rentalsApi.js';
-import { getPaymentMethods, getCustomerSources, getUpiAccounts } from '../../services/picklistsApi.js';
+import { getPaymentMethods, getCustomerSources, getUpiAccounts, getReviewLinks } from '../../services/picklistsApi.js';
 import { publishPosDisplayState } from '../../services/posDisplayApi.js';
 import BarcodeScanner from '../../components/BarcodeScanner.jsx';
 import { formatPaise } from '../../platform/money.js';
@@ -135,6 +135,8 @@ export function POSScreen() {
   const [picklistsError, setPicklistsError] = useState('');
 
   const [upiAccounts, setUpiAccounts] = useState([]);
+  // R-54: first active review link is sent to the display with the received state
+  const [reviewLinks, setReviewLinks] = useState([]);
   const [selectedUpiAccountUuid, setSelectedUpiAccountUuid] = useState('');
 
   // R-35: display code is stable per terminal (persisted in localStorage).
@@ -170,6 +172,12 @@ export function POSScreen() {
       .catch((err) => {
         if (!cancelled) setPicklistsError(err.message || 'Failed to load UPI accounts.');
       });
+    // Review links are optional: a failure just means no QR on the display.
+    getReviewLinks()
+      .then((links) => {
+        if (!cancelled) setReviewLinks(links);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -193,6 +201,9 @@ export function POSScreen() {
     getUpiAccounts()
       .then((accounts) => setUpiAccounts(accounts))
       .catch((err) => setPicklistsError(err.message || 'Failed to load UPI accounts.'));
+    getReviewLinks()
+      .then((links) => setReviewLinks(links))
+      .catch(() => {});
   }, [paymentMethod]);
 
   // Default the UPI account selector to the first active account once loaded.
@@ -247,6 +258,11 @@ export function POSScreen() {
     },
     [displayCode]
   );
+
+  const reviewUrl = useMemo(() => {
+    const active = reviewLinks.find((l) => l.isActive !== false && l.url);
+    return active ? active.url : undefined;
+  }, [reviewLinks]);
 
   const selectedUpiAccount = useMemo(
     () => upiAccounts.find((a) => a.uuid === selectedUpiAccountUuid) || upiAccounts[0] || null,
@@ -387,6 +403,12 @@ export function POSScreen() {
     }
   };
 
+  // R-54: done with this customer — send the display back to idle and start fresh.
+  const closeTransaction = () => {
+    publishDisplay({ status: 'idle' });
+    setReceipt(null);
+  };
+
   const clearCart = () => {
     if (confirmClearTimerRef.current) clearTimeout(confirmClearTimerRef.current);
     confirmClearTimerRef.current = null;
@@ -483,7 +505,7 @@ export function POSScreen() {
 
       // R-42c: first name only (single token) for the display's spoken thank-you.
       const customerFirstName = customer?.name?.trim().split(/\s+/)[0] || undefined;
-      publishDisplay({ status: 'received', customerFirstName });
+      publishDisplay({ status: 'received', customerFirstName, reviewUrl });
       setPaymentStep('thankyou');
       toast.success({ title: 'Checkout complete' });
 
@@ -627,7 +649,8 @@ export function POSScreen() {
           </>
         )}
         <div className="flex justify-end">
-          <Button onClick={() => setReceipt(null)}>New transaction</Button>
+          {/* R-54: the display keeps the thank-you + review QR up until this. No DB change: just publishes idle. */}
+          <Button onClick={closeTransaction} data-testid="close-transaction">Close transaction</Button>
         </div>
       </div>
     );

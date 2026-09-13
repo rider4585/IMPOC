@@ -17,6 +17,7 @@ const RESOURCE_BASE = {
   customerSources: '/picklists/customer-sources',
   expenseTypes: '/picklists/expense-types',
   upiAccounts: '/picklists/upi-accounts',
+  reviewLinks: '/picklists/review-links',
 };
 
 /**
@@ -172,9 +173,22 @@ export async function getUpiAccounts() {
   }
 }
 
+/** GET /review-links (R-54) -> [{uuid, label, url, isActive, ...}] */
+export async function getReviewLinks() {
+  try {
+    const response = await apiClient.get(RESOURCE_BASE.reviewLinks);
+    if (response.data?.success && response.data?.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to fetch review links');
+  } catch (error) {
+    throw buildError(error, 'Failed to fetch review links');
+  }
+}
+
 /**
  * Generic create for flat picklists.
- * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'|'upiAccounts'} resource
+ * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'|'upiAccounts'|'reviewLinks'} resource
  * @param {Object} payload
  */
 export async function createPicklistItem(resource, payload) {

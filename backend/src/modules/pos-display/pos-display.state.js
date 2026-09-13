@@ -15,12 +15,15 @@ export const IDLE_STATE = Object.freeze({
     amountPaise: null,
     upiUri: null,
     customerFirstName: null,
+    // R-54: Google review link rendered as a QR on the thank-you screen
+    reviewUrl: null,
 });
 
-// After a payment is marked received, auto-reset the channel to idle so a
-// late-joining or lingering display never keeps showing a stale confirmation
-// (and so a guessed code can't keep replaying an old payment).
-const RECEIVED_AUTO_RESET_MS = 8000;
+// R-54: the thank-you + review-QR screen stays up until the cashier clicks
+// "Close transaction" on the POS (which publishes idle). This long timer is
+// only a safety net so a forgotten display, or a guessed code, never keeps
+// showing an old confirmation for good.
+const RECEIVED_AUTO_RESET_MS = 15 * 60 * 1000;
 
 // code -> { state, subscribers: Set<res>, resetTimer: Timeout|null }
 const channels = new Map();

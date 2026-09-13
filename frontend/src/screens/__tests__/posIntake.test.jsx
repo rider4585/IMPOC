@@ -36,6 +36,11 @@ vi.mock('../../services/picklistsApi.js', () => ({
   getUpiAccounts: vi.fn().mockResolvedValue([
     { uuid: 'upi-1', label: 'Shop UPI', vpa: 'shop@okbank', isActive: true },
   ]),
+  // R-54: first ACTIVE link is sent to the display with the received state
+  getReviewLinks: vi.fn().mockResolvedValue([
+    { uuid: 'rl-0', label: 'Old', url: 'https://example.com/old', isActive: false },
+    { uuid: 'rl-1', label: 'Google Maps', url: 'https://search.google.com/local/writereview?placeid=ChIJabc', isActive: true },
+  ]),
 }));
 
 vi.mock('../../services/posDisplayApi.js', () => ({
@@ -483,8 +488,42 @@ describe('POS display channel (R-35)', () => {
     await checkoutViaPaymentDialog();
     expect(posDisplayService.publishPosDisplayState).toHaveBeenCalledWith(
       expect.any(String),
-      { status: 'received' }
+      { status: 'received', reviewUrl: 'https://search.google.com/local/writereview?placeid=ChIJabc' }
     );
+  });
+
+  it('R-54: "Close transaction" on the receipt publishes idle to the display without any sale call', async () => {
+    unitsService.getUnitByBarcode.mockResolvedValue({
+      uuid: 'u1',
+      barcode: 'B-100',
+      status: 'in_stock',
+      channel: 'RETAIL',
+      sellingPricePaise: '25000',
+    });
+    salesService.createSale.mockResolvedValue({
+      uuid: 's1',
+      saleNumber: 'SALE-001',
+      soldAt: '2026-01-01T00:00:00.000Z',
+      totalPaise: '25000',
+      status: 'completed',
+      lines: [{ uuid: 'l1', barcode: 'B-100', sellingPricePaise: '25000', unitStatus: 'sold' }],
+      reversals: [],
+    });
+    renderWithToast(<POSScreen />);
+    const input = screen.getByLabelText(/barcode/);
+    fireEvent.change(input, { target: { value: 'B-100' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('B-100')).toBeInTheDocument());
+
+    await checkoutViaPaymentDialog();
+    const closeBtn = await screen.findByTestId('close-transaction', {}, { timeout: 4000 });
+    posDisplayService.publishPosDisplayState.mockClear();
+    salesService.createSale.mockClear();
+
+    fireEvent.click(closeBtn);
+    expect(posDisplayService.publishPosDisplayState).toHaveBeenCalledWith(expect.any(String), { status: 'idle' });
+    expect(salesService.createSale).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('close-transaction')).not.toBeInTheDocument();
   });
 
   it('publishes an idle state on Cancel', async () => {

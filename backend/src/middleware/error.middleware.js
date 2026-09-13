@@ -50,6 +50,8 @@ const SAFE_4XX_MESSAGES = Object.freeze([
     'Vendor is not part of this trip',
     'Vendor already added to this trip',
     'Payment method already exists',
+    'Review link already exists',
+    'Review links must start with https://',
     'Customer source already exists',
     'UPI account already exists',
     'UPI account not found',

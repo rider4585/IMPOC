@@ -124,6 +124,24 @@ describe('PosDisplayScreen (R-35, public)', () => {
     });
     expect(screen.queryByTestId('display-upi-qr')).not.toBeInTheDocument();
     expect(screen.getByText(/thank you/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('display-review')).not.toBeInTheDocument();
+  });
+
+  it('R-54: RECEIVED with a reviewUrl shows the Google review QR until an idle state arrives', async () => {
+    renderAt('/display/ABC123');
+    const source = FakeEventSource.instances[0];
+    const reviewUrl = 'https://search.google.com/local/writereview?placeid=ChIJabc';
+
+    act(() => source.emit({ status: 'received', customerFirstName: 'Asha', reviewUrl }));
+    await waitFor(() => expect(screen.getByTestId('display-review')).toBeInTheDocument());
+    expect(screen.getByText(/scan to leave us a google review/i)).toBeInTheDocument();
+    const svg = screen.getByTestId('display-review').querySelector('svg');
+    expect(svg).not.toBeNull();
+
+    // Stays put on its own (no client-side timer); only the POS "Close transaction" idle publish clears it
+    act(() => source.emit({ status: 'idle', method: null, amountPaise: null, upiUri: null, reviewUrl: null }));
+    await waitFor(() => expect(screen.queryByTestId('display-review')).not.toBeInTheDocument());
+    expect(screen.getByTestId('display-idle')).toBeInTheDocument();
   });
 
   it('returns to IDLE when the server resets the state (auto-reset)', async () => {

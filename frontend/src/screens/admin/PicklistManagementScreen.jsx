@@ -6,7 +6,7 @@ import { ProductTypesManager } from './ProductTypesManager.jsx';
 import {
   FlatPicklistManager,
 } from './FlatPicklistManager.jsx';
-import { getColours, getSizes, getDamageGrades, getPaymentMethods, getCustomerSources, getExpenseTypes, getUpiAccounts } from '../../services/picklistsApi.js';
+import { getColours, getSizes, getDamageGrades, getPaymentMethods, getCustomerSources, getExpenseTypes, getUpiAccounts, getReviewLinks } from '../../services/picklistsApi.js';
 import { DAMAGE_GRADE_OUTCOMES } from '../../constants/damageGrades.js';
 
 const TABS = [
@@ -18,6 +18,7 @@ const TABS = [
   { key: 'customer-sources', label: 'Customer sources' },
   { key: 'expense-types', label: 'Expense types' },
   { key: 'upi-accounts', label: 'UPI accounts' },
+  { key: 'review-links', label: 'Review links' },
 ];
 
 const COLOUR_COLUMNS = [{ key: 'name', label: 'Name' }];
@@ -56,6 +57,16 @@ const UPI_ACCOUNT_COLUMNS = [
 const UPI_ACCOUNT_FIELDS = [
   { key: 'label', label: 'Label', required: true },
   { key: 'vpa', label: 'UPI ID (VPA), e.g. shree@okhdfcbank', required: true },
+];
+
+// R-54: shown as a QR on the customer display after payment (first ACTIVE link wins)
+const REVIEW_LINK_COLUMNS = [
+  { key: 'label', label: 'Label' },
+  { key: 'url', label: 'Link (https)' },
+];
+const REVIEW_LINK_FIELDS = [
+  { key: 'label', label: 'Label, e.g. Google Maps', required: true },
+  { key: 'url', label: 'Link, e.g. https://search.google.com/local/writereview?placeid=…', required: true },
 ];
 
 export function PicklistManagementScreen() {
@@ -160,6 +171,15 @@ export function PicklistManagementScreen() {
           source={getUpiAccounts}
           columns={UPI_ACCOUNT_COLUMNS}
           fields={UPI_ACCOUNT_FIELDS}
+        />
+      )}
+      {active === 'review-links' && (
+        <FlatPicklistManager
+          resource="reviewLinks"
+          singular="Review link"
+          source={getReviewLinks}
+          columns={REVIEW_LINK_COLUMNS}
+          fields={REVIEW_LINK_FIELDS}
         />
       )}
       </div>
