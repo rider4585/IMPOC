@@ -18,6 +18,9 @@ export default (sequelize) => {
             id: { type: DataTypes.INTEGER, primaryKey: true, allowNull: false },
             pageSize: { type: DataTypes.STRING(10), field: 'page_size', allowNull: false, defaultValue: 'A4' },
             orientation: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'portrait' },
+            // R-56: only used when pageSize === 'CUSTOM'
+            pageCustomWidthMm: { type: DataTypes.DECIMAL(7, 2), field: 'page_custom_width_mm', allowNull: false, defaultValue: 101.6 },
+            pageCustomHeightMm: { type: DataTypes.DECIMAL(7, 2), field: 'page_custom_height_mm', allowNull: false, defaultValue: 152.4 },
             columns: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 3 },
             rows: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 5 },
             marginTopMm: mm('margin_top_mm', 8),

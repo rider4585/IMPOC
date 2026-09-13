@@ -44,6 +44,7 @@ import ExpenseTypeModel from './ExpenseType.js';
 import UpiAccountModel from './UpiAccount.js';
 import BarcodeLayoutModel from './BarcodeLayout.js';
 import ReviewLinkModel from './ReviewLink.js';
+import BarcodeLayoutTemplateModel from './BarcodeLayoutTemplate.js';
 import VendorModel from './Vendor.js';
 import TripModel from './Trip.js';
 import TripVendorModel from './TripVendor.js';
@@ -81,6 +82,7 @@ const ExpenseType = ExpenseTypeModel(sequelize);
 const UpiAccount = UpiAccountModel(sequelize);
 const BarcodeLayout = BarcodeLayoutModel(sequelize);
 const ReviewLink = ReviewLinkModel(sequelize);
+const BarcodeLayoutTemplate = BarcodeLayoutTemplateModel(sequelize);
 const Vendor = VendorModel(sequelize);
 const Trip = TripModel(sequelize);
 const TripVendor = TripVendorModel(sequelize);
@@ -544,6 +546,7 @@ export {
     UpiAccount,
     BarcodeLayout,
     ReviewLink,
+    BarcodeLayoutTemplate,
     Vendor,
     Trip,
     TripVendor,

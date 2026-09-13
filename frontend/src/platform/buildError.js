@@ -85,6 +85,10 @@ export const SAFE_4XX_MESSAGES = Object.freeze([
   'required geometry setting',
   'Invalid page count',
   'Layout does not fit',
+  'Layout template already exists',
+  'Layout template not found',
+  'Template name is required',
+  'Custom page size',
   // Validation safety nets
   'Request UUID must be a valid UUID',
   'Invalid UUID format',

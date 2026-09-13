@@ -41,3 +41,43 @@ export async function fetchLayoutPreviewPdf() {
     throw buildError(error, 'Failed to render the preview sheet');
   }
 }
+
+/* R-56: layout templates (named snapshots of a layout) */
+
+const TEMPLATES = `${BARCODE_ROUTES.LAYOUT}/templates`;
+
+export async function getBarcodeLayoutTemplates() {
+  try {
+    const response = await apiClient.get(TEMPLATES);
+    if (response.data?.success && response.data?.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to load layout templates');
+  } catch (error) {
+    throw buildError(error, 'Failed to load layout templates');
+  }
+}
+
+export async function createBarcodeLayoutTemplate({ name, layout }) {
+  try {
+    const response = await apiClient.post(TEMPLATES, { name, layout });
+    if (response.data?.success && response.data?.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to save layout template');
+  } catch (error) {
+    throw buildError(error, 'Failed to save layout template');
+  }
+}
+
+export async function deleteBarcodeLayoutTemplate(uuid) {
+  try {
+    const response = await apiClient.delete(`${TEMPLATES}/${uuid}`);
+    if (response.data?.success) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to delete layout template');
+  } catch (error) {
+    throw buildError(error, 'Failed to delete layout template');
+  }
+}

@@ -2,12 +2,24 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Input, Select, Card, CardHeader, CardContent, CardTitle, useToast } from '../components/ui';
 import { useAuth } from '../auth/useAuth.js';
 import { PERMISSIONS } from '../constants/permissions';
-import { getBarcodeLayout, saveBarcodeLayout, fetchLayoutPreviewPdf } from '../services/barcodeLayoutApi.js';
+import {
+  getBarcodeLayout,
+  saveBarcodeLayout,
+  fetchLayoutPreviewPdf,
+  getBarcodeLayoutTemplates,
+  createBarcodeLayoutTemplate,
+  deleteBarcodeLayoutTemplate,
+} from '../services/barcodeLayoutApi.js';
 import {
   DEFAULT_LAYOUT,
   PAGE_SIZE_OPTIONS,
   ORIENTATION_OPTIONS,
+  CUSTOM_PAGE_SIZE,
+  LENGTH_UNITS,
+  GRID_MAX,
   computeSheetGeometry,
+  mmToUnit,
+  unitToMm,
 } from '../platform/labelLayout.js';
 
 /**
@@ -30,8 +42,19 @@ const GROUPS = [
   {
     title: 'Page',
     fields: [
-      { key: 'pageSize', label: 'Page size', type: 'select', options: PAGE_SIZE_OPTIONS.map((v) => ({ value: v, label: v })) },
+      {
+        key: 'pageSize',
+        label: 'Page size',
+        type: 'select',
+        options: PAGE_SIZE_OPTIONS.map((v) => ({
+          value: v,
+          label: { A3: 'A3 (297 × 420 mm)', A4: 'A4 (210 × 297 mm)', A5: 'A5 (148 × 210 mm)', LETTER: 'Letter (8.5 × 11 in)', CUSTOM: 'Custom size…' }[v] || v,
+        })),
+      },
       { key: 'orientation', label: 'Orientation', type: 'select', options: ORIENTATION_OPTIONS.map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })) },
+      // R-56: custom page dimensions — rendered by CustomPageSize (unit-aware), stored in mm
+      { key: 'pageCustomWidthMm', type: 'custom-page' },
+      { key: 'pageCustomHeightMm', type: 'custom-page-skip' },
       { key: 'marginTopMm', label: 'Top margin (mm)', step: 0.5 },
       { key: 'marginBottomMm', label: 'Bottom margin (mm)', step: 0.5 },
       { key: 'marginLeftMm', label: 'Left margin (mm)', step: 0.5 },
@@ -41,8 +64,8 @@ const GROUPS = [
   {
     title: 'Grid',
     fields: [
-      { key: 'columns', label: 'Columns', step: 1, min: 1, max: 10 },
-      { key: 'rows', label: 'Rows', step: 1, min: 1, max: 10 },
+      { key: 'columns', label: 'Columns', step: 1, min: 1, max: GRID_MAX },
+      { key: 'rows', label: 'Rows', step: 1, min: 1, max: GRID_MAX },
       { key: 'gapHorizontalMm', label: 'Gap between columns (mm)', step: 0.5 },
       { key: 'gapVerticalMm', label: 'Gap between rows (mm)', step: 0.5 },
     ],
@@ -76,7 +99,18 @@ const GROUPS = [
   },
 ];
 
-const NUMBER_KEYS = GROUPS.flatMap((g) => g.fields).filter((f) => !f.type).map((f) => f.key);
+const NUMBER_KEYS = [...GROUPS.flatMap((g) => g.fields).filter((f) => !f.type).map((f) => f.key), 'pageCustomWidthMm', 'pageCustomHeightMm'];
+
+const UNIT_STORAGE_KEY = 'label-layout:custom-unit';
+const loadUnit = () => {
+  try {
+    const u = localStorage.getItem(UNIT_STORAGE_KEY);
+    return u && LENGTH_UNITS[u] ? u : 'mm';
+  } catch {
+    return 'mm';
+  }
+};
+
 
 /** Form state keeps strings for number inputs so the user can clear/retype. */
 const toForm = (layout) => {
@@ -221,6 +255,97 @@ function PagePreview({ geometry }) {
   );
 }
 
+/**
+ * Width / height for a CUSTOM page with a unit picker (mm / cm / inch). The
+ * form keeps mm; the inputs show and accept the chosen unit.
+ */
+function CustomPageSize({ form, setField, disabled, unit, onUnitChange }) {
+  // While typing we show the raw text; otherwise the value is derived from the stored mm.
+  const [editing, setEditing] = useState(null); // { key, value } | null
+  const shown = (key, mmKey) => (editing?.key === key ? editing.value : mmToUnit(form[mmKey], unit));
+
+  const change = (key, mmKey) => (e) => {
+    const value = e.target.value;
+    setEditing({ key, value });
+    if (value.trim() !== '' && Number.isFinite(Number(value))) setField(mmKey, String(unitToMm(value, unit)));
+  };
+  const stopEditing = () => setEditing(null);
+
+  return (
+    <div className="sm:col-span-2 grid gap-3 sm:grid-cols-3" data-testid="custom-page-size">
+      <Input id="layout-customWidth" label={`Page width (${LENGTH_UNITS[unit].label})`} type="number" inputMode="decimal" step="any" min={0} value={shown('w', 'pageCustomWidthMm')} onChange={change('w', 'pageCustomWidthMm')} onBlur={stopEditing} disabled={disabled} />
+      <Input id="layout-customHeight" label={`Page height (${LENGTH_UNITS[unit].label})`} type="number" inputMode="decimal" step="any" min={0} value={shown('h', 'pageCustomHeightMm')} onChange={change('h', 'pageCustomHeightMm')} onBlur={stopEditing} disabled={disabled} />
+      <Select
+        label="Unit"
+        value={unit}
+        options={Object.entries(LENGTH_UNITS).map(([value, u]) => ({ value, label: u.label }))}
+        onChange={(next) => { stopEditing(); onUnitChange(next); }}
+        disabled={disabled}
+      />
+      <p className="sm:col-span-3 text-xs text-[var(--ink-muted)]">
+        Stored as {Number(form.pageCustomWidthMm)} × {Number(form.pageCustomHeightMm)} mm (portrait; use Orientation to turn it). Allowed 50–2000 mm per side.
+      </p>
+    </div>
+  );
+}
+
+/** Saved layout templates: apply into the form, save the current draft, delete (R-56). */
+function TemplatesCard({ templates, canEdit, loading, onApply, onSave, onDelete }) {
+  const [selected, setSelected] = useState('');
+  const [name, setName] = useState('');
+  const options = templates.map((t) => ({ value: t.uuid, label: t.name }));
+  const current = templates.find((t) => t.uuid === selected) || null;
+
+  return (
+    <Card data-testid="layout-templates">
+      <CardHeader>
+        <CardTitle>Templates</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+          <Select
+            label="Saved templates"
+            value={selected}
+            options={options}
+            onChange={setSelected}
+            placeholder={templates.length ? 'Choose a template…' : 'No templates saved yet'}
+            disabled={loading || templates.length === 0}
+          />
+          <Button type="button" variant="secondary" disabled={!current} onClick={() => current && onApply(current)} data-testid="apply-template">
+            Apply
+          </Button>
+          <Button type="button" variant="outline" disabled={!current || !canEdit} onClick={() => current && onDelete(current)} data-testid="delete-template">
+            Delete
+          </Button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+          <Input
+            id="template-name"
+            label="Save the current settings as a template"
+            placeholder="e.g. Roll 4×6 inch, A3 landscape 6×8"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={100}
+            disabled={!canEdit || loading}
+          />
+          <Button
+            type="button"
+            disabled={!canEdit || loading || !name.trim()}
+            onClick={async () => {
+              const ok = await onSave(name.trim());
+              if (ok) setName('');
+            }}
+            data-testid="save-template"
+          >
+            Save as template
+          </Button>
+        </div>
+        <p className="text-xs text-[var(--ink-muted)]">Applying a template fills the form; press <strong>Save layout</strong> to make it the sheet that prints.</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function LabelLayoutScreen() {
   const toast = useToast();
   const { permissions } = useAuth();
@@ -232,6 +357,18 @@ export function LabelLayoutScreen() {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState('');
+  const [templates, setTemplates] = useState([]);
+  const [unit, setUnit] = useState(loadUnit);
+
+  const reloadTemplates = useCallback(() => {
+    getBarcodeLayoutTemplates()
+      .then(setTemplates)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    reloadTemplates();
+  }, [reloadTemplates]);
 
   useEffect(() => {
     let cancelled = false;
@@ -291,6 +428,46 @@ export function LabelLayoutScreen() {
     setForm(toForm(DEFAULT_LAYOUT));
   };
 
+  const handleUnitChange = (next) => {
+    setUnit(next);
+    try {
+      localStorage.setItem(UNIT_STORAGE_KEY, next);
+    } catch {
+      // storage unavailable — the unit simply resets next visit
+    }
+  };
+
+  const applyTemplate = (template) => {
+    setForm(toForm(template.layout));
+    toast.info({ title: `Template "${template.name}" applied`, description: 'Press Save layout to use it for printing.' });
+  };
+
+  const saveTemplate = async (name) => {
+    if (geometry.problems.length > 0) {
+      toast.error({ title: 'Layout does not fit', description: geometry.problems[0] });
+      return false;
+    }
+    try {
+      await createBarcodeLayoutTemplate({ name, layout: draft });
+      toast.success({ title: 'Template saved', description: name });
+      reloadTemplates();
+      return true;
+    } catch (err) {
+      toast.error({ title: 'Could not save template', description: err.message });
+      return false;
+    }
+  };
+
+  const removeTemplate = async (template) => {
+    try {
+      await deleteBarcodeLayoutTemplate(template.uuid);
+      toast.success({ title: 'Template deleted', description: template.name });
+      reloadTemplates();
+    } catch (err) {
+      toast.error({ title: 'Could not delete template', description: err.message });
+    }
+  };
+
   const handlePreviewPdf = async () => {
     setPreviewing(true);
     try {
@@ -313,6 +490,11 @@ export function LabelLayoutScreen() {
   };
 
   const renderField = (field) => {
+    if (field.type === 'custom-page-skip') return null;
+    if (field.type === 'custom-page') {
+      if (form.pageSize !== CUSTOM_PAGE_SIZE) return null;
+      return <CustomPageSize key="custom-page" form={form} setField={setField} disabled={!canEdit} unit={unit} onUnitChange={handleUnitChange} />;
+    }
     if (field.type === 'select') {
       return (
         <Select
@@ -394,6 +576,14 @@ export function LabelLayoutScreen() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* Form */}
         <form id="label-layout-form" onSubmit={handleSave} className="flex flex-col gap-4">
+          <TemplatesCard
+            templates={templates}
+            canEdit={canEdit}
+            loading={loading}
+            onApply={applyTemplate}
+            onSave={saveTemplate}
+            onDelete={removeTemplate}
+          />
           {GROUPS.map((group) => (
             <Card key={group.title}>
               <CardHeader>
@@ -445,7 +635,7 @@ export function LabelLayoutScreen() {
           <Card>
             <CardHeader>
               <CardTitle>
-                Page — {draft.pageSize} {draft.orientation}
+                Page — {draft.pageSize === CUSTOM_PAGE_SIZE ? `Custom ${draft.pageCustomWidthMm} × ${draft.pageCustomHeightMm} mm` : draft.pageSize} {draft.orientation}
               </CardTitle>
             </CardHeader>
             <CardContent className="flex justify-center">
