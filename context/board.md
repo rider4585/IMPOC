@@ -933,3 +933,5 @@ R-55 done. Board: 142 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) /
 
 # SHIFT CLOSE #5 (2026-09-13)
 R-56 done. Board: 143 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Committed + pushed: code on `context` and `main`, docs on `context`. The user's production-deployment work (app.js, .env.example, ecosystem.config.cjs, deploy/, docs/, .env.production, .gitignore) stays uncommitted by their choice.
+
+**db:refresh fix (2026-09-13, no ticket):** `undo:all` failed on three of today's migrations. Grid views are now built by a column-aware `createGridViews()` helper (20260910000002) used by the R-48 and R-51 migrations; rollbacks of 0006/0007/0001 tolerate existing rows. Full refresh verified twice. Rule recorded in god-memory.
