@@ -916,3 +916,20 @@ R-53 + R-54 done. Board: 141 done / 0 doing / 1 blocked (R-52, parked to ~2026-1
 R-55 done. Board: 142 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Committed + pushed: code on `context` and `main`, docs on `context`.
 
 **Follow-up (not ticketed):** if more uploads come, move files out of the DB (disk/object storage + attachments table) and migrate `receipt_image`.
+
+---
+
+# R-56 — SHEET CONFIGURATOR: TEMPLATES + PAGE SIZES A3/A4/A5/LETTER/CUSTOM (2026-09-13, DONE — user-tested)
+
+**Constraint honoured:** `backend/app.js` is being edited by the user for production — template routes are mounted inside `barcode-layout.routes.js` (`/api/barcode-layouts/templates`), app.js untouched.
+
+**Templates:** new `barcode_layout_templates` (uuid, name unique case-insensitively among live rows, `layout` JSONB snapshot, soft delete; migration `20260913000006`). GET (read perm) / POST (manage perm; 409 duplicate name, 400 if the layout doesn't fit) / DELETE. UI: **Templates** card at the top of *Configure barcode sheet* — pick + **Apply** (fills the form only; *Save layout* makes it print) + **Delete**; "Save the current settings as a template" + **Save as template**.
+
+**Page sizes:** `A3` added (841.89 × 1190.55 pt); new `CUSTOM` with `page_custom_width_mm` / `page_custom_height_mm` (50–2000 mm, default 4 × 6 in). UI: Page size → *Custom size…* reveals Width / Height + a **Unit** picker (mm / cm / inch); values convert live and are **stored in mm**; the unit choice is remembered (localStorage). Geometry mirrors updated together (`resolvePageSizePt`, `LENGTH_UNITS`, `mmToUnit`/`unitToMm`).
+
+**Verified:** jest **748/748**, vitest **410/410** (3 clean runs), build OK; live API: template saved → custom 4×6 in layout saved → preview PDF page 288 × 432 pt with 2×3 labels (eyeballed). **PENDING user test** in the browser.
+**R-56 fix (user):** the 10 rows / 10 columns cap is gone — validator, UI and DB CHECK (migration `20260913000007`) now share `GRID_MAX = 100` as a typo guard only; the fit check is the real validation. A3 4×14 = 56 labels/page verified live.
+**CLOSED 2026-09-13:** user tested templates, custom sizes and >10-row grids — working as expected.
+
+# SHIFT CLOSE #5 (2026-09-13)
+R-56 done. Board: 143 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Committed + pushed: code on `context` and `main`, docs on `context`. The user's production-deployment work (app.js, .env.example, ecosystem.config.cjs, deploy/, docs/, .env.production, .gitignore) stays uncommitted by their choice.

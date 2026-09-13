@@ -339,3 +339,11 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 - Uncommitted: R-55 + docs.
 
 ## [2026-09-13 ~18:30Z] R-55 CLOSED (user-tested on device). Board 142 done / R-52 blocked / R-46, R-47 todo. All committed + pushed.
+
+## [2026-09-13 ~20:00Z] R-56 BUILT (awaiting user test) — templates + A3 + custom page sizes
+- app.js is OFF LIMITS while the user's production work is uncommitted (also .env.example, ecosystem.config.cjs, deploy/, docs/, frontend/.env.production). Mount new routes on existing routers if needed.
+- Jest gotcha: one describe's afterAll closes sequelize → a second describe in the same file can't connect. One lifecycle per file.
+- Custom sizes: storage is mm; UI unit is presentation only (LENGTH_UNITS). A3 in PAGE_SIZES_PT. Both geometry copies changed together (tests pin them).
+- Uncommitted: R-56 + docs.
+
+## [2026-09-13 ~21:00Z] R-56 CLOSED (user-tested). Board 143 done / R-52 blocked / R-46, R-47 todo. Committed + pushed; user's deploy files left uncommitted on purpose.
