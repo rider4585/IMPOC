@@ -62,7 +62,7 @@ const TRIP_VENDOR_INCLUDE = (whereDeleted = { [Sequelize.Op.is]: null }) => ({
     as: 'tripVendors',
     where: { deletedAt: whereDeleted },
     required: false,
-    attributes: ['id', 'uuid', 'tripId', 'vendorId', 'billReference', 'totalPaidPaise', 'notes', 'receiptImage', 'createdAt', 'updatedAt'],
+    attributes: ['id', 'uuid', 'tripId', 'vendorId', 'billReference', 'totalPaidPaise', 'cgstPaise', 'sgstPaise', 'notes', 'receiptImage', 'createdAt', 'updatedAt'],
     include: [
         {
             model: Vendor,
@@ -142,6 +142,8 @@ export const createTrip = async ({ name, purchasedOn, notes, vendors = [] }) => 
                     vendorId: vendor.id,
                     billReference: vendorBill.billReference || null,
                     totalPaidPaise: vendorBill.totalPaidPaise,
+                    cgstPaise: vendorBill.cgstPaise ?? 0,
+                    sgstPaise: vendorBill.sgstPaise ?? 0,
                     notes: vendorBill.notes || null,
                     receiptImage: vendorBill.receiptImage || null,
                 },
@@ -249,7 +251,7 @@ export const verifyTripAccess = async (tripUuid, user) => {
  * @param {string} tripUuid - Trip UUID
  * @param {Object} data - { vendorUuid, billReference, totalPaidPaise, notes }
  */
-export const addTripVendor = async (tripUuid, { vendorUuid, billReference, totalPaidPaise, notes, receiptImage }) => {
+export const addTripVendor = async (tripUuid, { vendorUuid, billReference, totalPaidPaise, cgstPaise, sgstPaise, notes, receiptImage }) => {
     const transaction = await sequelize.transaction();
 
     try {
@@ -287,6 +289,8 @@ export const addTripVendor = async (tripUuid, { vendorUuid, billReference, total
                 vendorId: vendor.id,
                 billReference: billReference || null,
                 totalPaidPaise,
+                cgstPaise: cgstPaise ?? 0,
+                sgstPaise: sgstPaise ?? 0,
                 notes: notes || null,
                 receiptImage: receiptImage || null,
             },
@@ -449,6 +453,8 @@ function mapTripVendorDTO(tripVendor, vendor, tripUuid) {
         vendorName: vendor?.name || null,
         billReference: tripVendor.billReference,
         totalPaidPaise: String(tripVendor.totalPaidPaise),
+        cgstPaise: String(tripVendor.cgstPaise ?? 0),
+        sgstPaise: String(tripVendor.sgstPaise ?? 0),
         notes: tripVendor.notes,
         receiptImage: tripVendor.receiptImage ?? null,
         createdAt: tripVendor.createdAt,

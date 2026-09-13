@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { CHANNEL } from '../../constants/channel.js';
 
+// R-51: GST rate on a purchase line, percent with 2 decimals (e.g. 2.5)
+const gstRateSchema = z
+    .number()
+    .min(0, 'GST rate cannot be negative')
+    .max(100, 'GST rate cannot exceed 100%')
+    .refine((v) => Math.round(v * 100) === v * 100, 'GST rate may have at most 2 decimals');
+
 const MAX_SAFE_MONEY = Number.MAX_SAFE_INTEGER;
 
 export const createStockSchema = z
@@ -42,6 +49,9 @@ export const createStockSchema = z
             .max(MAX_SAFE_MONEY, 'Whole buying price exceeds maximum BIGINT value')
             .nullable()
             .optional(),
+
+        cgstRatePct: gstRateSchema.optional().default(0),
+        sgstRatePct: gstRateSchema.optional().default(0),
 
         sellingPricePaise: z
             .number()
@@ -157,6 +167,9 @@ export const updateStockSchema = z
             .max(MAX_SAFE_MONEY, 'Whole buying price exceeds maximum BIGINT value')
             .nullable()
             .optional(),
+
+        cgstRatePct: gstRateSchema.optional(),
+        sgstRatePct: gstRateSchema.optional(),
 
         quantity: z
             .number()

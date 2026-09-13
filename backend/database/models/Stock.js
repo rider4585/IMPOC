@@ -63,6 +63,21 @@ export default (sequelize) => {
                 allowNull: true,
             },
 
+            // R-51: GST rates the vendor charged on this line (percent, e.g. 2.50)
+            cgstRatePct: {
+                type: DataTypes.DECIMAL(5, 2),
+                field: 'cgst_rate_pct',
+                allowNull: false,
+                defaultValue: 0,
+            },
+
+            sgstRatePct: {
+                type: DataTypes.DECIMAL(5, 2),
+                field: 'sgst_rate_pct',
+                allowNull: false,
+                defaultValue: 0,
+            },
+
             sellingPricePaise: {
                 type: DataTypes.BIGINT,
                 field: 'selling_price_paise',

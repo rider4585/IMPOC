@@ -41,6 +41,22 @@ export default (sequelize) => {
                 allowNull: false,
             },
 
+            // R-51: final CGST / SGST amounts printed at the bill subtotal.
+            // totalPaidPaise is GST-inclusive; these are recorded, never reconciled.
+            cgstPaise: {
+                type: DataTypes.BIGINT,
+                field: 'cgst_paise',
+                allowNull: false,
+                defaultValue: 0,
+            },
+
+            sgstPaise: {
+                type: DataTypes.BIGINT,
+                field: 'sgst_paise',
+                allowNull: false,
+                defaultValue: 0,
+            },
+
             notes: {
                 type: DataTypes.TEXT,
                 allowNull: true,

@@ -8,6 +8,8 @@ import { getTemplates } from '../../services/templatesApi.js';
 import { getProductTypes, getSizes } from '../../services/picklistsApi.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { formatPaiseForInput, parseRupeesToPaise } from '../../platform/moneyInput.js';
+import { landedCostPerUnit, parsePercent } from '../../platform/gst.js';
+import { formatPaise } from '../../platform/money.js';
 
 export function StockForm() {
   const { tripUuid } = useParams();
@@ -37,6 +39,8 @@ export function StockForm() {
     quantity: prefill?.quantity != null ? String(prefill.quantity) : '1',
     buyingPricePaise: rupeeOrEmpty(prefill?.buyingPricePaise),
     wholeBuyingPricePaise: rupeeOrEmpty(prefill?.wholeBuyingPricePaise),
+    cgstRatePct: prefill?.cgstRatePct != null ? String(prefill.cgstRatePct) : '',
+    sgstRatePct: prefill?.sgstRatePct != null ? String(prefill.sgstRatePct) : '',
     sellingPricePaise: rupeeOrEmpty(prefill?.sellingPricePaise),
     floorPricePaise: rupeeOrEmpty(prefill?.floorPricePaise),
     channel: prefill?.channel || CHANNEL.RETAIL,
@@ -144,6 +148,10 @@ export function StockForm() {
       if (Number.isNaN(wholeBuying)) { setError('Whole stock buying price must be a valid rupee amount.'); return; }
     }
 
+    const cgstRatePct = parsePercent(form.cgstRatePct);
+    const sgstRatePct = parsePercent(form.sgstRatePct);
+    if ([cgstRatePct, sgstRatePct].some(Number.isNaN)) { setError('CGST and SGST must be percentages between 0 and 100 (up to 2 decimals).'); return; }
+
     const isRental = form.channel === CHANNEL.RENTAL;
     if (isRental) {
       const rent = parseRupeesToPaise(form.rentPerDayPaise);
@@ -159,6 +167,8 @@ export function StockForm() {
         quantity,
         buyingPricePaise: buying,
         wholeBuyingPricePaise: wholeBuying,
+        cgstRatePct,
+        sgstRatePct,
         sellingPricePaise: selling,
         floorPricePaise: floor,
         channel: form.channel,
@@ -175,6 +185,8 @@ export function StockForm() {
         quantity,
         buyingPricePaise: buying,
         wholeBuyingPricePaise: wholeBuying,
+        cgstRatePct,
+        sgstRatePct,
         sellingPricePaise: selling,
         floorPricePaise: floor,
         channel: form.channel,
@@ -202,6 +214,24 @@ export function StockForm() {
       </div>
     );
   }
+
+  // R-51: true per-unit cost with GST, so the selling price is chosen with tax counted (client-side only)
+  const landedCostHint = (() => {
+    const cgst = parsePercent(form.cgstRatePct);
+    const sgst = parsePercent(form.sgstRatePct);
+    if (Number.isNaN(cgst) || Number.isNaN(sgst)) return 'Enter valid CGST / SGST percentages to see the cost per unit incl. GST.';
+    const buying = parseRupeesToPaise(form.buyingPricePaise);
+    const whole = parseRupeesToPaise(String(form.wholeBuyingPricePaise || '').trim() || '0');
+    const cost = landedCostPerUnit({
+      buyingPricePaise: Number.isNaN(buying) ? null : buying,
+      wholeBuyingPricePaise: Number.isNaN(whole) ? null : whole,
+      quantity: Number(form.quantity),
+      cgstRatePct: cgst,
+      sgstRatePct: sgst,
+    });
+    if (!cost) return 'Cost per unit incl. GST appears here once a buying price is entered.';
+    return `Cost per unit incl. GST: ${formatPaise(cost.totalPaise)} (buying ${formatPaise(cost.basePaise)} + GST ${cost.ratePct}% = ${formatPaise(cost.gstPaise)})`;
+  })();
 
   return (
     <div className="mx-auto flex max-w-[640px] flex-col gap-5 p-6">
@@ -300,7 +330,11 @@ export function StockForm() {
 
         <Input label="Buying price (₹)" value={form.buyingPricePaise} onChange={set('buyingPricePaise')} inputMode="decimal" required />
         <Input label="Whole stock buying price (₹)" value={form.wholeBuyingPricePaise} onChange={set('wholeBuyingPricePaise')} inputMode="decimal" hint="Optional total for the whole stock, if you bought it as a lot." />
-        <Input label="Selling price (₹)" value={form.sellingPricePaise} onChange={set('sellingPricePaise')} inputMode="decimal" required />
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="CGST (%)" value={form.cgstRatePct} onChange={set('cgstRatePct')} inputMode="decimal" placeholder="e.g. 2.5" />
+          <Input label="SGST (%)" value={form.sgstRatePct} onChange={set('sgstRatePct')} inputMode="decimal" placeholder="e.g. 2.5" />
+        </div>
+        <Input label="Selling price (₹)" value={form.sellingPricePaise} onChange={set('sellingPricePaise')} inputMode="decimal" required hint={landedCostHint} />
         <Input label="Floor price (₹)" value={form.floorPricePaise} onChange={set('floorPricePaise')} inputMode="decimal" required hint="Cannot exceed selling price." />
 
         <SearchableSelect

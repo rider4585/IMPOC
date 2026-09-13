@@ -90,6 +90,8 @@ export const createStock = async ({
     quantity,
     buyingPricePaise,
     wholeBuyingPricePaise,
+    cgstRatePct,
+    sgstRatePct,
     sellingPricePaise,
     floorPricePaise,
     channel,
@@ -191,6 +193,8 @@ export const createStock = async ({
                 quantity,
                 buyingPricePaise,
                 wholeBuyingPricePaise: wholeBuyingPricePaise ?? null,
+                cgstRatePct: cgstRatePct ?? 0,
+                sgstRatePct: sgstRatePct ?? 0,
                 sellingPricePaise,
                 floorPricePaise,
                 channel,
@@ -236,6 +240,8 @@ export const getStocksByTrip = async (tripUuid) => {
             'quantity',
             'buyingPricePaise',
             'wholeBuyingPricePaise',
+            'cgstRatePct',
+            'sgstRatePct',
             'sellingPricePaise',
             'floorPricePaise',
             'channel',
@@ -278,6 +284,8 @@ export const getStockByUuid = async (tripUuid, stockUuid) => {
             'quantity',
             'buyingPricePaise',
             'wholeBuyingPricePaise',
+            'cgstRatePct',
+            'sgstRatePct',
             'sellingPricePaise',
             'floorPricePaise',
             'channel',
@@ -367,6 +375,8 @@ export const updateStock = async (tripUuid, stockUuid, updates) => {
         if (updates.quantity !== undefined) patch.quantity = updates.quantity;
         if (updates.buyingPricePaise !== undefined) patch.buyingPricePaise = updates.buyingPricePaise;
         if (updates.wholeBuyingPricePaise !== undefined) patch.wholeBuyingPricePaise = updates.wholeBuyingPricePaise ?? null;
+        if (updates.cgstRatePct !== undefined) patch.cgstRatePct = updates.cgstRatePct;
+        if (updates.sgstRatePct !== undefined) patch.sgstRatePct = updates.sgstRatePct;
         if (updates.sellingPricePaise !== undefined) patch.sellingPricePaise = updates.sellingPricePaise;
         if (updates.floorPricePaise !== undefined) patch.floorPricePaise = updates.floorPricePaise;
         if (updates.rentPerDayPaise !== undefined) patch.rentPerDayPaise = updates.rentPerDayPaise ?? null;
@@ -602,6 +612,8 @@ function mapStockDTO(stock, tripUuid, vendorUuid, productTypeUuid) {
         quantity: stock.quantity,
         buyingPricePaise: String(stock.buyingPricePaise),
         wholeBuyingPricePaise: stock.wholeBuyingPricePaise != null ? String(stock.wholeBuyingPricePaise) : null,
+        cgstRatePct: Number(stock.cgstRatePct ?? 0),
+        sgstRatePct: Number(stock.sgstRatePct ?? 0),
         sellingPricePaise: String(stock.sellingPricePaise),
         floorPricePaise: String(stock.floorPricePaise),
         channel: stock.channel,
@@ -725,6 +737,8 @@ function mapListAllStocksDTO(row) {
         quantity: row.quantity,
         buyingPricePaise: String(row.buyingPricePaise),
         wholeBuyingPricePaise: row.wholeBuyingPricePaise != null ? String(row.wholeBuyingPricePaise) : null,
+        cgstRatePct: Number(row.cgstRatePct ?? 0),
+        sgstRatePct: Number(row.sgstRatePct ?? 0),
         sellingPricePaise: String(row.sellingPricePaise),
         floorPricePaise: String(row.floorPricePaise),
         channel: row.channel,
