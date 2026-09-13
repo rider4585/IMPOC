@@ -42,6 +42,8 @@ const migration = {
         await queryInterface.dropTable('barcode_layout_templates');
         await queryInterface.sequelize.query('ALTER TABLE barcode_layouts DROP CONSTRAINT IF EXISTS barcode_layouts_custom_page_check');
         await queryInterface.sequelize.query('ALTER TABLE barcode_layouts DROP CONSTRAINT IF EXISTS barcode_layouts_page_size_check');
+        // A3 / CUSTOM did not exist before this migration: fall back to A4 so the old CHECK can be re-added.
+        await queryInterface.sequelize.query("UPDATE barcode_layouts SET page_size = 'A4' WHERE page_size IN ('A3', 'CUSTOM')");
         await queryInterface.sequelize.query(
             "ALTER TABLE barcode_layouts ADD CONSTRAINT barcode_layouts_page_size_check CHECK (page_size IN ('A4','A5','LETTER'))",
         );

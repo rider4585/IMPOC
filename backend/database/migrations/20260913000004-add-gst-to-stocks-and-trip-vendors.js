@@ -1,6 +1,6 @@
 'use strict';
 
-import { VIEWS as GRID_VIEWS } from './20260910000002-create-grid-views.js';
+import { dropGridViews, createGridViews } from './20260910000002-create-grid-views.js';
 
 /**
  * R-51: record the GST vendors charge on purchases.
@@ -12,9 +12,7 @@ import { VIEWS as GRID_VIEWS } from './20260910000002-create-grid-views.js';
  */
 const migration = {
     async up(queryInterface, Sequelize) {
-        for (const view of GRID_VIEWS) {
-            await queryInterface.sequelize.query(`DROP VIEW IF EXISTS ${view.name}`);
-        }
+        await dropGridViews(queryInterface);
 
         for (const column of ['cgst_rate_pct', 'sgst_rate_pct']) {
             await queryInterface.addColumn('stocks', column, {
@@ -38,24 +36,19 @@ const migration = {
             'ALTER TABLE trip_vendors ADD CONSTRAINT trip_vendors_gst_paise_check CHECK (cgst_paise >= 0 AND sgst_paise >= 0)',
         );
 
-        for (const view of GRID_VIEWS) {
-            await queryInterface.sequelize.query(view.sql);
-        }
+        await createGridViews(queryInterface);
     },
 
     async down(queryInterface) {
-        for (const view of GRID_VIEWS) {
-            await queryInterface.sequelize.query(`DROP VIEW IF EXISTS ${view.name}`);
-        }
+        await dropGridViews(queryInterface);
         await queryInterface.sequelize.query('ALTER TABLE stocks DROP CONSTRAINT IF EXISTS stocks_gst_rate_check');
         await queryInterface.removeColumn('stocks', 'cgst_rate_pct');
         await queryInterface.removeColumn('stocks', 'sgst_rate_pct');
         await queryInterface.sequelize.query('ALTER TABLE trip_vendors DROP CONSTRAINT IF EXISTS trip_vendors_gst_paise_check');
         await queryInterface.removeColumn('trip_vendors', 'cgst_paise');
         await queryInterface.removeColumn('trip_vendors', 'sgst_paise');
-        for (const view of GRID_VIEWS) {
-            await queryInterface.sequelize.query(view.sql);
-        }
+        // createGridViews omits the GST projections now that the columns are gone.
+        await createGridViews(queryInterface);
     },
 };
 

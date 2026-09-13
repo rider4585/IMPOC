@@ -14,6 +14,8 @@ const migration = {
     },
     async down(queryInterface) {
         await queryInterface.sequelize.query('ALTER TABLE barcode_layouts DROP CONSTRAINT IF EXISTS barcode_layouts_grid_check');
+        // A saved sheet may already use more than 10 rows/columns: clamp it so the old CHECK can be re-added.
+        await queryInterface.sequelize.query('UPDATE barcode_layouts SET columns = LEAST(columns, 10), rows = LEAST(rows, 10)');
         await queryInterface.sequelize.query(
             'ALTER TABLE barcode_layouts ADD CONSTRAINT barcode_layouts_grid_check CHECK (columns BETWEEN 1 AND 10 AND rows BETWEEN 1 AND 10)',
         );
