@@ -308,3 +308,4 @@ WHERE st.deleted_at IS NULL`,
 
 export const up = migration.up.bind(migration);
 export const down = migration.down.bind(migration);
+export const VIEWS = migration.VIEWS;

@@ -18,7 +18,7 @@ export default (sequelize) => {
             },
 
             barcode: {
-                type: DataTypes.STRING(12),
+                type: DataTypes.STRING(32),
                 allowNull: false,
             },
 

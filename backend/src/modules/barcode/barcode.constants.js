@@ -77,3 +77,29 @@ export const BARCODE_TEST_CONFIG = {
 
     testValue: '123456789012',
 };
+
+/**
+ * Barcode VALUE format (R-48).
+ *
+ *   SHREE + TS6 + CNT4  ->  15 chars, uppercase A-Z0-9 only.
+ *
+ * - TS6  : seconds since EPOCH_MS in base-36, zero-padded to 6 (lasts ~69 years).
+ * - CNT4 : nextval(barcode_seq) mod 36^4 in base-36, zero-padded to 4.
+ *
+ * Two values can only collide with the same second AND the same counter.
+ * Within a second the sequence keeps climbing; after a sequence reset
+ * (db wipe, re-migrate) the timestamp is strictly later than every label
+ * already printed, so old and new labels never overlap.
+ */
+export const BARCODE_FORMAT = {
+    prefix: 'SHREE',
+    epochMs: Date.UTC(2026, 0, 1),
+    timestampLength: 6,
+    counterLength: 4,
+    radix: 36,
+    // 5 + 6 + 4; column/validator cap is BARCODE_MAX_LENGTH for headroom
+    length: 15,
+};
+
+/** Storage + validation ceiling for a barcode string (units / sale_lines / rental_lines). */
+export const BARCODE_MAX_LENGTH = 32;

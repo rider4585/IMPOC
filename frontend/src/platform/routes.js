@@ -9,6 +9,10 @@
 export const BARCODE_ROUTES = {
   /** GET /barcodes/generate - Generate a barcode PDF sheet */
   GENERATE: '/barcodes/generate',
+  /** GET /barcodes/preview - One sample page rendered with the saved label layout (R-50) */
+  PREVIEW: '/barcodes/preview',
+  /** GET/PUT /barcode-layouts - The single saved label-sheet layout (R-50) */
+  LAYOUT: '/barcode-layouts',
 };
 
 // Trip endpoints

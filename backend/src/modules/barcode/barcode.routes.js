@@ -3,6 +3,7 @@ import { Router } from 'express';
 import {
     generateBarcodePdf,
     generateBarcodeTestSheetPdf,
+    previewBarcodeSheetPdf,
 } from './barcode.controller.js';
 
 import { authenticate } from '../../middleware/auth.middleware.js';
@@ -16,6 +17,13 @@ router.get(
     authenticate,
     authorize(PERMISSIONS.INVENTORY.BARCODE_GENERATE),
     generateBarcodePdf
+);
+
+router.get(
+    '/preview',
+    authenticate,
+    authorize(PERMISSIONS.INVENTORY.BARCODE_GENERATE),
+    previewBarcodeSheetPdf,
 );
 
 router.get(

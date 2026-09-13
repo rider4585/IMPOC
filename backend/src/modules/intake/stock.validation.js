@@ -235,7 +235,7 @@ export const scanIntoStockSchema = z.object({
     barcode: z
         .string()
         .min(1, 'Barcode must be at least 1 character')
-        .max(12, 'Barcode must be at most 12 characters'),
+        .max(32, 'Barcode must be at most 32 characters'),
 
     colourUuid: z
         .string()

@@ -3,8 +3,8 @@ import { z } from 'zod';
 // UUID format validation (standard UUID v4)
 const uuidSchema = z.string().uuid('Invalid UUID format');
 
-// Barcode validation (1-12 alphanumeric characters)
-const barcodeSchema = z.string().min(1).max(12).regex(/^[A-Z0-9]+$/, 'Barcode must be uppercase alphanumeric');
+// Barcode validation (1-32 uppercase alphanumeric; R-48 values are 15 chars: SHREE + ts + counter)
+const barcodeSchema = z.string().min(1).max(32).regex(/^[A-Z0-9]+$/, 'Barcode must be uppercase alphanumeric');
 
 // Pagination
 const pageSchema = z.number().int().min(1).default(1);

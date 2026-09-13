@@ -16,7 +16,7 @@ const uuidSchema = z.string().uuid('Invalid UUID format');
 const sellableUnitItemSchema = z
     .object({
         unitUuid: uuidSchema.optional(),
-        barcode: z.string().trim().min(1).max(12).optional(),
+        barcode: z.string().trim().min(1).max(32).optional(),
         sellingPricePaise: z.number().int('Selling price must be an integer number of paise').min(0, 'Selling price cannot be negative').optional(),
     })
     .refine(
