@@ -330,3 +330,12 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 - Uncommitted: R-54 + docs.
 
 ## [2026-09-13 ~16:30Z] R-54 CLOSED (user-tested). Board 141 done / R-52 blocked / R-46, R-47 todo. All committed + pushed.
+
+## [2026-09-13 ~18:00Z] R-55 photo capture BUILT (awaiting user device test)
+- PhotoCapture is reusable: any future image field should use it (onPhoto(dataUrl)) + imageResize — don't add bare <input type=file> again.
+- Camera in the in-app browser pane is always blocked → only the fallback path is verifiable here; real getUserMedia needs the user's device (HTTPS).
+- Test hygiene: asyncUtilTimeout 5s in vitest.setup.js; when a screen sets data then loading=false in separate renders, tests must wait for the loaded UI (buttons enabled), not the first value. POS thank-you banner is a 450ms window — wait on createSale instead.
+- Vite dev pages that use React must live under the project root (frontend/dev/*.html + src/dev/*.jsx), not public/ (no plugin-react preamble there).
+- Uncommitted: R-55 + docs.
+
+## [2026-09-13 ~18:30Z] R-55 CLOSED (user-tested on device). Board 142 done / R-52 blocked / R-46, R-47 todo. All committed + pushed.

@@ -897,3 +897,22 @@ R-51 done (user-tested). R-52 parked until ~mid-Oct 2026 by user choice (product
 
 # SHIFT CLOSE #3 (2026-09-13)
 R-53 + R-54 done. Board: 141 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Committed + pushed: code on `context` and `main`, docs on `context`.
+
+---
+
+# R-55 — VENDOR BILL PHOTO: TAKE / GALLERY / REVIEW / RETAKE (2026-09-13, DONE — user-tested on device)
+
+**Inventory first (user asked):** the app has exactly ONE file input — Trip detail → Add vendor → bill receipt (`FileReader` → base64 → `trip_vendors.receipt_image` TEXT). No other image/file columns anywhere (checked `information_schema`).
+
+**User wants:** Take photo on every device + Choose from gallery; review the shot, retake if bad, then submit.
+
+**Built:** `components/PhotoCapture.jsx` — two buttons → one review dialog (Cancel / Retake / Use photo). Camera = `getUserMedia` (rear cam on phones, webcam on laptops; stream attached by effect once the portalled `<video>` exists; tracks stopped on close/unmount). Any camera failure → plain message + the button becomes a native `<input capture="environment">` (phone camera app); no `getUserMedia` at all → native from the start. Gallery = plain file input → same review. `platform/imageResize.js` downsizes everything to ≤1600 px JPEG q0.82 (EXIF orientation via `createImageBitmap`), so a phone photo lands at ~200–400 KB. `platform/camera.js` holds constraints + error wording. Nothing changed server-side (`receipt_image`, 10 MB cap).
+
+**Also:** two pre-existing test races fixed (LabelLayout acted before `loading=false`; POS helper polled for the 450 ms thank-you) + suite-wide `asyncUtilTimeout` 5 s — the suite now passes 3× in a row under load (405/405). Dev harness for the component at `/dev/photo-capture.html` (vite dev only).
+
+**Verified:** harness in the browser: 3000×2000 PNG → review shows 1600×1067 JPEG (138 KB → 20 KB); camera blocked in the pane → fallback path shown. **CLOSED 2026-09-13:** user tested the real camera + gallery + review/retake on device — 'working really good'.
+
+# SHIFT CLOSE #4 (2026-09-13)
+R-55 done. Board: 142 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Committed + pushed: code on `context` and `main`, docs on `context`.
+
+**Follow-up (not ticketed):** if more uploads come, move files out of the DB (disk/object storage + attachments table) and migrate `receipt_image`.
