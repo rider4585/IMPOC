@@ -103,7 +103,8 @@ async function fillStockBasics({ typeUuid = 'pt1', quantity = '1', buying = '500
 
 async function expectCreateStockPayload(payload) {
   await waitFor(() => expect(tripsService.createStock).toHaveBeenCalledTimes(1));
-  expect(tripsService.createStock).toHaveBeenCalledWith('t1', payload);
+  // R-51: GST rates always travel with the stock; 0 when the inputs are left blank
+  expect(tripsService.createStock).toHaveBeenCalledWith('t1', { cgstRatePct: 0, sgstRatePct: 0, ...payload });
 }
 
 describe('StockForm — two-level type/subtype + whole/per-unit buying price (R-11)', () => {
@@ -384,5 +385,59 @@ describe('TemplateForm — buying template list + create/edit (R-11)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(templatesService.deleteTemplate).toHaveBeenCalledWith('tmp1'));
+  });
+});
+describe('StockForm — GST on purchase (R-51)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authModule.useAuth.mockReturnValue({ permissions: CREATOR });
+    tripsService.getTrip.mockResolvedValue(TRIP);
+    tripsService.createStock.mockResolvedValue({ uuid: 'S1', name: 'New stock' });
+    templatesService.getTemplates.mockResolvedValue([]);
+    getProductTypes.mockResolvedValue(PRODUCT_TYPES);
+    getSizes.mockResolvedValue([]);
+  });
+
+  it('shows the per-unit cost incl. GST under Selling price as prices and rates are typed', async () => {
+    renderStockForm();
+    await screen.findByLabelText('Type');
+
+    expect(screen.getByText(/appears here once a buying price is entered/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Buying price (₹)'), { target: { value: '1000' } });
+    fireEvent.change(screen.getByLabelText(/cgst \(%\)/i), { target: { value: '2.5' } });
+    fireEvent.change(screen.getByLabelText(/sgst \(%\)/i), { target: { value: '2.5' } });
+
+    expect(screen.getByText(/cost per unit incl\. gst: ₹1,050\.00/i)).toBeInTheDocument();
+    expect(screen.getByText(/gst 5% = ₹50\.00/i)).toBeInTheDocument();
+  });
+
+  it('uses whole price / quantity when only the lot price is known', async () => {
+    renderStockForm();
+    await screen.findByLabelText('Type');
+
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText(/whole stock buying price/i), { target: { value: '1200' } });
+    fireEvent.change(screen.getByLabelText(/cgst \(%\)/i), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText(/sgst \(%\)/i), { target: { value: '6' } });
+
+    expect(screen.getByText(/cost per unit incl\. gst: ₹336\.00/i)).toBeInTheDocument();
+  });
+
+  it('sends the GST rates with the stock and rejects invalid percentages', async () => {
+    renderStockForm();
+    await screen.findByLabelText('Type');
+    await fillStockBasics();
+
+    fireEvent.change(screen.getByLabelText(/cgst \(%\)/i), { target: { value: '150' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save stock' }));
+    expect(await screen.findByText(/percentages between 0 and 100/i)).toBeInTheDocument();
+    expect(tripsService.createStock).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText(/cgst \(%\)/i), { target: { value: '9' } });
+    fireEvent.change(screen.getByLabelText(/sgst \(%\)/i), { target: { value: '9' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save stock' }));
+    await waitFor(() => expect(tripsService.createStock).toHaveBeenCalledTimes(1));
+    expect(tripsService.createStock.mock.calls[0][1]).toMatchObject({ cgstRatePct: 9, sgstRatePct: 9, buyingPricePaise: 50000 });
   });
 });

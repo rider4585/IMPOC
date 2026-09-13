@@ -163,6 +163,11 @@ export function StocksScreen() {
             <div className="typography-money-sm text-[var(--ink-muted)]">
               Per unit {formatPaise(Number(stock.buyingPricePaise))}
             </div>
+            {(Number(stock.cgstRatePct) > 0 || Number(stock.sgstRatePct) > 0) && (
+              <div className="text-xs text-[var(--ink-faint)]" title="CGST + SGST charged by the vendor (R-51)">
+                GST {Number(stock.cgstRatePct)}% + {Number(stock.sgstRatePct)}%
+              </div>
+            )}
           </div>
         );
       },

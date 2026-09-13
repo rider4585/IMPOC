@@ -170,12 +170,15 @@ describe('TripDetailScreen — single-mode searchable combobox add-vendor with b
 
     fireEvent.change(within(dialog).getByLabelText(/bill reference/i), { target: { value: 'B-123' } });
     fireEvent.change(within(dialog).getByLabelText(/total paid/i), { target: { value: '1250' } });
+    // R-51: GST amounts from the bill subtotal (total paid already includes them)
+    fireEvent.change(within(dialog).getByLabelText(/cgst \(₹\)/i), { target: { value: '29.76' } });
+    fireEvent.change(within(dialog).getByLabelText(/sgst \(₹\)/i), { target: { value: '29.76' } });
     fireEvent.click(within(dialog).getByRole('button', { name: /^add vendor$/i }));
 
     await waitFor(() => {
       expect(tripsService.addTripVendor).toHaveBeenCalledWith(
         't1',
-        { vendorUuid: 'v1', billReference: 'B-123', totalPaidPaise: 125000, notes: null, receiptImage: null }
+        { vendorUuid: 'v1', billReference: 'B-123', totalPaidPaise: 125000, cgstPaise: 2976, sgstPaise: 2976, notes: null, receiptImage: null }
       );
     });
 
@@ -226,7 +229,7 @@ describe('TripDetailScreen — single-mode searchable combobox add-vendor with b
       });
       expect(tripsService.addTripVendor).toHaveBeenCalledWith(
         't1',
-        { vendorUuid: 'v-new', billReference: 'B-099', totalPaidPaise: 500000, notes: null, receiptImage: null }
+        { vendorUuid: 'v-new', billReference: 'B-099', totalPaidPaise: 500000, cgstPaise: 0, sgstPaise: 0, notes: null, receiptImage: null }
       );
     });
 
@@ -280,7 +283,7 @@ describe('TripDetailScreen — single-mode searchable combobox add-vendor with b
     await waitFor(() => {
       expect(tripsService.addTripVendor).toHaveBeenCalledWith(
         't1',
-        { vendorUuid: 'v1', billReference: 'B-777', totalPaidPaise: 250000, notes: null, receiptImage: dataUrl }
+        { vendorUuid: 'v1', billReference: 'B-777', totalPaidPaise: 250000, cgstPaise: 0, sgstPaise: 0, notes: null, receiptImage: dataUrl }
       );
     });
 

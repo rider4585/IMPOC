@@ -19,6 +19,9 @@ export const tripVendorBillSchema = z.object({
         .optional()
         .default(null),
     totalPaidPaise: paiseSchema,
+    // R-51: bill-level GST amounts (recorded only; totalPaidPaise is GST-inclusive)
+    cgstPaise: paiseSchema.optional().default(0),
+    sgstPaise: paiseSchema.optional().default(0),
     notes: z
         .string()
         .max(2000, 'Notes cannot exceed 2000 characters')
@@ -80,6 +83,9 @@ export const addTripVendorSchema = z.object({
         .optional()
         .default(null),
     totalPaidPaise: paiseSchema,
+    // R-51: bill-level GST amounts (recorded only; totalPaidPaise is GST-inclusive)
+    cgstPaise: paiseSchema.optional().default(0),
+    sgstPaise: paiseSchema.optional().default(0),
     notes: z
         .string()
         .max(2000, 'Notes cannot exceed 2000 characters')

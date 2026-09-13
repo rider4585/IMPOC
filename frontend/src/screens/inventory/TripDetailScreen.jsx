@@ -46,7 +46,7 @@ export function TripDetailScreen() {
 
   const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [creatingNewVendor, setCreatingNewVendor] = useState(false);
-  const [vendorForm, setVendorForm] = useState({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '', receiptImage: null });
+  const [vendorForm, setVendorForm] = useState({ vendorUuid: '', billReference: '', totalPaidPaise: '', cgstPaise: '', sgstPaise: '', notes: '', receiptImage: null });
   const [newVendor, setNewVendor] = useState({ name: '', address: '', phone: '' });
   const [vendorFormError, setVendorFormError] = useState('');
   const [receiptError, setReceiptError] = useState('');
@@ -152,6 +152,13 @@ export function TripDetailScreen() {
       setVendorFormError('Total paid must be a valid rupee amount.');
       return;
     }
+    // R-51: GST amounts from the bill subtotal (optional; total paid already includes them)
+    const cgstPaise = parseRupeesToPaise(String(vendorForm.cgstPaise || '').trim() || '0');
+    const sgstPaise = parseRupeesToPaise(String(vendorForm.sgstPaise || '').trim() || '0');
+    if ([cgstPaise, sgstPaise].some(Number.isNaN)) {
+      setVendorFormError('CGST and SGST must be valid rupee amounts.');
+      return;
+    }
 
     setSavingVendor(true);
     try {
@@ -168,6 +175,8 @@ export function TripDetailScreen() {
         vendorUuid,
         billReference: vendorForm.billReference.trim() || null,
         totalPaidPaise,
+        cgstPaise,
+        sgstPaise,
         notes: vendorForm.notes.trim() || null,
         receiptImage: vendorForm.receiptImage || null,
       });
@@ -183,7 +192,7 @@ export function TripDetailScreen() {
   };
 
   const resetVendorDialog = () => {
-    setVendorForm({ vendorUuid: '', billReference: '', totalPaidPaise: '', notes: '', receiptImage: null });
+    setVendorForm({ vendorUuid: '', billReference: '', totalPaidPaise: '', cgstPaise: '', sgstPaise: '', notes: '', receiptImage: null });
     setNewVendor({ name: '', address: '', phone: '' });
     setCreatingNewVendor(false);
     setVendorFormError('');
@@ -285,6 +294,16 @@ export function TripDetailScreen() {
       size: 140,
       cell: (info) => info.getValue() != null ? (
         <span className="typography-money-sm text-[var(--ink)]">{formatPaise(Number(info.getValue()))}</span>
+      ) : (
+        <span className="text-[var(--ink-muted)]">—</span>
+      ),
+    },
+    {
+      accessorKey: 'gst',
+      header: 'GST incl. (₹)',
+      size: 130,
+      cell: (info) => info.getValue() != null ? (
+        <span className="typography-money-sm text-[var(--ink-muted)]" title="CGST + SGST shown on the bill; already part of Paid">{formatPaise(Number(info.getValue()))}</span>
       ) : (
         <span className="text-[var(--ink-muted)]">—</span>
       ),
@@ -453,6 +472,7 @@ export function TripDetailScreen() {
               vendorName: tv.vendor?.name || vendorName(tv.vendorUuid),
               billRef: tv.bill_reference ?? tv.billReference,
               paid: tv.total_paid ?? tv.totalPaidPaise,
+              gst: tv.cgstPaise != null || tv.sgstPaise != null ? Number(tv.cgstPaise ?? 0) + Number(tv.sgstPaise ?? 0) : null,
               receipt: tv.receiptImage ?? tv.receipt_image ?? null,
             }))}
             columns={vendorColumns}
@@ -628,8 +648,24 @@ export function TripDetailScreen() {
             onChange={(e) => setVendorForm((f) => ({ ...f, totalPaidPaise: e.target.value }))}
             placeholder="e.g. 14400"
             inputMode="decimal"
-            hint="Enter in rupees; stored as whole paise."
+            hint="Enter in rupees, GST included, exactly as paid."
           />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="CGST (₹)"
+              value={vendorForm.cgstPaise}
+              onChange={(e) => setVendorForm((f) => ({ ...f, cgstPaise: e.target.value }))}
+              placeholder="From the bill"
+              inputMode="decimal"
+            />
+            <Input
+              label="SGST (₹)"
+              value={vendorForm.sgstPaise}
+              onChange={(e) => setVendorForm((f) => ({ ...f, sgstPaise: e.target.value }))}
+              placeholder="From the bill"
+              inputMode="decimal"
+            />
+          </div>
           <Input
             label="Notes"
             value={vendorForm.notes}

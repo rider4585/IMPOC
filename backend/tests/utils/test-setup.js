@@ -416,6 +416,8 @@ export async function initializeTestDatabase() {
               st.quantity,
               st.buying_price_paise AS "buyingPricePaise",
               st.whole_buying_price_paise AS "wholeBuyingPricePaise",
+              st.cgst_rate_pct AS "cgstRatePct",
+              st.sgst_rate_pct AS "sgstRatePct",
               st.selling_price_paise AS "sellingPricePaise",
               st.floor_price_paise AS "floorPricePaise",
               st.channel,
