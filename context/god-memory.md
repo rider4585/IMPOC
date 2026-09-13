@@ -322,3 +322,11 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 
 - FOLLOW-UP R-48 (2026-09-13): three barcode inputs (POS add item, rental create, stock intake) still had maxLength=12 -> 15-char codes were truncated on the client. Now `BARCODE_MAX_LENGTH` (32) from frontend/src/constants/barcode.js. Grep for hard-coded 12s whenever the barcode shape changes.
 - R-53 rev: fps per row derived from Pillow inter-frame diff (method in board). Poke = window pointerdown → scheduler.poke(); NO document.hidden guard on poke (the in-app browser pane reports hidden=true while visible — cost me a false negative).
+
+## [2026-09-13 ~16:00Z] R-54 review QR BUILT (awaiting user test)
+- POLICY LOCK: never pre-fill/steer Google reviews (told the user; accepted). Review QR only.
+- Display 'received' now persists (15-min safety reset); POS must publish idle on Close transaction / New transaction / Clear cart — all three do. If a new POS exit path is added, publish idle there too.
+- Test-DB gotcha: don't add ADMIN users in new suites — SEC-CR-2 counts active admins across the shared impoc_test; use MANAGER (has picklists.*).
+- Uncommitted: R-54 + docs.
+
+## [2026-09-13 ~16:30Z] R-54 CLOSED (user-tested). Board 141 done / R-52 blocked / R-46, R-47 todo. All committed + pushed.

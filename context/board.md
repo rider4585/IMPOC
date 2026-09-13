@@ -880,3 +880,20 @@ R-51 done (user-tested). R-52 parked until ~mid-Oct 2026 by user choice (product
 **R-53 revision (user, same day):** per-row **fps from the sheet** — measured mean inter-frame pixel change: fly/walk (~0.12, even steps) → 12 fps; idle 0.07 → 6; blink 0.10 → 4; key-pose rows sleepy 0.22 → 3, coding 0.22 → 4, worried 0.21 → 5, reading 0.15 → 5; cheer 8 (one-shot). **Poke:** any click/touch on the display → `scheduler.poke()` plays row 0 (idle/attention) for 4 s (`PET_POKE`), repeated taps restart the hold, then the random cycle resumes. Verified live. vitest 393/393.
 **R-53 polish (user):** idle view shows only the bird + shop name (waiting line removed). Pet canvas is now viewport-capped (`min(384px, 88vw, 50vh·192/208)`, height auto) — the fixed 384 px canvas was clipping on phones; frames in the PNG are intact (bbox check: none touch a cell edge).
 **R-53 closed (user):** the half sparkle in coding frame 2 is in the PNG itself (verified: transparent gap before the 192-px boundary, no sprite touches any boundary) — not a grid issue; accepted as-is.
+
+---
+
+# R-54 — GOOGLE REVIEW QR AFTER PAYMENT (2026-09-13, DONE — user-tested)
+
+**Validated with the user first:** Google's write-review link cannot pre-select stars or pre-fill text, and templated/steered reviews break Google's review policy (removals, listing penalties). User accepted a plain review QR.
+
+**Decisions (user):** after *Mark received* the display shows Thank-you + review QR and **stays** until the cashier clicks **Close transaction** on POS — no DB change, it only publishes `idle`. Review link managed in a new Picklists tab.
+
+**Backend:** `review-links` module (mirror of `upi-accounts`): `review_links` (label, url ≤2000 https-only, is_active; migration `20260913000005`), `/api/picklists/review-links` GET/POST/GET:uuid/PATCH under PICKLISTS perms. `pos-display`: `reviewUrl` (https, ≤2000) accepted on publish, `IDLE_STATE.reviewUrl=null`; the 8 s received auto-reset is now a **15 min safety net** (forgotten display / guessed code). jest **744/744**.
+
+**Frontend:** `getReviewLinks`; Picklists → **Review links** (label + link). POS: loads links, sends the **first active** url as `reviewUrl` with the received publish; receipt screen's button is now **Close transaction** (publishes idle, starts a fresh sale). Display `ReceivedView`: thank-you + 200 px level-H logo QR + “Loved it? Scan to leave us a Google review”. vitest **395/395**. Live-verified on `/display/R54DEMO` (persisted >12 s, cleared by idle).
+
+**CLOSED 2026-09-13:** user ran a sale with the real link, saw the QR, closed the transaction — 'working great'.
+
+# SHIFT CLOSE #3 (2026-09-13)
+R-53 + R-54 done. Board: 141 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Committed + pushed: code on `context` and `main`, docs on `context`.
