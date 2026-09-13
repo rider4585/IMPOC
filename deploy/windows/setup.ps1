@@ -244,10 +244,19 @@ if (-not (Get-Command pm2 -ErrorAction SilentlyContinue)) {
     Refresh-Path
 }
 Push-Location $Backend
-pm2 delete impoc 2>$null | Out-Null
-pm2 start ecosystem.config.cjs
+# pm2 prints "[PM2][ERROR] Process or Namespace impoc not found" to stderr on a
+# first install; with $ErrorActionPreference = 'Stop' PowerShell turns that
+# into a terminating error even under 2>$null. So: only delete when the
+# process exists, and route pm2's stderr through cmd so it never trips Stop.
+$existing = cmd /c "pm2 jlist 2>nul"
+$hasImpoc = $false
+if ($existing) {
+    try { $hasImpoc = @($existing | ConvertFrom-Json | Where-Object { $_.name -eq 'impoc' }).Count -gt 0 } catch { $hasImpoc = $false }
+}
+if ($hasImpoc) { cmd /c "pm2 delete impoc >nul 2>&1" | Out-Null }
+cmd /c "pm2 start ecosystem.config.cjs"
 if ($LASTEXITCODE -ne 0) { Pop-Location; Fail 'pm2 start failed. Run "pm2 logs impoc" to see why.' }
-pm2 save --force | Out-Null
+cmd /c "pm2 save --force >nul 2>&1" | Out-Null
 Pop-Location
 Ok 'pm2 process "impoc" running and saved'
 
