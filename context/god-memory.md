@@ -352,3 +352,7 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 - Grid views are re-created via `createGridViews()` / `dropGridViews()` exported from 20260910000002 — COLUMN-AWARE (omits projections for optional columns like stocks.cgst_rate_pct when absent). Every migration that touches a column the views read must use these helpers (R-48 widen + R-51 GST do). NEVER inline `view.sql` in an up/down again: on a fresh DB the views migration runs before later columns exist, and on undo the columns are gone before older downs re-create views.
 - Downs must tolerate current data: 0006 down resets A3/CUSTOM→A4 before re-adding the old CHECK; 0007 down clamps rows/cols to 10; 0001 down no longer narrows barcode to 12 (would truncate). User: system not in production, data loss acceptable — but the fixes stand.
 - Verified: `npm run db:refresh` twice from a consistent state → 55 migrations, 5 views (+GST cols), 4 matviews, admin seeded.
+
+## [2026-09-13 ~22:30Z] R-57 BUILT (awaiting user test) — the Select's `creatable`/`onCreate` row only shows when the query matches NOTHING (cmdk filter is fuzzy + case-insensitive), so an 'existing name' dedupe path is unreachable from the UI. Uncommitted.
+
+## [2026-09-13 ~23:00Z] R-57 CLOSED. Board 144 done / R-52 blocked / R-46, R-47 todo. Pushed context + main.

@@ -935,3 +935,13 @@ R-55 done. Board: 142 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) /
 R-56 done. Board: 143 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Committed + pushed: code on `context` and `main`, docs on `context`. The user's production-deployment work (app.js, .env.example, ecosystem.config.cjs, deploy/, docs/, .env.production, .gitignore) stays uncommitted by their choice.
 
 **db:refresh fix (2026-09-13, no ticket):** `undo:all` failed on three of today's migrations. Grid views are now built by a column-aware `createGridViews()` helper (20260910000002) used by the R-48 and R-51 migrations; rollbacks of 0006/0007/0001 tolerate existing rows. Full refresh verified twice. Rule recorded in god-memory.
+
+---
+
+# R-57 — ADD-UNIT PAGE: INLINE NEW COLOUR / SIZE (2026-09-13, DONE)
+
+**User:** on the scan/add-unit page, add a new colour or size straight from the dropdown; make them searchable. **Search already existed** (the app's cmdk Select filters as you type). **Built:** Colour + Size selects are now `creatable` for users with `picklists.create` — typing a name that matches nothing shows **+ Add colour "…"** / **+ Add size "…"**; picking it creates the picklist item, adds it to the list, selects it and toasts (so the auto-commit fires as usual once both are chosen). No backend change. vitest **413/413**.
+**CLOSED 2026-09-13** (user: push). 
+
+# SHIFT CLOSE #6 (2026-09-13)
+R-57 done. Board: 144 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). All pushed. `main` still lacks the Windows deployment commits (6b6ca91 + 0efe6ed) — user's call.
