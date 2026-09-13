@@ -9,7 +9,7 @@ import { SHOP_NAME } from '../../components/ShopLogo.jsx';
 import { qrLogoSettings } from '../../platform/qrLogo.js';
 import { BORDER_STYLES, getBorderStyle, setBorderStyle } from '../../platform/displayBorderStyle.js';
 
-const DEFAULT_STATE = { status: 'idle', method: null, amountPaise: null, upiUri: null, customerFirstName: null };
+const DEFAULT_STATE = { status: 'idle', method: null, amountPaise: null, upiUri: null, customerFirstName: null, reviewUrl: null };
 
 /**
  * Speaks the R-42c thank-you line via the Web Speech API. No-ops (silently)
@@ -185,7 +185,7 @@ function AwaitingView({ method, amountPaise, upiUri, borderStyle }) {
   );
 }
 
-function ReceivedView({ customerFirstName }) {
+function ReceivedView({ customerFirstName, reviewUrl }) {
   return (
     <motion.div
       key="received"
@@ -207,6 +207,21 @@ function ReceivedView({ customerFirstName }) {
         {customerFirstName ? `Thank you, ${customerFirstName}!` : 'Thank you!'}
       </h1>
       <p className="text-[var(--ink-muted)]">Payment received.</p>
+      {reviewUrl && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="mt-4 flex flex-col items-center gap-3"
+          data-testid="display-review"
+        >
+          <div className="rounded-2xl bg-white p-4 shadow-lg">
+            <QRCodeSVG value={reviewUrl} size={200} level="H" imageSettings={qrLogoSettings(200)} />
+          </div>
+          <p className="max-w-[26rem] text-lg font-semibold text-[var(--ink)]">Loved it? Scan to leave us a Google review</p>
+          <p className="text-sm text-[var(--ink-muted)]">Your words help other shoppers find us.</p>
+        </motion.div>
+      )}
     </motion.div>
   );
 }
@@ -284,7 +299,7 @@ function PosDisplayView({ code }) {
             borderStyle={borderStyle}
           />
         )}
-        {state.status === 'received' && <ReceivedView customerFirstName={state.customerFirstName} />}
+        {state.status === 'received' && <ReceivedView customerFirstName={state.customerFirstName} reviewUrl={state.reviewUrl} />}
         {state.status !== 'awaiting' && state.status !== 'received' && <IdleView />}
       </AnimatePresence>
     </div>

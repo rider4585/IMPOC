@@ -50,6 +50,25 @@ describe('pos-display state store (in-memory)', () => {
     expect(res.write).not.toHaveBeenCalled();
   });
 
+  it('R-54: keeps a received state (review QR) well beyond the old 8s — the reset is only a long safety net', () => {
+    jest.useFakeTimers();
+    try {
+      const res = makeFakeRes();
+      subscribe('CODEHOLD', res);
+      res.write.mockClear();
+      publish('CODEHOLD', { status: 'received', reviewUrl: 'https://example.com/r' });
+      jest.advanceTimersByTime(60 * 1000);
+      expect(res.write).toHaveBeenCalledTimes(1);
+      expect(getState('CODEHOLD').status).toBe('received');
+      expect(__testing.RECEIVED_AUTO_RESET_MS).toBeGreaterThanOrEqual(10 * 60 * 1000);
+      // an explicit idle publish (POS "Close transaction") clears it immediately
+      publish('CODEHOLD', { status: 'idle' });
+      expect(getState('CODEHOLD')).toEqual(IDLE_STATE);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('auto-resets to idle after a received state, on a timer', () => {
     jest.useFakeTimers();
     try {
@@ -142,6 +161,7 @@ describe('POST /api/pos-display/:code (publish)', () => {
       amountPaise: 25000,
       upiUri: 'upi://pay?pa=shop@bank&am=250.00',
       customerFirstName: null,
+      reviewUrl: null,
     });
   });
 
@@ -158,7 +178,25 @@ describe('POST /api/pos-display/:code (publish)', () => {
       amountPaise: null,
       upiUri: null,
       customerFirstName: 'Asha',
+      reviewUrl: null,
     });
+  });
+
+  it('R-54: publishes a received state with an https reviewUrl and rejects non-https / junk', async () => {
+    const ok = await request(app)
+      .post('/api/pos-display/PUBTEST8')
+      .set('Authorization', `Bearer ${salesToken}`)
+      .send({ status: 'received', reviewUrl: 'https://search.google.com/local/writereview?placeid=ChIJabc123' });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.body.data.reviewUrl).toBe('https://search.google.com/local/writereview?placeid=ChIJabc123');
+
+    for (const bad of ['http://example.com/review', 'not a url', 'javascript:alert(1)']) {
+      const res = await request(app)
+        .post('/api/pos-display/PUBTEST8')
+        .set('Authorization', `Bearer ${salesToken}`)
+        .send({ status: 'received', reviewUrl: bad });
+      expect(res.statusCode).toBe(400);
+    }
   });
 
   it('rejects a multi-token customerFirstName', async () => {

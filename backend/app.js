@@ -16,6 +16,7 @@ import customerSourceRoutes from './src/modules/customer-sources/customer-source
 import expenseTypesRoutes from './src/modules/expense-types/expense-type.routes.js';
 import upiAccountsRoutes from './src/modules/upi-accounts/upi-account.routes.js';
 import barcodeLayoutRoutes from './src/modules/barcode-layouts/barcode-layout.routes.js';
+import reviewLinksRoutes from './src/modules/review-links/review-link.routes.js';
 import posDisplayRoutes from './src/modules/pos-display/pos-display.routes.js';
 import vendorsRoutes from './src/modules/vendors/vendor.routes.js';
 import tripRoutes from './src/modules/intake/trip.routes.js';
@@ -84,6 +85,7 @@ app.use('/api/picklists/payment-methods', paymentMethodRoutes);
 app.use('/api/picklists/customer-sources', customerSourceRoutes);
 app.use('/api/picklists/expense-types', expenseTypesRoutes);
 app.use('/api/picklists/upi-accounts', upiAccountsRoutes);
+app.use('/api/picklists/review-links', reviewLinksRoutes);
 app.use('/api/barcode-layouts', barcodeLayoutRoutes);
 app.use('/api/pos-display', posDisplayRoutes);
 app.use('/api/vendors', vendorsRoutes);

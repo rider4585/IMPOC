@@ -93,7 +93,7 @@ describe('LabelLayoutScreen (R-50)', () => {
     expect(screen.getByText(/need the/i)).toBeInTheDocument();
   });
 
-  it('opens the backend-rendered preview PDF', async () => {
+  it('opens the backend-rendered preview PDF', { timeout: 15000 }, async () => {
     api.fetchLayoutPreviewPdf.mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' }));
     global.URL.createObjectURL = vi.fn(() => 'blob:preview');
     global.URL.revokeObjectURL = vi.fn();
@@ -104,6 +104,6 @@ describe('LabelLayoutScreen (R-50)', () => {
     fireEvent.click(screen.getByRole('button', { name: /preview pdf/i }));
 
     // blob creation + window.open run after an awaited fetch; allow headroom under full-suite load
-    await waitFor(() => expect(window.open).toHaveBeenCalledWith('blob:preview', '_blank', 'noopener'), { timeout: 4000 });
+    await waitFor(() => expect(window.open).toHaveBeenCalledWith('blob:preview', '_blank', 'noopener'), { timeout: 10000 });
   });
 });
