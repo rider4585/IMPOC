@@ -11,6 +11,46 @@ import axios from 'axios';
 
 let accessTokenGetter = null;
 
+/**
+ * User-facing wording for failures the server did not (or could not) explain:
+ * the backend is down / unreachable, a proxy answered 502/503/504, or an
+ * unhandled 500. Axios's own text ("Request failed with status code 502",
+ * "Network Error", "timeout of 30000ms exceeded") must never reach the UI.
+ */
+export const SERVER_UNREACHABLE_MESSAGE =
+  'Cannot reach the server. Please check that it is running and try again.';
+export const SERVER_NOT_RESPONDING_MESSAGE =
+  'The server is not responding right now. Please try again in a moment.';
+export const SERVER_ERROR_MESSAGE =
+  'Something went wrong on the server. Please try again.';
+
+/**
+ * Map a transport / 5xx failure to its friendly message; null for anything
+ * the caller should handle itself (4xx bodies, programming errors).
+ */
+export function friendlyServerMessage(error) {
+  if (!error?.isAxiosError) {
+    return null;
+  }
+
+  const status = error.response?.status;
+
+  if (!error.response) {
+    // Connection refused, DNS failure, CORS block, or client-side timeout.
+    return SERVER_UNREACHABLE_MESSAGE;
+  }
+
+  if (status === 502 || status === 503 || status === 504) {
+    return SERVER_NOT_RESPONDING_MESSAGE;
+  }
+
+  if (status >= 500) {
+    return SERVER_ERROR_MESSAGE;
+  }
+
+  return null;
+}
+
 // Optional handler invoked after a successful background refresh so the caller
 // (e.g. AuthProvider) can update its in-memory token state with the new value.
 let tokenRefreshHandler = null;
@@ -170,6 +210,14 @@ apiClient.interceptors.response.use(
           // Clear the refresh promise so the next 401 can start a fresh refresh
           refreshPromise = null;
         });
+    }
+
+    // Replace axios's transport / 5xx wording with something a shop user can act on.
+    // Screens that read err.message directly (and buildError) see the friendly text.
+    const friendly = friendlyServerMessage(error);
+    if (friendly) {
+      error.message = friendly;
+      error.isServerUnavailable = true;
     }
 
     return Promise.reject(error);

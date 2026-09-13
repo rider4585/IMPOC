@@ -82,6 +82,7 @@ export const SAFE_4XX_MESSAGES = Object.freeze([
   'Pages cannot exceed',
   'required geometry setting',
   'Invalid page count',
+  'Layout does not fit',
   // Validation safety nets
   'Request UUID must be a valid UUID',
   'Invalid UUID format',
@@ -121,6 +122,15 @@ export function isSafeClientMessage(message) {
  * @returns {Error} an Error with optional `statusCode` and `errors` properties
  */
 export function buildError(error, fallback) {
+  // Backend down / unreachable / 5xx: apiClient already swapped in the
+  // user-facing wording; never surface a 5xx body or axios's own text.
+  if (error?.isServerUnavailable) {
+    const err = new Error(error.message);
+    err.statusCode = error.response?.status;
+    err.isServerUnavailable = true;
+    return err;
+  }
+
   const responseBody = error?.response?.data;
   if (responseBody?.message) {
     const statusCode = error.response.status;
