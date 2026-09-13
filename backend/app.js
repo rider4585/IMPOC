@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import authRoutes from './src/modules/auth/auth.routes.js';
 import userRoutes from './src/modules/users/user.routes.js';
@@ -103,6 +106,27 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/receipts', receiptRoutes);
+
+/*
+ * Production: serve the built frontend from the same origin as the API, so a
+ * single pm2 process answers http://<host>:<PORT> and no CORS / cookie-domain
+ * setup is needed. Mounted only when the build output exists, so dev (Vite
+ * proxy) and tests are unaffected. Override the folder with FRONTEND_DIST.
+ */
+const frontendDist = process.env.FRONTEND_DIST
+    || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../frontend/dist');
+
+if (fs.existsSync(path.join(frontendDist, 'index.html'))) {
+    app.use(express.static(frontendDist, { index: 'index.html' }));
+
+    // React Router fallback: any non-API GET that is not a file gets index.html.
+    app.get(/^\/(?!api\/).*/, (req, res, next) => {
+        if (req.method !== 'GET' || path.extname(req.path)) {
+            return next();
+        }
+        res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+}
 
 app.use(errorMiddleware);
 

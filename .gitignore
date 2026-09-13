@@ -44,3 +44,8 @@ palace/
 roster-backups/
 hallways.json
 roster.json
+
+# Production laptop (deploy/windows scripts)
+dist.new/
+dist.old/
+backups/
