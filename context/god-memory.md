@@ -273,3 +273,33 @@ User-approved colourful A5 HTML receipt recreating their reference (cream/brown,
 
 ## R-46 + R-47 DEFERRED (2026-09-11)
 User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets immediately. Both stay todo. R-47 now carries the FOSS analysis: recommended Option B = thin build (pg-boss on existing Postgres + Nodemailer + thin REST adapters to WhatsApp Cloud API/SMS gateway, reuse delivery_logs + R-45 branded receipt HTML + tokenized /receipt page); Novu = the heavier full-platform alt (separate service). No FOSS escape for paid WhatsApp/SMS delivery. Awaiting user go + the open decisions before either is dispatched.
+
+## [2026-09-13 ~05:30Z] R-48 DONE — barcode values SHREE+timestamp+counter (done directly, no worker)
+- New Mac setup for the user (Homebrew Postgres 16; DBs IMPOC/IMPOC_test wiped via DROP SCHEMA public, re-migrated 36 migrations + seeded; .env filled; COOKIE_SECURE=false, FRONTEND_ORIGIN still localhost:3000 — set to the LAN URL if phones will open the app). Backend `npm i` blocked on stale Xcode CLT (argon2 'functional' header) — user to reinstall; jest still ran (prebuilt argon2 present).
+- FORMAT LOCK: `SHREE` + 6-char base36 seconds-since-2026-01-01 + 4-char base36 (seq mod 36^4) = 15 chars, uppercase alnum. formatBarcodeValue(seq, nowMs) exported from barcode.service.js; constants BARCODE_FORMAT / BARCODE_MAX_LENGTH(32) in barcode.constants.js. One timestamp per batch.
+- GOTCHA: ALTER COLUMN TYPE on units/sale_lines/rental_lines.barcode fails while v_*_grid views exist → migration 20260913000001 drops/re-creates them via `export const VIEWS` added to 20260910000002-create-grid-views.js. Any future barcode/line column type change must do the same.
+- Validators now max(32) (units regex still ^[A-Z0-9]+$ — scanner output must be uppercase; our values are). Frontend untouched.
+- Verified: jest 725/725, migrate up/undo/up clean, live generate smoke → SHREE0D4N5H000V..0019 in the PDF.
+- OPEN for user: physical scan test at 35mm; raise barcode_width_pt if flaky. Ticket R-48 marked done in tasks.json.
+
+## [2026-09-13 ~06:30Z] R-49 built, IN TEST (user rule: don't mark done until tested + confirmed)
+- BarcodePrintScreen: toasts (useToast; tests need ToastProvider), form always visible, requestKey re-minted per completed request via finishAttempt (lazy useState init — the old useEffect+setState tripped react-hooks/set-state-in-effect). Keep `import React` — vitest uses the classic JSX runtime here even though eslint flags it unused.
+- Generator: label code area is content-driven now; infoBox.minHeight=14 is a floor, not the height. Any future label geometry work: price box = label remainder.
+- Friendly 5xx/transport errors done centrally in apiClient interceptor (isServerUnavailable flag) — no ticket by user choice.
+- Local verification tooling: `.claude/launch.json` (backend/frontend/frontend-http); `frontend/vite.http.config.js` is a TEMP plain-HTTP vite config for the in-app browser (self-signed basic-ssl cert is rejected there) — delete or gitignore, do not commit. PDF eyeballing: pypdfium2+pillow in scratchpad/pylibs (no poppler on this Mac).
+- Uncommitted: R-48, friendly-errors, R-49. User to say when to commit.
+
+## [2026-09-13 ~07:30Z] R-50 built, IN TEST — label layout configurator (single row)
+- GEOMETRY LOCK: barcode-layout.geometry.js (backend) == platform/labelLayout.js (frontend). Change one → change both; tests in tests/barcode-layout.integration.test.js + LabelLayoutScreen.test.jsx pin the historic A4 3×5 numbers (label 173.86×145.70pt).
+- app_settings barcode_* keys are DEAD (generator reads barcode_layouts). Don't seed/patch them for new behaviour; the seed migration + its test stay for history.
+- Test DBs use sync(): no seed row → service findOrCreate(DEFAULT_LAYOUT). Any code path touching the layout must tolerate a missing row the same way.
+- Preview endpoint deliberately renders the SAVED layout only (user saves, then previews) — no draft-in-query to keep the URL simple and idempotency untouched.
+- Browser check blocked on login (I don't type passwords) — user to sign in at http://localhost:5174 (temp HTTP vite) or use their own browser.
+- Open tickets: R-49 (paper test), R-50 (browser test). All uncommitted with R-48 + friendly-error fix.
+
+- REVISION: user wanted no extra tab → configurator embedded on Print labels (toggle). /label-layout route removed; don't re-add a nav item. Corner radius default 0.
+
+## [2026-09-13 ~08:30Z] R-49 + R-50 CLOSED (user-tested: browser + paper, 'working super fine')
+- Also confirms R-48's caveat is moot: the 15-char SHREE code scans at the 35 mm default width.
+- Board: 137 done / 0 doing / 2 todo (R-46 Campaigns, R-47 Receipt delivery — both plan-only on user decisions).
+- Everything from this session is still UNCOMMITTED on `context`; user has not asked to commit. Keep `.claude/launch.json` + `frontend/vite.http.config.js` out of any commit.

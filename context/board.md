@@ -775,3 +775,63 @@ Merged `71d3273` (feat `f86945a`) into framework/md-impoc. Built by `worker-r42-
 
 # SHIFT CLOSE (2026-09-11, god)
 Safe to close. Floor clear (only god; all workers archived), inbox drained, 0 pending spawn requests, working tree clean. HEAD = a0b06f3 (framework/md-impoc). This session shipped: R-35 (POS UPI-QR checkout + public display), R-42 (logo QR + border toggle + spoken thank-you), R-43 (intake colour/size per-unit fix), R-41 closed (scanner, user-accepted), SHREE->Shree rename (d617e06 + a0b06f3), R-44 mobile responsiveness pass (a0b06f3). Board 132 done. OPEN = 3 plan-only tickets parked on user decisions: R-45 (update receipt), R-46 (Campaigns IG/WhatsApp), R-47 (receipt delivery email/WhatsApp/SMS). Nothing in flight.
+
+---
+
+# R-48 — BARCODE VALUES: SHREE + TIMESTAMP + COUNTER (2026-09-13, DONE, built directly in session — no worker)
+
+**Trigger (user):** barcode values were a bare reflection of `barcode_seq` (12 zero-padded digits). Drop/reset the sequence (db wipe, re-migrate) and new labels collide with labels already stuck on stock. User also wants every barcode to start with `shree`.
+
+**Decision (user-approved):** value = `SHREE` + TS6 + CNT4 = **15 chars**, uppercase A–Z0–9 only. Example `SHREE0D4N5H000V`.
+- TS6 = seconds since 2026-01-01T00:00Z, base-36, zero-padded to 6 (fits until ~2094; formatter throws after). One timestamp per generate call.
+- CNT4 = `nextval(barcode_seq) mod 36^4`, base-36, zero-padded to 4 (1,679,616 per second ≫ max batch 10,000).
+- Uniqueness: collision needs same second AND same counter; sequence keeps climbing inside a second; after any reset the timestamp is later than every printed label. Only a backwards clock breaks it (accepted).
+
+**Changes (backend only; frontend had no 12-char assumption):**
+- `barcode.constants.js` → `BARCODE_FORMAT` + `BARCODE_MAX_LENGTH=32`; `barcode.service.js` → exported pure `formatBarcodeValue(seq, nowMs)`, 12-digit cap removed.
+- Migration `20260913000001-widen-barcode-columns` → `units/sale_lines/rental_lines.barcode` VARCHAR(12)→32, `units_barcode_length_check` 1..32. Postgres refuses ALTER TYPE under a view, so it drops the 5 R-32 grid views, widens, re-creates them by importing `VIEWS` (now exported) from `20260910000002-create-grid-views.js`. Down narrows back to 12 (fails by design if R-48 labels exist).
+- Models Unit/SaleLine/RentalLine STRING(32); validators `max(12)`→`max(32)` in units / sales / rental-agreement (×2) / intake stock.
+- Tests: new `tests/barcode.format.test.js` (7), integration 12-digit cases replaced.
+
+**Verified:** backend jest **725/725** (43 suites); `db:migrate` up→undo→up clean on fresh `IMPOC` dev DB; live smoke `GET /api/barcodes/generate?pages=1` → 200 PDF with 15 values `SHREE0D4N5H000V…0019`.
+
+**Caveat for the user to test on paper:** 15 mixed chars ≈ 1.7× the Code128 modules of 12 digits (subset C packs 2 digits/symbol) → thinner bars at the configured 35 mm. If phone scanning gets flaky, raise `barcode_width_pt` in app_settings (try 45–50 mm via the existing test sheet). Layout code untouched. Old 12-digit labels stay valid.
+
+**Environment notes (this Mac, 2026-09-13):** Postgres 16 via Homebrew, DBs `IMPOC` / `IMPOC_test` (owner `postgres`) wiped + re-migrated + seeded; `.env` filled (store address/phone, fresh JWT secrets, `COOKIE_SECURE=false` for home-wifi HTTP). `npm i` in backend needs a working Xcode CLT (`argon2` native build hit `'functional' file not found` → reinstall CLT); frontend needs `--legacy-peer-deps`.
+
+---
+
+# R-49 — PRINT LABELS: NO-REFRESH FLOW + LABEL LAYOUT (2026-09-13, DONE — user-tested)
+
+**Trigger (user):** after one sheet downloaded, the screen had to be refreshed to request another; wanted a normal top-right toast instead of the inline banner and the input always visible. Also: too much empty space under the barcode and a tiny price box.
+
+**Frontend** ([BarcodePrintScreen.jsx](frontend/src/screens/BarcodePrintScreen.jsx)): success → `toast.success('Sheet generated', 'N page(s) downloaded as barcodes.pdf.')`; replay (JSON) → `toast.info('Sheet already generated')`. Form is always rendered. requestKey now a lazy `useState(() => createRequestKey())` and **re-minted after every completed request** (`finishAttempt`) — SEC-M-3 kept: the key is reused only on retry of the same attempt, a new sheet is a new intent. Inline success/replay banners removed; waking + error banners unchanged. Tests wrapped in `ToastProvider`; new test asserts form stays usable and the 2nd request carries a different requestUuid. vitest 362/362.
+
+**Backend** ([barcode.generator.js](backend/src/modules/barcode/barcode.generator.js) `drawLabel`): code area = `paddingTop + barcode.heightPt + textMarginTop + fontSize + paddingBottom` (content-driven, clamped so the info box never drops below its 14pt floor); the divider moves up and the price box takes the whole remainder (~100pt ≈ 35mm on the 3×5 grid). No geometry keys changed. jest barcode suites 33/33; rendered PDF checked visually (tight barcode strip, large empty box).
+
+**Also this session (no ticket, user request):** friendly server-failure messages — [apiClient.js](frontend/src/platform/apiClient.js) `friendlyServerMessage()` rewrites no-response / 502-504 / 5xx axios errors to plain wording ("Cannot reach the server…", "The server is not responding right now…", "Something went wrong on the server…"); `buildError` passes it through; BarcodePrintScreen honours it. 5 tests.
+
+**CLOSED 2026-09-13:** user printed + scanned + re-requested without refresh — confirmed working. (R-48 15-char code scans fine at 35 mm.)
+
+---
+
+# R-50 — BARCODE LABEL CONFIGURATOR (2026-09-13, DONE — user-tested)
+
+**Trigger (user):** one page to configure everything about the label sheet with a preview; persist in a NEW table. **Decision (user): single config, no presets.**
+
+**Data:** `barcode_layouts` (migration `20260913000002`), exactly one row (`CHECK id = 1`), all lengths in **mm** (`DECIMAL(6,2)`), font/border in pt; seeded from today's sheet so output is unchanged until edited. The old `app_settings barcode_*` keys are no longer read by the generator (left in place). New permission `inventory.barcode_layout_manage` (migration `20260913000003`, Admin only).
+
+**Geometry — single source of truth:** `backend/src/modules/barcode-layouts/barcode-layout.geometry.js` (`computeSheetGeometry`, `DEFAULT_LAYOUT`, `PAGE_SIZES_PT`), mirrored 1:1 in `frontend/src/platform/labelLayout.js` so the live preview and the PDF agree. Returns label/barcode/text sizes in pt, `codeAreaHeight` (content-driven, R-49), `infoBox.height` = remainder, and `problems[]` (grid off page / barcode wider than label / label too short).
+
+**Backend:** `GET /api/barcode-layouts` (barcode_generate) — findOrCreate the row; `PUT` (barcode_layout_manage) — zod `.strict()` ranges + geometry fit check → 400 `Layout does not fit: …` (allow-listed both sides). `GET /api/barcodes/preview` (barcode_generate) — one sample page with the SAVED layout, dummy `SHREE000000000N` values, **no sequence draw, no request_keys row**, `Content-Disposition: inline`. `barcode.generator.js` now takes geometry from the layout (page size/orientation from PDFKit point sizes; `generateBarcodePdf(values, tx, layoutOverride)` + `generateSampleSheetPdf`). `barcode.service.js` reads columns/rows from the layout. Obsolete app_settings error-classification test rewritten. jest **732/732**.
+
+**Frontend (revised per user, same day):** NO separate tab — the configurator is a collapsible section on **Print labels** (`/barcode-sheets`) behind a "Configure barcode sheet" link under the form; `LabelLayoutScreen.jsx` is the embedded section. Inputs + Save disabled without `barcode_layout_manage`. Default corner radius 0 mm (user). Form grouped Page / Grid / Label / Barcode / Code text; right column: one-label SVG to scale (fake bars, code text, divider, grey "price / size written by hand"), size read-outs (label, barcode, price-box height, labels per page), page thumbnail of the grid, red fit warning. Buttons: Load defaults / Discard changes / Preview PDF (saved layout, opens tab; download fallback if popup blocked) / Save layout (dirty-gated). `services/barcodeLayoutApi.js`. vitest **369/369**, build OK.
+
+**Verified live:** PUT landscape A4 2×4 45 mm → `GET /api/barcodes/preview` rendered exactly that (eyeballed PNG), barcode_seq untouched; bad layout → 400 with the fit message. Dev row restored to defaults afterwards.
+
+**CLOSED 2026-09-13:** user exercised the embedded configurator (edit → preview → save → PDF) and printed — confirmed working.
+
+---
+
+# SHIFT CLOSE (2026-09-13, claude direct session — no hive workers)
+This session shipped on the `context` branch (ALL UNCOMMITTED, awaiting user's go): R-48 barcode values SHREE+timestamp+counter (+ column widening migration), friendly server-down/5xx wording (no ticket), R-49 Print labels no-refresh flow + label layout, R-50 barcode sheet configurator (single-row `barcode_layouts`, embedded on Print labels, live preview + PDF preview). Backend jest 732/732, frontend vitest 370/370, build clean. Dev DB `IMPOC` wiped + re-migrated (37 migrations) + seeded. OPEN = R-46, R-47 (plan-only, parked on user decisions). Local-only helpers not to commit: `.claude/launch.json`, `frontend/vite.http.config.js`.
