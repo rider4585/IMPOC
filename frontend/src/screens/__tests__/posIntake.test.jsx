@@ -80,8 +80,11 @@ async function checkoutViaPaymentDialog() {
     expect(screen.getByTestId('payment-mark-received')).toBeInTheDocument();
   });
   fireEvent.click(screen.getByTestId('payment-mark-received'));
+  // The "Thank you" step is only on screen for THANK_YOU_DELAY_MS (450 ms) before the
+  // receipt replaces it, so under load a poll can miss it. Wait for the durable
+  // effect instead: the sale was created (the thank-you/receipt follow from that).
   await waitFor(() => {
-    expect(screen.getByTestId('payment-thankyou')).toBeInTheDocument();
+    expect(salesService.createSale).toHaveBeenCalled();
   });
 }
 

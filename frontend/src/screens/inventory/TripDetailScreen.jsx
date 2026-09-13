@@ -25,8 +25,9 @@ import { getVendors, createVendor } from '../../services/vendorsApi.js';
 import { getProductTypes } from '../../services/picklistsApi.js';
 import { formatPaise } from '../../platform/money.js';
 import { parseRupeesToPaise } from '../../platform/moneyInput.js';
+import PhotoCapture from '../../components/PhotoCapture.jsx';
 
-const MAX_RECEIPT_BYTES = 5 * 1024 * 1024; // ~5MB cap for bill receipt images (base64 dataURL)
+const MAX_RECEIPT_BYTES = 5 * 1024 * 1024; // ~5MB cap for bill receipt images (base64 dataURL, post-resize)
 
 export function TripDetailScreen() {
   const { tripUuid } = useParams();
@@ -218,29 +219,6 @@ export function TripDetailScreen() {
   const handleChangeDirection = () => {
     setCreatingNewVendor(false);
     setNewVendor({ name: '', address: '', phone: '' });
-  };
-
-  const handleReceiptFile = (e) => {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
-    setReceiptError('');
-    if (!file.type.startsWith('image/')) {
-      setReceiptError('Please choose an image file.');
-      return;
-    }
-    if (file.size > MAX_RECEIPT_BYTES) {
-      setReceiptError('Receipt image must be 5 MB or smaller.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setVendorForm((f) => ({ ...f, receiptImage: reader.result }));
-      }
-    };
-    reader.onerror = () => setReceiptError('Could not read the image file.');
-    reader.readAsDataURL(file);
   };
 
   const stockByVendorGroups = useMemo(() => {
@@ -675,7 +653,7 @@ export function TripDetailScreen() {
           />
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-[var(--ink)]">Bill receipt image</label>
+            <label className="text-sm font-medium text-[var(--ink)]">Bill receipt photo</label>
             {vendorForm.receiptImage ? (
               <div className="flex items-center gap-3">
                 <img
@@ -695,12 +673,13 @@ export function TripDetailScreen() {
                 <span className="text-xs text-[var(--ink-muted)]">Attached to this vendor&apos;s bill.</span>
               </div>
             ) : (
-              <input
-                type="file"
-                accept="image/*"
-                data-testid="receipt-file-input"
-                className="text-sm text-[var(--ink)] file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-[var(--surface-sunken)] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-[var(--ink)] hover:file:bg-[var(--border-strong)]"
-                onChange={handleReceiptFile}
+              /* R-55: take a photo (any device) or pick one; both go through a review/retake step */
+              <PhotoCapture
+                maxBytes={MAX_RECEIPT_BYTES}
+                onPhoto={(dataUrl) => {
+                  setReceiptError('');
+                  setVendorForm((f) => ({ ...f, receiptImage: dataUrl }));
+                }}
               />
             )}
             {receiptError && (
