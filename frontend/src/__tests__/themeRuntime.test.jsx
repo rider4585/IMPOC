@@ -60,4 +60,28 @@ describe('ThemeProvider runtime attribute sync', () => {
     act(() => api.setColorScheme('light'));
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
+
+  it('R-58: a custom accent sets the primary CSS variables inline and a preset clears them again', () => {
+    render(
+      <ThemeProvider>
+        <Harness />
+      </ThemeProvider>
+    );
+    const root = document.documentElement;
+    act(() => api.setCustomPrimary('#1e90ff'));
+    expect(root.getAttribute('data-primary')).toBe('custom');
+    expect(root.style.getPropertyValue('--primary')).toBe('#1E90FF');
+    expect(root.style.getPropertyValue('--primary-hover')).toBe('#1A7FE0');
+    expect(root.style.getPropertyValue('--primary-foreground')).toBe('#FFFFFF');
+    expect(root.style.getPropertyValue('--focus-ring')).toBe('#1E90FF');
+    const saved = JSON.parse(localStorage.getItem('impoc-theme-settings') || '{}');
+    expect(saved).toMatchObject({ primaryColor: 'custom', customPrimary: '#1E90FF' });
+
+    act(() => api.setCustomPrimary('not-a-colour')); // ignored
+    expect(root.style.getPropertyValue('--primary')).toBe('#1E90FF');
+
+    act(() => api.setPrimaryColor('green'));
+    expect(root.getAttribute('data-primary')).toBe('green');
+    expect(root.style.getPropertyValue('--primary')).toBe('');
+  });
 });

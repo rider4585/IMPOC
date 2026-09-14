@@ -46,6 +46,10 @@ export const PERMISSIONS = Object.freeze({
         MANAGE: 'roles.manage',
     },
 
+    BRANDING: {
+        MANAGE: 'branding.manage',
+    },
+
     CUSTOMERS: {
         VIEW: 'customers.view',
         CREATE: 'customers.create',

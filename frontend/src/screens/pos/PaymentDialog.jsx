@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, Button, Select } from '../../components/ui';
 import { formatPaise } from '../../platform/money.js';
 import { qrLogoSettings } from '../../platform/qrLogo.js';
+import { useBranding } from '../../theme/BrandingProvider.jsx';
 
 /**
  * PaymentDialog (R-35) — the two-step Checkout confirmation.
@@ -29,6 +30,7 @@ export function PaymentDialog({
   displayCode,
   displayUrl,
 }) {
+  const { logoDataUrl } = useBranding();
   const isUpi = paymentMethod === 'UPI';
   const noActiveUpiAccount = isUpi && upiAccounts.length === 0;
 
@@ -107,7 +109,7 @@ export function PaymentDialog({
                   value={upiUri}
                   size={200}
                   level="H"
-                  imageSettings={qrLogoSettings(200)}
+                  imageSettings={qrLogoSettings(200, logoDataUrl)}
                   data-testid="payment-upi-qr"
                 />
                 <p className="text-center text-sm font-medium text-[var(--ink)]">

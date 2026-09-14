@@ -1,6 +1,7 @@
 import React, { useMemo, useRef } from 'react';
 import { Dialog, Button } from '../ui';
 import { buildBrandedReceiptHtml } from '../../platform/brandedReceiptHtml.js';
+import { useBranding } from '../../theme/BrandingProvider.jsx';
 
 /**
  * BrandedReceiptDialog — live preview + print for the colourful A5 branded
@@ -14,7 +15,9 @@ import { buildBrandedReceiptHtml } from '../../platform/brandedReceiptHtml.js';
  */
 export function BrandedReceiptDialog({ open, onClose, receipt, title = 'Branded receipt' }) {
   const iframeRef = useRef(null);
-  const html = useMemo(() => (receipt ? buildBrandedReceiptHtml(receipt) : ''), [receipt]);
+  // R-58: the uploaded shop logo replaces the monogram on the printed receipt
+  const { logoDataUrl } = useBranding();
+  const html = useMemo(() => (receipt ? buildBrandedReceiptHtml(receipt, logoDataUrl ? { logoSrc: logoDataUrl } : {}) : ''), [receipt, logoDataUrl]);
 
   const handlePrint = () => {
     const win = iframeRef.current?.contentWindow;

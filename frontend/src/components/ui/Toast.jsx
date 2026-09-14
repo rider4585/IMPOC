@@ -104,6 +104,15 @@ export function ToastProvider({ children }) {
   );
 }
 
+/**
+ * Like useToast but returns a no-op API outside a ToastProvider — for chrome
+ * that is always mounted (e.g. the theme drawer) and rendered in isolation by tests.
+ */
+const NOOP_TOAST = Object.freeze({ success() {}, error() {}, info() {}, warning() {} });
+export function useOptionalToast() {
+  return useContext(ToastContext) || NOOP_TOAST;
+}
+
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) {

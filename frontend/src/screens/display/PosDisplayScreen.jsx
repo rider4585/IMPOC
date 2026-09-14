@@ -5,7 +5,7 @@ import DigitalPet from '../../components/DigitalPet.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import { getPosDisplayStreamUrl } from '../../platform/posDisplayStream.js';
 import { formatPaise } from '../../platform/money.js';
-import { SHOP_NAME } from '../../components/ShopLogo.jsx';
+import { useBranding } from '../../theme/BrandingProvider.jsx';
 import { qrLogoSettings } from '../../platform/qrLogo.js';
 import { BORDER_STYLES, getBorderStyle, setBorderStyle } from '../../platform/displayBorderStyle.js';
 
@@ -106,9 +106,10 @@ function DisplayCodeEntry() {
     navigate(`/display/${trimmed}`);
   };
 
+  const { shopName } = useBranding();
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-[var(--surface-base)] p-6 text-center">
-      <h1 className="typography-heading text-[var(--ink)]">{SHOP_NAME}</h1>
+      <h1 className="typography-heading text-[var(--ink)]">{shopName}</h1>
       <p className="text-[var(--ink-muted)]">Enter the display code shown at the counter.</p>
       <form onSubmit={submit} className="flex gap-2">
         <input
@@ -131,6 +132,7 @@ function DisplayCodeEntry() {
 }
 
 function IdleView() {
+  const { shopName } = useBranding();
   return (
     <motion.div
       key="idle"
@@ -144,12 +146,13 @@ function IdleView() {
       <div className="flex w-full items-end justify-center" aria-hidden="true">
         <DigitalPet scale={2} />
       </div>
-      <h1 className="typography-heading text-[var(--ink)]">{SHOP_NAME}</h1>
+      <h1 className="typography-heading text-[var(--ink)]">{shopName}</h1>
     </motion.div>
   );
 }
 
 function AwaitingView({ method, amountPaise, upiUri, borderStyle }) {
+  const { logoDataUrl } = useBranding();
   const amount = Number(amountPaise) || 0;
   return (
     <motion.div
@@ -168,7 +171,7 @@ function AwaitingView({ method, amountPaise, upiUri, borderStyle }) {
                 value={upiUri}
                 size={280}
                 level="H"
-                imageSettings={qrLogoSettings(280)}
+                imageSettings={qrLogoSettings(280, logoDataUrl)}
                 data-testid="display-upi-qr"
               />
             </div>
@@ -186,6 +189,7 @@ function AwaitingView({ method, amountPaise, upiUri, borderStyle }) {
 }
 
 function ReceivedView({ customerFirstName, reviewUrl }) {
+  const { logoDataUrl } = useBranding();
   return (
     <motion.div
       key="received"
@@ -216,7 +220,7 @@ function ReceivedView({ customerFirstName, reviewUrl }) {
           data-testid="display-review"
         >
           <div className="rounded-2xl bg-white p-4 shadow-lg">
-            <QRCodeSVG value={reviewUrl} size={200} level="H" imageSettings={qrLogoSettings(200)} />
+            <QRCodeSVG value={reviewUrl} size={200} level="H" imageSettings={qrLogoSettings(200, logoDataUrl)} />
           </div>
           <p className="max-w-[26rem] text-lg font-semibold text-[var(--ink)]">Loved it? Scan to leave us a Google review</p>
           <p className="text-sm text-[var(--ink-muted)]">Your words help other shoppers find us.</p>
