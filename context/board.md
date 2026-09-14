@@ -971,3 +971,13 @@ R-58 done. Board: 145 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) /
 
 # SHIFT CLOSE #8 (2026-09-14)
 R-59 done. Board: 146 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Pushed to `context` + `main`.
+
+---
+
+# R-60 — DURABLE BACKUPS ON THE SHOP LAPTOP (2026-09-14, BUILT — awaiting user run of setup.cmd)
+
+**User:** local DB backup twice a day (times asked at setup, 24h), a manual cloud upload to Google Drive (personal gmail) in date-wise folders, all wired by the setup script; the laptop already ran setup once → strictly additive, idempotent, a failing step must never touch what runs.
+
+**Shape:** everything under `C:\IMPOC-backups\` (outside the repo; `IMPOC_BACKUP_ROOT` overrides). Shared `lib\backup-common.ps1`: verified dumps (`pg_dump -Fc` → `.partial` → `pg_restore --list` → rename), pruning, atomic `last-status.json`, monthly log, rclone lookup. `backup-local.ps1/.cmd` (14-day retention) — registered as two scheduled tasks by setup step 10 (validated `HH:mm,HH:mm` prompt or `-BackupTimes`; StartWhenAvailable; first backup taken immediately). `backup-cloud.ps1/.cmd` — fresh dump → `rclone copy --checksum` to encrypted `gdrive-crypt:YYYY/MM/DD/` + `.env` → `config/`, confirmed with `lsl`, 90-day cloud prune, token-expiry hint. `restore-db.ps1` — pick local/cloud, type-DB-name confirm, safety dump, pm2 stop → drop/create → `pg_restore` → migrate → pm2 start, failure prints the way back. Setup step 11 (`-SkipCloud` to bypass): rclone via winget or zip, Google sign-in (`drive.file` scope), crypt remote with generated password + salt **shown once** and written to `CLOUD-BACKUP-PASSWORD-SAVE-ME.txt`, connection test. Steps 10–11 are try/catch → warnings only, placed after pm2/firewall/startup. `update.ps1` pre-migration dump now uses the helper. Docs §8 rewritten.
+
+**Verified here:** all 7 scripts parse under pwsh 7.6; the helper ran for real against the dev DB (181 KB verified dump, prune, corrupt-file rejection, status/log, no `.partial` leftovers). **Windows-only parts untested locally** (Task Scheduler, rclone install/sign-in) — user re-runs `setup.cmd` on the laptop.

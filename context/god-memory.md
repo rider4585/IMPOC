@@ -366,3 +366,11 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 ## [2026-09-14 ~10:45Z] R-58 CLOSED (user-tested). Board 145 done / R-52 blocked / R-46, R-47 todo. Pushed.
 
 ## [2026-09-14 ~11:45Z] R-59 CLOSED (user-tested). UI note: app inputs/selects are h-9, buttons h-11; to put an Input beside a Button use Input size="lg" (h-11 wins in CSS order) and wrap the Input in the flex child (className goes on the <input>, not its wrapper). Board 146 done. Pushed.
+
+## [2026-09-14 ~12:30Z] R-60 backups BUILT (awaiting laptop run)
+- RULE for deploy scripts: the laptop has run setup once → new setup steps go AFTER the existing ones, wrapped in try/catch → Warn (never Fail), idempotent (Register-ScheduledTask -Force, skip existing rclone remotes). Native tools via `cmd /c "... 2>&1"` under $ErrorActionPreference='Stop' (redirected stderr = terminating error in Windows PowerShell 5.1).
+- Backups live OUTSIDE the repo (C:\IMPOC-backups) so update.ps1's clean-tree check and git never see them.
+- A dump only counts after `pg_restore --list` succeeds; write to .partial then rename.
+- Local pwsh is installed (brew) — parse-check with /tmp/parse.ps1 pattern; smoke-test helpers by shimming `cmd` with sh and prepending Postgres.app's bin (pg_dump version must match the server).
+- Google login token expiry is the one chore: `rclone config reconnect gdrive:`. Crypt password+salt shown once; without them cloud backups are unreadable.
+- Uncommitted: R-60.
