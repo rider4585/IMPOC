@@ -17,8 +17,13 @@
       6. Installs pm2, starts the app, saves the process list.
       7. Opens the Windows Firewall port, sets PostgreSQL to start automatically.
       8. Puts start.cmd in the Startup folder so pm2 + the web page come up on login.
+      9. (R-60) Creates C:\IMPOC-backups and two daily Windows scheduled tasks that
+         take a verified database backup (times asked, 24h format).
+     10. (R-60) Installs rclone and signs in to Google Drive once, so
+         backup-cloud.cmd can upload encrypted copies (skip with -SkipCloud).
 
-    Safe to re-run: every step is idempotent.
+    Safe to re-run: every step is idempotent, and steps 9-10 only ever add;
+    if they fail the app, database, .env, pm2 and firewall are untouched.
 
 .PARAMETER Port
     Port the app listens on. Default 3000.
@@ -28,12 +33,21 @@
 
 .PARAMETER NoBrowser
     Do not register the auto-open of the web page at login (pm2 still starts).
+
+.PARAMETER BackupTimes
+    Two daily local-backup times in 24h HH:mm, e.g. '13:00,18:00'. Asked
+    interactively when omitted.
+
+.PARAMETER SkipCloud
+    Do not install / configure rclone + Google Drive (local backups still run).
 #>
 [CmdletBinding()]
 param(
     [int]$Port = 3000,
     [string]$DbName = 'impoc',
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [string]$BackupTimes,
+    [switch]$SkipCloud
 )
 
 $ErrorActionPreference = 'Stop'
@@ -291,6 +305,148 @@ $lnk.Save()
 Ok "shortcut placed in $startupDir"
 
 # ---------------------------------------------------------------------------
+# 10. Local database backups - twice a day (R-60)
+#     Additive + idempotent. Any failure here is a warning: the app keeps running.
+# ---------------------------------------------------------------------------
+Step 'Local database backups (twice daily)'
+$backupSummary = 'not configured'
+try {
+    . (Join-Path $PSScriptRoot 'lib\backup-common.ps1')
+    $dirs = Initialize-BackupDirs
+    Ok "backup folder $($dirs.root)"
+
+    function Test-Hm([string]$t) { return $t -match '^([01]\d|2[0-3]):[0-5]\d$' }
+    $times = @()
+    if ($BackupTimes) { $times = $BackupTimes -split '\s*,\s*' }
+    while ($times.Count -ne 2 -or ($times | Where-Object { -not (Test-Hm $_) })) {
+        $answer = Read-Host 'Two backup times during shop hours, 24h format, e.g. 13:00,18:00 [default: 13:00,18:00]'
+        if (-not $answer) { $answer = '13:00,18:00' }
+        $times = @($answer -split '\s*,\s*')
+        if ($times.Count -ne 2 -or ($times | Where-Object { -not (Test-Hm $_) })) { Warn 'Please enter exactly two times as HH:mm,HH:mm (24h).' }
+    }
+
+    $backupScript = Join-Path $PSScriptRoot 'backup-local.ps1'
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
+        -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$backupScript`"" `
+        -WorkingDirectory $PSScriptRoot
+    # StartWhenAvailable: a laptop that was off at the scheduled time backs up at the next boot.
+    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30) `
+        -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
+
+    for ($i = 0; $i -lt 2; $i++) {
+        $taskName = "IMPOC database backup $($i + 1)"
+        $trigger = New-ScheduledTaskTrigger -Daily -At $times[$i]
+        # -Force replaces an existing task with the same name (re-runs / new times)
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+        Ok "task '$taskName' at $($times[$i]) daily"
+    }
+
+    # Prove it works right now: one verified backup.
+    Write-Host '    taking a first backup...'
+    cmd /c "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$backupScript`" -Label setup"
+    if ($LASTEXITCODE -eq 0) { Ok 'first backup verified' } else { Warn 'first backup failed - see C:\IMPOC-backups\logs' }
+    $backupSummary = "$($times[0]) and $($times[1]) daily -> $($dirs.local)"
+} catch {
+    Warn "Local backup setup failed: $($_.Exception.Message)"
+    Warn 'The app is unaffected. Fix the cause and re-run setup.cmd, or run backup-local.cmd by hand.'
+}
+
+# ---------------------------------------------------------------------------
+# 11. Cloud backups - rclone + Google Drive, encrypted (R-60)
+#     Optional (-SkipCloud). Needs you at the keyboard once for the Google sign-in.
+# ---------------------------------------------------------------------------
+$cloudSummary = 'skipped'
+if (-not $SkipCloud) {
+    Step 'Cloud backups (rclone + Google Drive)'
+    try {
+        $rclone = Find-Rclone
+        if (-not $rclone) {
+            Write-Host '    installing rclone...'
+            $installed = $false
+            if (Get-Command winget -ErrorAction SilentlyContinue) {
+                cmd /c "winget install --id Rclone.Rclone -e --accept-source-agreements --accept-package-agreements --silent >nul 2>&1"
+                Refresh-Path
+                $rclone = Find-Rclone
+                $installed = [bool]$rclone
+            }
+            if (-not $installed) {
+                # winget missing/blocked: download the official zip into C:\IMPOC\rclone
+                $zip = Join-Path $env:TEMP 'rclone.zip'
+                Invoke-WebRequest -Uri 'https://downloads.rclone.org/rclone-current-windows-amd64.zip' -OutFile $zip -UseBasicParsing
+                $tmpDir = Join-Path $env:TEMP 'rclone-unzip'
+                if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir }
+                Expand-Archive -Path $zip -DestinationPath $tmpDir -Force
+                New-Item -ItemType Directory -Force -Path $script:RcloneInstallDir | Out-Null
+                Get-ChildItem $tmpDir -Recurse -Filter 'rclone.exe' | Select-Object -First 1 |
+                    ForEach-Object { Copy-Item $_.FullName (Join-Path $script:RcloneInstallDir 'rclone.exe') -Force }
+                $rclone = Find-Rclone
+            }
+            if (-not $rclone) { throw 'could not install rclone (no winget and download failed).' }
+        }
+        Ok "rclone at $rclone"
+
+        # Base remote: Google Drive, scope drive.file = rclone can only see files it created.
+        if (Test-RcloneRemote $rclone $script:RcloneBaseRemote) {
+            Ok "Google Drive remote '$($script:RcloneBaseRemote)' already configured"
+        } else {
+            Write-Host ''
+            Write-Host '    A browser window will open: sign in with the shop Google account and click Allow.' -ForegroundColor Yellow
+            Write-Host '    (rclone only gets access to the files it creates, nothing else in your Drive.)' -ForegroundColor Yellow
+            Read-Host '    Press Enter to continue'
+            cmd /c "`"$rclone`" config create $($script:RcloneBaseRemote) drive scope drive.file"
+            if ($LASTEXITCODE -ne 0 -or -not (Test-RcloneRemote $rclone $script:RcloneBaseRemote)) { throw 'Google Drive sign-in did not complete.' }
+            Ok 'signed in to Google Drive'
+        }
+
+        # Encrypted remote on top: names + contents scrambled before upload.
+        $passwordFile = Join-Path $dirs.root 'CLOUD-BACKUP-PASSWORD-SAVE-ME.txt'
+        if (Test-RcloneRemote $rclone $script:RcloneRemote) {
+            Ok "encrypted remote '$($script:RcloneRemote)' already configured"
+        } else {
+            $cryptPassword = New-Secret 24
+            $cryptSalt     = New-Secret 24
+            $obsPw   = (cmd /c "`"$rclone`" obscure `"$cryptPassword`"").Trim()
+            $obsSalt = (cmd /c "`"$rclone`" obscure `"$cryptSalt`"").Trim()
+            cmd /c "`"$rclone`" config create $($script:RcloneRemote) crypt remote `"$($script:RcloneBaseRemote):$($script:RcloneFolder)`" password `"$obsPw`" password2 `"$obsSalt`" >nul"
+            if ($LASTEXITCODE -ne 0 -or -not (Test-RcloneRemote $rclone $script:RcloneRemote)) { throw 'could not create the encrypted remote.' }
+            Write-Utf8NoBom $passwordFile @"
+IMPOC cloud backup encryption - SAVE THIS IN YOUR PASSWORD MANAGER, THEN DELETE THIS FILE.
+Without these two values the backups in Google Drive cannot be read on any other computer.
+
+rclone remote : $($script:RcloneRemote)  (crypt over $($script:RcloneBaseRemote):$($script:RcloneFolder))
+password      : $cryptPassword
+salt          : $cryptSalt
+created       : $(Get-Date -Format 'yyyy-MM-dd HH:mm')
+
+To restore on a fresh laptop: install rclone, sign in to the same Google account
+(rclone config create gdrive drive scope drive.file), then
+rclone config create gdrive-crypt crypt remote gdrive:IMPOC-backups password <password> password2 <salt>
+"@
+            Write-Host ''
+            Write-Host '    ============================================================' -ForegroundColor Magenta
+            Write-Host '    CLOUD BACKUP ENCRYPTION - copy these now, shown only once' -ForegroundColor Magenta
+            Write-Host "    password : $cryptPassword" -ForegroundColor Magenta
+            Write-Host "    salt     : $cryptSalt" -ForegroundColor Magenta
+            Write-Host "    (also written to $passwordFile - delete it once saved)" -ForegroundColor Magenta
+            Write-Host '    ============================================================' -ForegroundColor Magenta
+            Read-Host '    Press Enter after you have saved them'
+        }
+
+        # Connection test: create the folder and list it.
+        cmd /c "`"$rclone`" mkdir `"$($script:RcloneRemote):`" >nul 2>&1"
+        cmd /c "`"$rclone`" lsd `"$($script:RcloneBaseRemote):`" >nul 2>&1"
+        if ($LASTEXITCODE -ne 0) { throw 'Google Drive is configured but a test listing failed (sign-in expired?). Run: rclone config reconnect gdrive:' }
+        Ok "Google Drive folder '$($script:RcloneFolder)' ready (encrypted)"
+        $cloudSummary = "double-click deploy\windows\backup-cloud.cmd  -> Google Drive > $($script:RcloneFolder) > YYYY\MM\DD"
+    } catch {
+        Warn "Cloud backup setup failed: $($_.Exception.Message)"
+        Warn 'Local backups still run. Re-run setup.cmd later to finish the cloud part.'
+        $cloudSummary = 'NOT configured (see warning above)'
+    }
+}
+
+# ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 Write-Host @"
@@ -305,6 +461,10 @@ Write-Host @"
   pm2 status   : pm2 status
   pm2 logs     : pm2 logs impoc
   Restart      : pm2 restart impoc
+
+  Local backups : $backupSummary
+  Cloud backups : $cloudSummary
+  Restore       : .\deploy\windows\restore-db.ps1   (admin PowerShell)
 
   MANUAL STEP - so it starts without anyone touching the laptop:
     1. Turn on automatic sign-in:  run "netplwiz", untick
