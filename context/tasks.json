@@ -1233,7 +1233,7 @@
     {
       "id": "R-61",
       "title": "Barcode scanner zoom: 1x / 2x / 3x presets (default 2x), remembered per device, applied only when the camera supports zoom",
-      "status": "doing",
+      "status": "done",
       "priority": "medium",
       "assignee": "claude (direct, no worker)",
       "origin": "user (2026-09-14)",
@@ -1241,7 +1241,8 @@
         "R-41"
       ],
       "createdAt": "2026-09-14T14:00:00.000Z",
-      "details": "USER: a zoom setting for the scanner camera, default 2x, only if the camera supports (optical/digital) zoom; must NOT ask every time — a configurator with exactly three presets 1x / 2x / 3x, the choice stored in that device's localStorage and used every time a scanner opens.\n\nBUILT 2026-09-14: platform/scannerZoom.js (SCANNER_ZOOM_PRESETS [1,2,3], default 2, key 'impoc-scanner-zoom', load/save with validation). BarcodeScanner: initial zoom = `zoom` prop if given else loadScannerZoom(); on camera start applied via applyConstraints only when getCapabilities().zoom exists, clamped to its min/max; the old +/- stepper replaced by three pill buttons (role=group 'Camera zoom', aria-pressed) — tapping saves the preset and applies it; no capability → no control, no constraint. Same behaviour in POS, add-unit intake and Units-page scanners (shared component). BarcodeScanner.jsx imports React so it renders under vitest. Tests: scannerZoom (1), BarcodeScanner.zoom (4: default+presets, choose→persist→reuse on next open, clamp + junk storage, no-zoom camera). vitest 426/426, build OK. Pending: user tries on the shop phone."
+      "details": "USER: a zoom setting for the scanner camera, default 2x, only if the camera supports (optical/digital) zoom; must NOT ask every time — a configurator with exactly three presets 1x / 2x / 3x, the choice stored in that device's localStorage and used every time a scanner opens.\n\nBUILT 2026-09-14: platform/scannerZoom.js (SCANNER_ZOOM_PRESETS [1,2,3], default 2, key 'impoc-scanner-zoom', load/save with validation). BarcodeScanner: initial zoom = `zoom` prop if given else loadScannerZoom(); on camera start applied via applyConstraints only when getCapabilities().zoom exists, clamped to its min/max; the old +/- stepper replaced by three pill buttons (role=group 'Camera zoom', aria-pressed) — tapping saves the preset and applies it; no capability → no control, no constraint. Same behaviour in POS, add-unit intake and Units-page scanners (shared component). BarcodeScanner.jsx imports React so it renders under vitest. Tests: scannerZoom (1), BarcodeScanner.zoom (4: default+presets, choose→persist→reuse on next open, clamp + junk storage, no-zoom camera). vitest 426/426, build OK. Pending: user tries on the shop phone.\n\nDONE 2026-09-14: user tested on the shop phone — 'working completely fine'.",
+      "completedAt": "2026-09-14T15:00:00.000Z"
     }
   ]
 }

@@ -986,6 +986,7 @@ R-59 done. Board: 146 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) /
 
 ---
 
-# R-61 — SCANNER ZOOM PRESETS 1× / 2× / 3× (2026-09-14, BUILT — awaiting user test)
+# R-61 — SCANNER ZOOM PRESETS 1× / 2× / 3× (2026-09-14, DONE — user-tested)
 
 **User:** default 2× zoom when the camera supports it; never ask each time — three presets only, remembered on the device. **Built:** `platform/scannerZoom.js` (presets `[1,2,3]`, default 2, localStorage `impoc-scanner-zoom`); `BarcodeScanner` reads the stored preset on open, applies it only when `getCapabilities().zoom` exists (clamped), and shows three pill buttons (role group *Camera zoom*) in place of the old ± stepper; a tap saves + applies. No-zoom cameras: no control, no constraint. Shared by POS, intake and Units scanners. vitest **426/426**.
+**CLOSED 2026-09-14:** user tested on device — working. Board: 147 done / 1 doing (R-60 backups, awaiting laptop run) / 1 blocked (R-52) / 2 todo (R-46, R-47).
