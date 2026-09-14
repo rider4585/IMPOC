@@ -62,6 +62,7 @@ import RentalReversalModel from './RentalReversal.js';
 import ExpenseModel from './Expense.js';
 import ExpenseReversalModel from './ExpenseReversal.js';
 import CustomerModel from './Customer.js';
+import CustomerEnquiryModel from './CustomerEnquiry.js';
 import DeliveryLogModel from './DeliveryLog.js';
 
 const User = UserModel(sequelize);
@@ -100,6 +101,7 @@ const RentalReversal = RentalReversalModel(sequelize);
 const Expense = ExpenseModel(sequelize);
 const ExpenseReversal = ExpenseReversalModel(sequelize);
 const Customer = CustomerModel(sequelize);
+const CustomerEnquiry = CustomerEnquiryModel(sequelize);
 const DeliveryLog = DeliveryLogModel(sequelize);
 
 /*
@@ -521,6 +523,17 @@ RentalAgreement.belongsTo(Customer, {
 });
 
 /*
+ * CustomerEnquiry (R-63) ↔ Customer / ProductType / Colour / Size / User
+ */
+Customer.hasMany(CustomerEnquiry, { foreignKey: 'customerId', as: 'enquiries' });
+CustomerEnquiry.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
+CustomerEnquiry.belongsTo(ProductType, { foreignKey: 'productTypeId', as: 'productType' });
+CustomerEnquiry.belongsTo(Colour, { foreignKey: 'colourId', as: 'colour' });
+CustomerEnquiry.belongsTo(Size, { foreignKey: 'sizeId', as: 'size' });
+CustomerEnquiry.belongsTo(User, { foreignKey: 'createdByUserId', as: 'createdBy' });
+CustomerEnquiry.belongsTo(User, { foreignKey: 'closedByUserId', as: 'closedBy' });
+
+/*
  * DeliveryLog (no FK - designed for future WhatsApp/SMTP/SMS integration,
  * entity_id stores the target entity's uuid, not a relational id)
  */
@@ -564,5 +577,6 @@ export {
     Expense,
     ExpenseReversal,
     Customer,
+    CustomerEnquiry,
     DeliveryLog,
 };

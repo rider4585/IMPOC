@@ -31,6 +31,14 @@ export async function initializeTestDatabase() {
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_templates_vendor_product_name ON stock_templates (vendor_id, product_type_id, name) WHERE deleted_at IS NULL'
       );
 
+      // Unique phone / email per live customer (from migration 20260905000003)
+      await db.sequelize.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_phone ON customers (phone) WHERE phone IS NOT NULL AND deleted_at IS NULL'
+      );
+      await db.sequelize.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_email ON customers (email) WHERE email IS NOT NULL AND deleted_at IS NULL'
+      );
+
       // Ensures barcodes are unique across live units (from migration 20260828000001)
       await db.sequelize.query(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_units_barcode_unique ON units (barcode) WHERE deleted_at IS NULL'
@@ -589,6 +597,10 @@ export async function seedTestData() {
     // Delivery permissions
     { name: 'delivery.view', description: 'View delivery logs' },
     { name: 'delivery.create', description: 'Create delivery logs' },
+    // Enquiry permissions (R-63)
+    { name: 'enquiries.view', description: 'View customer enquiries' },
+    { name: 'enquiries.create', description: 'Log customer enquiries' },
+    { name: 'enquiries.update', description: 'Edit, close and reopen customer enquiries' },
   ], { ignoreDuplicates: true });
 
   // Assign permissions to ADMIN role (all permissions)
@@ -598,7 +610,7 @@ export async function seedTestData() {
   // Assign permissions to MANAGER role
   const managerRole = roles[1];
   const managerPermissions = permissions.filter(p =>
-    ['users.view', 'users.update', 'inventory.view', 'inventory.create', 'inventory.update', 'inventory.barcode_generate', 'picklists.view', 'picklists.create', 'picklists.update', 'sales.view', 'sales.create', 'sales.update', 'sales.cancel', 'sales.refund', 'rentals.view', 'rentals.create', 'rentals.update', 'rentals.return', 'rentals.cancel', 'expenses.view', 'expenses.create', 'expenses.update', 'reports.view', 'customers.view', 'customers.create', 'customers.update', 'customers.delete', 'delivery.view', 'delivery.create'].includes(p.name)
+    ['users.view', 'users.update', 'inventory.view', 'inventory.create', 'inventory.update', 'inventory.barcode_generate', 'picklists.view', 'picklists.create', 'picklists.update', 'sales.view', 'sales.create', 'sales.update', 'sales.cancel', 'sales.refund', 'rentals.view', 'rentals.create', 'rentals.update', 'rentals.return', 'rentals.cancel', 'expenses.view', 'expenses.create', 'expenses.update', 'reports.view', 'customers.view', 'customers.create', 'customers.update', 'customers.delete', 'delivery.view', 'delivery.create', 'enquiries.view', 'enquiries.create', 'enquiries.update'].includes(p.name)
   );
   await managerRole.addPermissions(managerPermissions);
 
@@ -612,7 +624,7 @@ export async function seedTestData() {
   // Assign permissions to CASHIER role
   const cashierRole = roles[3];
   const cashierPermissions = permissions.filter(p =>
-    ['inventory.view', 'sales.view', 'sales.create'].includes(p.name)
+    ['inventory.view', 'sales.view', 'sales.create', 'enquiries.view', 'enquiries.create', 'enquiries.update'].includes(p.name)
   );
   await cashierRole.addPermissions(cashierPermissions);
 

@@ -22,6 +22,7 @@ import {
   ShoppingBag,
   Wallet,
   Users,
+  MessageSquareText,
   UserCog,
   KeyRound,
   ListChecks,
@@ -80,6 +81,7 @@ const ICONS = {
   permissions: <ShieldCheck {...iconProps} />,
   picklists: <ListChecks {...iconProps} />,
   customers: <Users {...iconProps} />,
+  enquiries: <MessageSquareText {...iconProps} />,
   dashboardItem: <Layers {...iconProps} />,
   stocks: <Package {...iconProps} />,
   units: <Tags {...iconProps} />,
@@ -104,6 +106,7 @@ const itemIcon = {
   '/permissions': 'permissions',
   '/picklists': 'picklists',
   '/customers': 'customers',
+  '/enquiries': 'enquiries',
   '/dashboard': 'dashboardItem',
 };
 

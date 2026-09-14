@@ -53,8 +53,10 @@ function rethrowUnique(error) {
 
 /**
  * Create a customer. name is required; phone/email are unique when present.
+ * `transaction` lets a caller (R-63 enquiries) create the customer inside
+ * its own unit of work.
  */
-export const createCustomer = async (payload) => {
+export const createCustomer = async (payload, { transaction } = {}) => {
     const customer = await Customer.create({
         name: payload.name,
         phone: payload.phone ?? null,
@@ -69,7 +71,7 @@ export const createCustomer = async (payload) => {
         consentRecordedAt: (payload.consentWhatsapp || payload.consentEmail || payload.consentSms || payload.consentWhatsappGroup)
             ? new Date()
             : null,
-    }).catch(rethrowUnique);
+    }, { transaction }).catch(rethrowUnique);
 
     return mapCustomerDTO(customer);
 };

@@ -37,7 +37,7 @@ describe('navigationSections — grouped, labelled, iconed', () => {
       {}
     );
     expect(sectionItems.inventory).toEqual(['/trips', '/vendors', '/stocks', '/units', '/barcode-sheets']);
-    expect(sectionItems.pos).toEqual(['/pos', '/sales']);
+    expect(sectionItems.pos).toEqual(['/pos', '/sales', '/enquiries']);
     expect(sectionItems.rentals).toEqual(['/rentals']);
     expect(sectionItems.expenses).toEqual(['/expenses']);
     expect(sectionItems.admin).toEqual(['/users', '/roles', '/permissions', '/picklists', '/customers']);

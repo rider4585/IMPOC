@@ -115,6 +115,22 @@ export const UNIT_ROUTES = {
   GET: (uuid) => `/units/${encodeURIComponent(uuid)}`,
 };
 
+// Customer enquiry endpoints (R-63: "do you have X?" requests taken at the counter)
+export const ENQUIRY_ROUTES = {
+  /** GET /enquiries - List enquiries (?status=OPEN|MATCHED|NOTIFIED|CLOSED, ?search=, ?customerUuid=) */
+  LIST: '/enquiries',
+  /** POST /enquiries - Log an enquiry (customerUuid OR inline customer{}) */
+  CREATE: '/enquiries',
+  /** GET /enquiries/{uuid} */
+  GET: (uuid) => `/enquiries/${encodeURIComponent(uuid)}`,
+  /** PATCH /enquiries/{uuid} - Edit the ask */
+  UPDATE: (uuid) => `/enquiries/${encodeURIComponent(uuid)}`,
+  /** POST /enquiries/{uuid}/close - Close with a reason */
+  CLOSE: (uuid) => `/enquiries/${encodeURIComponent(uuid)}/close`,
+  /** POST /enquiries/{uuid}/reopen */
+  REOPEN: (uuid) => `/enquiries/${encodeURIComponent(uuid)}/reopen`,
+};
+
 // Customer endpoints (Schema V2 customers entity with contact + consent)
 export const CUSTOMER_ROUTES = {
   /** GET /customers - List or search customers (?search=phone-or-name-partial) */
