@@ -364,3 +364,5 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 - Uncommitted: R-58 + docs.
 
 ## [2026-09-14 ~10:45Z] R-58 CLOSED (user-tested). Board 145 done / R-52 blocked / R-46, R-47 todo. Pushed.
+
+## [2026-09-14 ~11:45Z] R-59 CLOSED (user-tested). UI note: app inputs/selects are h-9, buttons h-11; to put an Input beside a Button use Input size="lg" (h-11 wins in CSS order) and wrap the Input in the flex child (className goes on the <input>, not its wrapper). Board 146 done. Pushed.

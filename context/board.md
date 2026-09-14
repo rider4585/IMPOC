@@ -961,3 +961,13 @@ R-57 done. Board: 144 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) /
 
 # SHIFT CLOSE #7 (2026-09-14)
 R-58 done. Board: 145 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Committed + pushed: code on `context` and `main`, docs on `context`. `main` still lacks the Windows deployment commits (6b6ca91, 0efe6ed) — user's call.
+
+---
+
+# R-59 — UNITS PAGE: SCAN A BARCODE TO FIND THE UNIT (2026-09-14, DONE — user-tested)
+
+**Scan** button next to the Search box opens the same camera dialog POS uses (R-41 scanner). A detected code closes the dialog, clears the stock filter, drops the barcode into Search (grid filters to it) and toasts *Unit found* / *No unit with this barcode*. No backend change. vitest **421/421**.
+**CLOSED 2026-09-14:** search bar + Scan button sized to match (Input `size="lg"` in a flex-1 wrapper); user tested the camera on device — works.
+
+# SHIFT CLOSE #8 (2026-09-14)
+R-59 done. Board: 146 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Pushed to `context` + `main`.
