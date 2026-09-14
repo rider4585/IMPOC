@@ -4,7 +4,11 @@ import {
   Button,
   Input,
   SearchableSelect,
+  Dialog,
+  useToast,
 } from '../../components/ui';
+import { ScanBarcode } from 'lucide-react';
+import BarcodeScanner from '../../components/BarcodeScanner.jsx';
 import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
@@ -55,6 +59,10 @@ export function UnitsScreen() {
   const [error, setError] = useState('');
 
   const [search, setSearch] = useState('');
+  // R-59: camera scan → search by that barcode
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState('');
+  const toast = useToast();
   const [stockUuid, setStockUuid] = useState(() => readStockUuid(location.search));
 
   const [stocks, setStocks] = useState([]);
@@ -85,13 +93,21 @@ export function UnitsScreen() {
     setError('');
     try {
       const data = await listAllUnits({ search, stockUuid });
-      setUnits(Array.isArray(data) ? data : data?.items || []);
+      const rows = Array.isArray(data) ? data : data?.items || [];
+      setUnits(rows);
+      // R-59: report the outcome of a camera scan once its results are in
+      if (scannedBarcode && search === scannedBarcode) {
+        const hit = rows.find((u) => String(u.barcode).toUpperCase() === scannedBarcode.toUpperCase());
+        if (hit) toast.success({ title: 'Unit found', description: scannedBarcode });
+        else toast.warning({ title: 'No unit with this barcode', description: scannedBarcode });
+        setScannedBarcode('');
+      }
     } catch (err) {
       setError(err.message || 'Failed to load units');
     } finally {
       setLoading(false);
     }
-  }, [search, stockUuid]);
+  }, [search, stockUuid, scannedBarcode, toast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +128,20 @@ export function UnitsScreen() {
   }, []);
 
   const legend = useMemo(() => Object.values(STATUS_META), []);
+
+  const handleScannerDetected = useCallback((value) => {
+    const code = String(value || '').trim().toUpperCase();
+    if (!code) return;
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(40);
+    } catch {
+      /* no haptics */
+    }
+    setScannerOpen(false);
+    setStockUuid('');
+    setScannedBarcode(code);
+    setSearch(code);
+  }, []);
 
   if (!can(PERMISSIONS.INVENTORY.VIEW)) {
     return (
@@ -193,14 +223,33 @@ export function UnitsScreen() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Input
-          type="search"
-          label="Search"
-          placeholder="Search barcode, stock, vendor…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search units"
-        />
+        <div className="flex items-end gap-2">
+          {/* Input's wrapper (label + field) must be the flex child, and the field matches the button's h-11 */}
+          <div className="min-w-0 flex-1">
+            <Input
+              type="search"
+              size="lg"
+              label="Search"
+              placeholder="Search barcode, stock, vendor…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search units"
+            />
+          </div>
+          {/* R-59: find a unit by pointing the camera at its label */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setScannerOpen(true)}
+            aria-label="Scan barcode"
+            title="Scan a barcode to find the unit"
+            data-testid="units-scan"
+            className="h-11 shrink-0 gap-2"
+          >
+            <ScanBarcode className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Scan</span>
+          </Button>
+        </div>
         {stockUuid && (
           <SearchableSelect
             label="Stock"
@@ -235,6 +284,22 @@ export function UnitsScreen() {
       )}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+        <Dialog
+          open={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          title="Scan barcode"
+          footer={
+            <Button variant="outline" onClick={() => setScannerOpen(false)}>
+              Close
+            </Button>
+          }
+        >
+          <div className="relative mx-auto w-full max-w-sm overflow-hidden rounded-lg" style={{ aspectRatio: '3/4', maxHeight: '60vh' }}>
+            {scannerOpen && <BarcodeScanner onDetected={handleScannerDetected} />}
+          </div>
+          <p className="mt-3 text-center text-xs text-[var(--ink-muted)]">Point the camera at a unit's label. The list filters to that barcode.</p>
+        </Dialog>
+
         <DataGrid
           data={units}
           columns={columns}
