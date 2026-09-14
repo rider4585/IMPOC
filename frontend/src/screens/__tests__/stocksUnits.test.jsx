@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { ToastProvider } from '../../components/ui/index.js';
 import * as authModule from '../../auth/useAuth.js';
@@ -16,6 +16,11 @@ vi.mock('../../services/tripsApi.js');
 vi.mock('../../services/vendorsApi.js');
 vi.mock('../../services/picklistsApi.js');
 vi.mock('../../services/unitsApi.js');
+// R-59: the camera scanner is exercised through its onDetected callback
+let lastScannerProps = null;
+vi.mock('../../components/BarcodeScanner.jsx', () => ({
+  default: (props) => { lastScannerProps = props; return <div data-testid="camera-stub" />; },
+}));
 
 import { StocksScreen } from '../inventory/StocksScreen.jsx';
 import { UnitsScreen } from '../inventory/UnitsScreen.jsx';
@@ -346,5 +351,36 @@ describe('UnitsScreen (R-12)', () => {
     expect(screen.getByText('Units boom')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
     await screen.findAllByTestId('unit-row');
+  });
+
+  it('R-59: Scan opens the camera; a detected barcode fills the search, refetches and reports the result', async () => {
+    unitsService.listAllUnits.mockImplementation(async ({ search }) =>
+      search === '8901234567890' ? UNITS.filter((u) => u.barcode === '8901234567890') : search ? [] : UNITS
+    );
+    renderWithToast(
+      <MemoryRouter initialEntries={['/units']}>
+        <Routes>
+          <Route path="/units" element={<UnitsScreen />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(unitsService.listAllUnits).toHaveBeenCalled());
+
+    expect(screen.queryByTestId('camera-stub')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('units-scan'));
+    expect(await screen.findByTestId('camera-stub')).toBeInTheDocument();
+
+    act(() => lastScannerProps.onDetected('8901234567890'));
+
+    await waitFor(() => expect(screen.getByLabelText('Search units')).toHaveValue('8901234567890'));
+    await waitFor(() => expect(unitsService.listAllUnits).toHaveBeenLastCalledWith({ search: '8901234567890', stockUuid: '' }));
+    expect(await screen.findByText(/unit found/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('camera-stub')).not.toBeInTheDocument());
+
+    // unknown barcode -> warning toast
+    fireEvent.click(screen.getByTestId('units-scan'));
+    await screen.findByTestId('camera-stub');
+    act(() => lastScannerProps.onDetected('SHREE0000000999'));
+    expect(await screen.findByText(/no unit with this barcode/i)).toBeInTheDocument();
   });
 });
