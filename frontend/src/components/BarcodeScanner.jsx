@@ -16,18 +16,25 @@ import React, {
 } from 'react';
 
 import '../BarcodeScanner.css';
+import {
+    SCANNER_ZOOM_PRESETS,
+    SCANNER_ZOOM_DEFAULT,
+    loadScannerZoom,
+    saveScannerZoom,
+} from '../platform/scannerZoom.js';
 
 const SCAN_PAUSE_DURATION = 5;
 
 /*
- * Default zoom level. 2x makes a 15-char Code128 label fill more of the
- * frame at counter distance; it is only applied when the camera reports a
- * zoom capability (optical or digital) and is clamped to its range.
- * Callers can override with the `zoom` prop.
+ * Zoom: three presets (1x / 2x / 3x), default 2x. The choice is remembered
+ * per device (localStorage) and used every time a scanner opens - the
+ * operator is never asked again. Only applied when the camera reports a
+ * zoom capability (optical or digital), clamped to its range. The `zoom`
+ * prop, when given, overrides the stored preference for that instance.
  */
-const DEFAULT_ZOOM = 2;
+const DEFAULT_ZOOM = SCANNER_ZOOM_DEFAULT;
 
-function BarcodeScanner({ onDetected, onError, zoom: requestedZoom = DEFAULT_ZOOM }) {
+function BarcodeScanner({ onDetected, onError, zoom: requestedZoom }) {
     const videoRef = useRef(null);
     const streamRef = useRef(null);
 
@@ -104,10 +111,10 @@ function BarcodeScanner({ onDetected, onError, zoom: requestedZoom = DEFAULT_ZOO
      */
 
     const [zoom, setZoom] =
-        useState(
+        useState(() =>
             typeof requestedZoom === 'number' && requestedZoom > 0
                 ? requestedZoom
-                : DEFAULT_ZOOM
+                : loadScannerZoom()
         );
 
     /*
@@ -123,7 +130,6 @@ function BarcodeScanner({ onDetected, onError, zoom: requestedZoom = DEFAULT_ZOO
      * Zoom delta applied by the floating
      * stepper controls.
      */
-    const ZOOM_STEP = 0.5;
 
     /*
      * Torch state.
@@ -342,7 +348,15 @@ function BarcodeScanner({ onDetected, onError, zoom: requestedZoom = DEFAULT_ZOO
      * ---------------------------------------------------------
      */
 
-    const changeZoom = async (delta) => {
+    const selectZoom = async (preset) => {
+        if (!SCANNER_ZOOM_PRESETS.includes(preset)) {
+            return;
+        }
+
+        // Remember the choice on this device even if the camera can't apply it right now.
+        saveScannerZoom(preset);
+        setZoom(preset);
+
         const stream =
             streamRef.current;
 
@@ -360,29 +374,18 @@ function BarcodeScanner({ onDetected, onError, zoom: requestedZoom = DEFAULT_ZOO
             return;
         }
 
-        const current =
-            typeof zoom === 'number'
-                ? zoom
-                : DEFAULT_ZOOM;
-
-        const nextZoom = Math.min(
+        const applied = Math.min(
             Math.max(
-                current + delta,
+                preset,
                 zoomRange.min
             ),
             zoomRange.max
         );
 
-        if (nextZoom === current) {
-            return;
-        }
-
         try {
             await track.applyConstraints({
-                advanced: [{ zoom: nextZoom }],
+                advanced: [{ zoom: applied }],
             });
-
-            setZoom(nextZoom);
         } catch (zoomError) {
             console.error(
                 'Unable to change zoom:',
@@ -1173,36 +1176,26 @@ function BarcodeScanner({ onDetected, onError, zoom: requestedZoom = DEFAULT_ZOO
                         />
 
                         {zoomRange && (
-                            <div className="scanner-zoom">
-                                <button
-                                    type="button"
-                                    className="scanner-zoom-button"
-                                    onClick={() =>
-                                        changeZoom(
-                                            -ZOOM_STEP
-                                        )
-                                    }
-                                    aria-label="Zoom out"
-                                >
-                                    −
-                                </button>
-
-                                <span className="scanner-zoom-value">
-                                    {zoom}×
-                                </span>
-
-                                <button
-                                    type="button"
-                                    className="scanner-zoom-button"
-                                    onClick={() =>
-                                        changeZoom(
-                                            ZOOM_STEP
-                                        )
-                                    }
-                                    aria-label="Zoom in"
-                                >
-                                    +
-                                </button>
+                            <div
+                                className="scanner-zoom"
+                                role="group"
+                                aria-label="Camera zoom"
+                            >
+                                {SCANNER_ZOOM_PRESETS.map((preset) => (
+                                    <button
+                                        key={preset}
+                                        type="button"
+                                        className={
+                                            'scanner-zoom-preset' +
+                                            (zoom === preset ? ' is-active' : '')
+                                        }
+                                        aria-pressed={zoom === preset}
+                                        aria-label={`Zoom ${preset}x`}
+                                        onClick={() => selectZoom(preset)}
+                                    >
+                                        {preset}×
+                                    </button>
+                                ))}
                             </div>
                         )}
 
