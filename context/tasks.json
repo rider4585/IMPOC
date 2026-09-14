@@ -1028,19 +1028,19 @@
     },
     {
       "id": "R-46",
-      "title": "Campaigns module: Instagram + WhatsApp publishing & broadcast + insights",
+      "title": "Instagram publishing module: posts + stories + insights (narrowed 2026-09-14; WhatsApp part moved to R-62)",
       "status": "todo",
       "priority": "medium",
       "assignee": null,
       "origin": "user (2026-09-11)",
       "deps": [],
       "createdAt": "2026-09-11T02:14:13.308Z",
-      "details": "PLAN ONLY -- do not start; scope + accounts + 3 open decisions must close first. Origin: user 2026-09-11.\n\nGOAL: a Campaigns module to (a) publish posts + stories to Instagram, (b) send offers/sales messages to WhatsApp, and (c) show insights on how each post/story/message performs.\n\nFEASIBILITY (verified vs 2026 Meta docs + provider info):\n- Instagram feed posts / carousel / Reels: FEASIBLE via Instagram Content Publishing API (3-step container: create media container from a PUBLIC media URL -> poll ready -> publish). Rate limit ~100 API posts / rolling 24h per account.\n- Instagram Stories: FEASIBLE via the same Content Publishing API (stories supported since 2023).\n- Instagram insights (per media: reach/impressions/likes/comments/saves/shares; stories: reach/impressions/exits/replies/taps fwd-back; account-level): FEASIBLE via Graph API Insights.\n- WhatsApp offers/sales one-to-many to customers: FEASIBLE via the OFFICIAL WhatsApp Cloud API using approved MARKETING message templates to OPTED-IN customers. Billed per DELIVERED message (marketing templates have no volume discount; priced by recipient country). Aligns with our existing consent flags + delivery_logs table.\n- WhatsApp message insights (sent/delivered/read + aggregates): FEASIBLE via status webhooks + WhatsApp Business analytics.\n- NOT POSSIBLE OFFICIALLY (must be called out to the user): \"stories/posts on WhatsApp\" = WhatsApp Status has NO API. \"WhatsApp broadcast CHANNELS\" has NO official Meta API -- only unofficial 3rd-party providers (Whapi.Cloud, Maytapi, WAHA) that run a reverse-engineered WhatsApp client, against WhatsApp ToS, with real risk of the business number being BANNED. Recommendation: do NOT put the primary number on that. The compliant \"broadcast\" is Cloud API marketing templates to opted-in customers (above).\n\nWHAT WE NEED (Meta approvals are the long pole -- days to weeks, human-driven):\nAccounts/verification: Meta Business Account + Business Verification; Facebook Page + Instagram Professional account linked; Meta Developer App with Instagram + WhatsApp products; App Review for permissions (instagram_business_content_publish, instagram insights, pages_show_list, pages_read_engagement, business_management -- note old instagram_basic/instagram_content_publish deprecated Jan 2025); WhatsApp Business Account (WABA) + a DEDICATED phone number not already used in the WhatsApp app + payment method + pre-approved templates; long-lived/system-user tokens + secure secret storage + refresh handling.\nInfra on our side: PUBLIC media hosting (IG fetches media from a public URL) -- S3/Cloudinary/own bucket; a PUBLIC HTTPS webhook endpoint for Meta callbacks (we have tunnels.json for dev); a scheduler/job queue for scheduled posts + insights polling.\n\nPROPOSED ARCHITECTURE (Express/Sequelize/Postgres + React):\n- Data model: Campaign (name, objective, status draft/scheduled/publishing/live/done) -> CampaignPost (one row per channel: instagram_feed | instagram_story | whatsapp_template; payload, scheduledAt, externalId, status) -> CampaignMetric (metric_type, value, fetched_at snapshots for trends); CampaignAsset (media); WhatsApp recipient list drawn from customers with whatsapp consent. Reuse delivery_logs for WhatsApp sends.\n- Provider-adapter layer: one interface (publish(post), fetchInsights(post)) with InstagramAdapter (Graph API) + WhatsAppAdapter (Cloud API + webhook). Isolates Meta specifics; a future BSP swap (Twilio/360dialog) = one adapter.\n- Insights ingestion: IG = scheduled poll of Graph Insights; WhatsApp = webhook for status + analytics API for aggregates; store snapshots in CampaignMetric.\n- Frontend: Campaigns section (list via our DataGrid), a composer (pick channels, upload media, write caption/template, schedule), an insights dashboard (reuse reports/chart patterns).\n- Compliance: WhatsApp marketing only to whatsapp-consented customers; opt-out handling; template-approval workflow.\n\nSUGGESTED PHASING:\n- Phase 0: accounts + verification + app review (gates everything; start early).\n- Phase 1: Instagram posts + stories + insights (cleanest official path).\n- Phase 2: WhatsApp marketing broadcast to opted-in customers + delivery/read insights.\n- Channels: decide separately; official only if/when Meta ships a Channels API, else unofficial-with-ban-risk (not recommended).\n\nCOST NOTE: IG publishing is free but rate-limited (100/24h). WhatsApp marketing is an ongoing per-delivered-message cost, priced by country, no volume discount.\n\nOPEN DECISIONS (needed before this can move):\n1) WhatsApp scope: accept the OFFICIAL Cloud API path (opt-in, paid per message, no Status, no Channels)? Or is Channels a hard requirement (only via risky unofficial tools)?\n2) Which accounts already exist (Meta Business, Instagram Professional, WABA)? Changes the timeline.\n3) Instagram: both posts + stories? Which insight metrics matter most (reach/impressions/saves/replies/link clicks)?\n\nSOURCES: getphyllo.com Instagram API guide 2026; postproxy.dev post-to-instagram-via-api 2026; whapi.cloud whatsapp-channel-api-automation; messagecentral.com whatsapp-business-api-complete-guide; blueticks.co whatsapp marketing pricing 2026.\n"
+      "details": "NARROWED 2026-09-14: WhatsApp broadcast/marketing now lives in the R-62 Communication platform (R-62h campaigns via wa.me hand-off now, R-62k Cloud API later). This ticket keeps only Instagram feed/story publishing + insights. Still PLAN ONLY, still needs the Meta accounts/app review. Original analysis follows.\n\nPLAN ONLY -- do not start; scope + accounts + 3 open decisions must close first. Origin: user 2026-09-11.\n\nGOAL: a Campaigns module to (a) publish posts + stories to Instagram, (b) send offers/sales messages to WhatsApp, and (c) show insights on how each post/story/message performs.\n\nFEASIBILITY (verified vs 2026 Meta docs + provider info):\n- Instagram feed posts / carousel / Reels: FEASIBLE via Instagram Content Publishing API (3-step container: create media container from a PUBLIC media URL -> poll ready -> publish). Rate limit ~100 API posts / rolling 24h per account.\n- Instagram Stories: FEASIBLE via the same Content Publishing API (stories supported since 2023).\n- Instagram insights (per media: reach/impressions/likes/comments/saves/shares; stories: reach/impressions/exits/replies/taps fwd-back; account-level): FEASIBLE via Graph API Insights.\n- WhatsApp offers/sales one-to-many to customers: FEASIBLE via the OFFICIAL WhatsApp Cloud API using approved MARKETING message templates to OPTED-IN customers. Billed per DELIVERED message (marketing templates have no volume discount; priced by recipient country). Aligns with our existing consent flags + delivery_logs table.\n- WhatsApp message insights (sent/delivered/read + aggregates): FEASIBLE via status webhooks + WhatsApp Business analytics.\n- NOT POSSIBLE OFFICIALLY (must be called out to the user): \"stories/posts on WhatsApp\" = WhatsApp Status has NO API. \"WhatsApp broadcast CHANNELS\" has NO official Meta API -- only unofficial 3rd-party providers (Whapi.Cloud, Maytapi, WAHA) that run a reverse-engineered WhatsApp client, against WhatsApp ToS, with real risk of the business number being BANNED. Recommendation: do NOT put the primary number on that. The compliant \"broadcast\" is Cloud API marketing templates to opted-in customers (above).\n\nWHAT WE NEED (Meta approvals are the long pole -- days to weeks, human-driven):\nAccounts/verification: Meta Business Account + Business Verification; Facebook Page + Instagram Professional account linked; Meta Developer App with Instagram + WhatsApp products; App Review for permissions (instagram_business_content_publish, instagram insights, pages_show_list, pages_read_engagement, business_management -- note old instagram_basic/instagram_content_publish deprecated Jan 2025); WhatsApp Business Account (WABA) + a DEDICATED phone number not already used in the WhatsApp app + payment method + pre-approved templates; long-lived/system-user tokens + secure secret storage + refresh handling.\nInfra on our side: PUBLIC media hosting (IG fetches media from a public URL) -- S3/Cloudinary/own bucket; a PUBLIC HTTPS webhook endpoint for Meta callbacks (we have tunnels.json for dev); a scheduler/job queue for scheduled posts + insights polling.\n\nPROPOSED ARCHITECTURE (Express/Sequelize/Postgres + React):\n- Data model: Campaign (name, objective, status draft/scheduled/publishing/live/done) -> CampaignPost (one row per channel: instagram_feed | instagram_story | whatsapp_template; payload, scheduledAt, externalId, status) -> CampaignMetric (metric_type, value, fetched_at snapshots for trends); CampaignAsset (media); WhatsApp recipient list drawn from customers with whatsapp consent. Reuse delivery_logs for WhatsApp sends.\n- Provider-adapter layer: one interface (publish(post), fetchInsights(post)) with InstagramAdapter (Graph API) + WhatsAppAdapter (Cloud API + webhook). Isolates Meta specifics; a future BSP swap (Twilio/360dialog) = one adapter.\n- Insights ingestion: IG = scheduled poll of Graph Insights; WhatsApp = webhook for status + analytics API for aggregates; store snapshots in CampaignMetric.\n- Frontend: Campaigns section (list via our DataGrid), a composer (pick channels, upload media, write caption/template, schedule), an insights dashboard (reuse reports/chart patterns).\n- Compliance: WhatsApp marketing only to whatsapp-consented customers; opt-out handling; template-approval workflow.\n\nSUGGESTED PHASING:\n- Phase 0: accounts + verification + app review (gates everything; start early).\n- Phase 1: Instagram posts + stories + insights (cleanest official path).\n- Phase 2: WhatsApp marketing broadcast to opted-in customers + delivery/read insights.\n- Channels: decide separately; official only if/when Meta ships a Channels API, else unofficial-with-ban-risk (not recommended).\n\nCOST NOTE: IG publishing is free but rate-limited (100/24h). WhatsApp marketing is an ongoing per-delivered-message cost, priced by country, no volume discount.\n\nOPEN DECISIONS (needed before this can move):\n1) WhatsApp scope: accept the OFFICIAL Cloud API path (opt-in, paid per message, no Status, no Channels)? Or is Channels a hard requirement (only via risky unofficial tools)?\n2) Which accounts already exist (Meta Business, Instagram Professional, WABA)? Changes the timeline.\n3) Instagram: both posts + stories? Which insight metrics matter most (reach/impressions/saves/replies/link clicks)?\n\nSOURCES: getphyllo.com Instagram API guide 2026; postproxy.dev post-to-instagram-via-api 2026; whapi.cloud whatsapp-channel-api-automation; messagecentral.com whatsapp-business-api-complete-guide; blueticks.co whatsapp marketing pricing 2026.\n"
     },
     {
       "id": "R-47",
-      "title": "Receipt delivery module: send receipt at checkout via email / WhatsApp / SMS (consent-gated)",
-      "status": "todo",
+      "title": "Receipt delivery module — FOLDED INTO R-62e (2026-09-14)",
+      "status": "done",
       "priority": "high",
       "assignee": null,
       "origin": "user (2026-09-11)",
@@ -1048,7 +1048,8 @@
         "R-45"
       ],
       "createdAt": "2026-09-11T02:27:59.909Z",
-      "details": "PLAN ONLY -- do not start; 5 open decisions must close first. Origin: user 2026-09-11. Priority: HIGH -- user calls this the next most important module. Soft-depends R-45 (receipt content) + shares WhatsApp infra with R-46.\n\nGOAL: at checkout, automatically send the receipt to the customer on the channels they are subscribed to -- EMAIL, WHATSAPP, and MOBILE NUMBER (SMS).\n\nSTRONG REUSE (system was designed for this in Schema V2): delivery_logs table already exists (channel, status, provider ids, receipt_payload JSONB) = the send ledger; receipt renderer already emits a self-contained DIGITAL payload \"for future WhatsApp/email/SMS\" + 58/80mm text (GET /api/receipts/preview|print); customers table carries email/phone + CONSENT flags (email/whatsapp/sms). This module mainly WIRES real providers into that skeleton.\n\nPER CHANNEL (feasibility + needs, verified vs 2026 provider/Meta info):\n- EMAIL (lowest friction, Phase 1): HTML receipt + optional PDF attachment. Provider = SMTP (nodemailer) or transactional API (SES / SendGrid / Postmark / Resend). Needs a verified sending domain (SPF/DKIM). No regulatory gate.\n- WHATSAPP (Phase 2, shares R-46 setup): receipts are UTILITY messages -> approved UTILITY template (cheaper than marketing) with a link or a PDF DOCUMENT header. Needs WhatsApp Business Account (WABA) + number + approved template + customer opt-in (we store whatsapp consent). Billed per delivered message (utility rate). Use the OFFICIAL WhatsApp Cloud API (NOT unofficial channel tools).\n- SMS / mobile number (Phase 3, highest friction): 160 chars can't hold a receipt -> send a short line + a LINK to a hosted receipt page. Provider = Twilio / MSG91 / Gupshup etc. INDIA CATCH: SMS requires DLT registration (sender ID + template registered with the telecom regulator) before sending -- a real approval gate.\n\nARCHITECTURE:\n1. ASYNC dispatch at checkout -- do NOT block the sale. After the sale commits, enqueue one delivery job per channel the customer is BOTH opted into AND has contact info for. Checkout returns instantly; a slow/down provider must never fail checkout.\n2. Provider-adapter layer: EmailAdapter, WhatsAppAdapter (shared with R-46), SmsAdapter behind one send(receiptPayload, recipient) interface.\n3. delivery_logs as the ledger (already exists): record each attempt + status transitions queued->sent->delivered->failed via provider webhooks; retry failures with backoff.\n4. Public hosted receipt page: a tokenized /receipt/:token route (reuse R-35 public-route-split so it renders outside RouteGuard/AppShell) so SMS/WhatsApp/email can link to a real receipt. Token must be unguessable + optionally expiring; exposes only that one receipt, no PII beyond the receipt itself.\n5. Idempotency: key each send to sale + channel so a checkout retry (sales already carry requestUuid) never double-sends.\n6. Optional PDF renderer (server-side html->pdf) for email attachment / WhatsApp document, if we attach rather than link.\n\nINFRA NEEDED: email provider/SMTP + verified domain; WhatsApp WABA + number + approved utility template (same account as R-46); SMS provider + India DLT registration; a JOB QUEUE (BullMQ/pg-boss) for async + retries; a PUBLIC HTTPS webhook for delivery-status callbacks (tunnels.json exists for dev); secure secret storage; optional PDF renderer.\n\nFRONTEND: receipt/checkout screen shows which channels will send (based on consent + contact) and their live status; a delivery-status view (reuse delivery_logs); possibly a manual \"resend\" action; if cashier-choice is chosen (decision 1), channel checkboxes on the receipt screen.\n\nSUGGESTED PHASING:\n- Phase 1: EMAIL + hosted tokenized receipt page + async queue + delivery_logs status tracking + resend. (No regulatory gate -> ships soonest.)\n- Phase 2: WHATSAPP receipt (utility template) -- gated on WABA setup (shared with R-46).\n- Phase 3: SMS -- gated on provider + India DLT registration.\n\nRELATIONSHIP: R-45 (update receipt) = the content this sends, so settle receipt content first (soft dep). R-46 (Campaigns) shares the WhatsApp/WABA setup + provider-adapter pattern -- build the WhatsApp adapter once, reuse for both. delivery_logs + consent already exist from Schema V2 (T-18).\n\nOPEN DECISIONS (needed before this can move):\n1) Auto-send at checkout on every consented channel, OR let the cashier pick channels on the receipt screen?\n2) Format: link to a hosted receipt page, PDF attachment, or both? (email can PDF; SMS/WhatsApp best as a link or WhatsApp document.)\n3) SMS: include now (needs India DLT registration) or defer to Phase 3?\n4) Providers: any preference (email provider, SMS provider) or leave to us?\n5) Accounts already in hand (email sending domain, WABA)? -- affects timeline.\n\nSOURCES (from R-46 research): messagecentral.com whatsapp-business-api-complete-guide 2026; blueticks.co whatsapp pricing 2026 (utility vs marketing categories); getphyllo.com / postproxy.dev (Meta Graph/Cloud API).\n | FOSS-vs-scratch ANALYSIS (god, 2026-09-11): sending is NOT free for 2/3 channels -- WhatsApp compliant send = Meta Cloud API (paid + WABA; FOSS whatsapp-web.js is the unofficial reverse-engineered client = ban risk, avoid), SMS = paid gateway + India DLT; only EMAIL is near-free (Nodemailer MIT + free/cheap provider SES/Brevo/Resend). Orchestration layer = the real build-vs-adopt: Option A adopt Novu (MIT open-core, self-host, 60+ providers, multi-channel, but a SEPARATE service w/ own infra + ops = heavy for a single-shop POS); Option B (RECOMMENDED) build thin ourselves with small FOSS libs -- pg-boss (MIT, Postgres-backed queue on our EXISTING Postgres, no Redis, retries/backoff built in) + Nodemailer + thin REST adapters for WhatsApp Cloud API + SMS, reusing existing delivery_logs + R-45 branded receipt HTML + a tokenized /receipt/:token page. Recommendation Option B (Novu only if a full notification center is later wanted). DEFERRED by user 2026-09-11 (not planning immediately). Still needs the 5 open decisions + approach pick (A/B) before dispatch."
+      "details": "CLOSED 2026-09-14 as superseded: the user decided invoices auto-send on consented channels through the new Communication platform (epic R-62). Email = real send via SMTP; WhatsApp = wa.me hand-off for now (no public URL, so no hosted receipt page, no PDF yet -> R-62m/R-62n). Open decisions 1-5 answered in R-62 epic. Original analysis kept below for reference.\n\nPLAN ONLY -- do not start; 5 open decisions must close first. Origin: user 2026-09-11. Priority: HIGH -- user calls this the next most important module. Soft-depends R-45 (receipt content) + shares WhatsApp infra with R-46.\n\nGOAL: at checkout, automatically send the receipt to the customer on the channels they are subscribed to -- EMAIL, WHATSAPP, and MOBILE NUMBER (SMS).\n\nSTRONG REUSE (system was designed for this in Schema V2): delivery_logs table already exists (channel, status, provider ids, receipt_payload JSONB) = the send ledger; receipt renderer already emits a self-contained DIGITAL payload \"for future WhatsApp/email/SMS\" + 58/80mm text (GET /api/receipts/preview|print); customers table carries email/phone + CONSENT flags (email/whatsapp/sms). This module mainly WIRES real providers into that skeleton.\n\nPER CHANNEL (feasibility + needs, verified vs 2026 provider/Meta info):\n- EMAIL (lowest friction, Phase 1): HTML receipt + optional PDF attachment. Provider = SMTP (nodemailer) or transactional API (SES / SendGrid / Postmark / Resend). Needs a verified sending domain (SPF/DKIM). No regulatory gate.\n- WHATSAPP (Phase 2, shares R-46 setup): receipts are UTILITY messages -> approved UTILITY template (cheaper than marketing) with a link or a PDF DOCUMENT header. Needs WhatsApp Business Account (WABA) + number + approved template + customer opt-in (we store whatsapp consent). Billed per delivered message (utility rate). Use the OFFICIAL WhatsApp Cloud API (NOT unofficial channel tools).\n- SMS / mobile number (Phase 3, highest friction): 160 chars can't hold a receipt -> send a short line + a LINK to a hosted receipt page. Provider = Twilio / MSG91 / Gupshup etc. INDIA CATCH: SMS requires DLT registration (sender ID + template registered with the telecom regulator) before sending -- a real approval gate.\n\nARCHITECTURE:\n1. ASYNC dispatch at checkout -- do NOT block the sale. After the sale commits, enqueue one delivery job per channel the customer is BOTH opted into AND has contact info for. Checkout returns instantly; a slow/down provider must never fail checkout.\n2. Provider-adapter layer: EmailAdapter, WhatsAppAdapter (shared with R-46), SmsAdapter behind one send(receiptPayload, recipient) interface.\n3. delivery_logs as the ledger (already exists): record each attempt + status transitions queued->sent->delivered->failed via provider webhooks; retry failures with backoff.\n4. Public hosted receipt page: a tokenized /receipt/:token route (reuse R-35 public-route-split so it renders outside RouteGuard/AppShell) so SMS/WhatsApp/email can link to a real receipt. Token must be unguessable + optionally expiring; exposes only that one receipt, no PII beyond the receipt itself.\n5. Idempotency: key each send to sale + channel so a checkout retry (sales already carry requestUuid) never double-sends.\n6. Optional PDF renderer (server-side html->pdf) for email attachment / WhatsApp document, if we attach rather than link.\n\nINFRA NEEDED: email provider/SMTP + verified domain; WhatsApp WABA + number + approved utility template (same account as R-46); SMS provider + India DLT registration; a JOB QUEUE (BullMQ/pg-boss) for async + retries; a PUBLIC HTTPS webhook for delivery-status callbacks (tunnels.json exists for dev); secure secret storage; optional PDF renderer.\n\nFRONTEND: receipt/checkout screen shows which channels will send (based on consent + contact) and their live status; a delivery-status view (reuse delivery_logs); possibly a manual \"resend\" action; if cashier-choice is chosen (decision 1), channel checkboxes on the receipt screen.\n\nSUGGESTED PHASING:\n- Phase 1: EMAIL + hosted tokenized receipt page + async queue + delivery_logs status tracking + resend. (No regulatory gate -> ships soonest.)\n- Phase 2: WHATSAPP receipt (utility template) -- gated on WABA setup (shared with R-46).\n- Phase 3: SMS -- gated on provider + India DLT registration.\n\nRELATIONSHIP: R-45 (update receipt) = the content this sends, so settle receipt content first (soft dep). R-46 (Campaigns) shares the WhatsApp/WABA setup + provider-adapter pattern -- build the WhatsApp adapter once, reuse for both. delivery_logs + consent already exist from Schema V2 (T-18).\n\nOPEN DECISIONS (needed before this can move):\n1) Auto-send at checkout on every consented channel, OR let the cashier pick channels on the receipt screen?\n2) Format: link to a hosted receipt page, PDF attachment, or both? (email can PDF; SMS/WhatsApp best as a link or WhatsApp document.)\n3) SMS: include now (needs India DLT registration) or defer to Phase 3?\n4) Providers: any preference (email provider, SMS provider) or leave to us?\n5) Accounts already in hand (email sending domain, WABA)? -- affects timeline.\n\nSOURCES (from R-46 research): messagecentral.com whatsapp-business-api-complete-guide 2026; blueticks.co whatsapp pricing 2026 (utility vs marketing categories); getphyllo.com / postproxy.dev (Meta Graph/Cloud API).\n | FOSS-vs-scratch ANALYSIS (god, 2026-09-11): sending is NOT free for 2/3 channels -- WhatsApp compliant send = Meta Cloud API (paid + WABA; FOSS whatsapp-web.js is the unofficial reverse-engineered client = ban risk, avoid), SMS = paid gateway + India DLT; only EMAIL is near-free (Nodemailer MIT + free/cheap provider SES/Brevo/Resend). Orchestration layer = the real build-vs-adopt: Option A adopt Novu (MIT open-core, self-host, 60+ providers, multi-channel, but a SEPARATE service w/ own infra + ops = heavy for a single-shop POS); Option B (RECOMMENDED) build thin ourselves with small FOSS libs -- pg-boss (MIT, Postgres-backed queue on our EXISTING Postgres, no Redis, retries/backoff built in) + Nodemailer + thin REST adapters for WhatsApp Cloud API + SMS, reusing existing delivery_logs + R-45 branded receipt HTML + a tokenized /receipt/:token page. Recommendation Option B (Novu only if a full notification center is later wanted). DEFERRED by user 2026-09-11 (not planning immediately). Still needs the 5 open decisions + approach pick (A/B) before dispatch.",
+      "completedAt": "2026-09-14T16:30:00.000Z"
     },
     {
       "id": "R-48",
@@ -1243,6 +1244,245 @@
       "createdAt": "2026-09-14T14:00:00.000Z",
       "details": "USER: a zoom setting for the scanner camera, default 2x, only if the camera supports (optical/digital) zoom; must NOT ask every time — a configurator with exactly three presets 1x / 2x / 3x, the choice stored in that device's localStorage and used every time a scanner opens.\n\nBUILT 2026-09-14: platform/scannerZoom.js (SCANNER_ZOOM_PRESETS [1,2,3], default 2, key 'impoc-scanner-zoom', load/save with validation). BarcodeScanner: initial zoom = `zoom` prop if given else loadScannerZoom(); on camera start applied via applyConstraints only when getCapabilities().zoom exists, clamped to its min/max; the old +/- stepper replaced by three pill buttons (role=group 'Camera zoom', aria-pressed) — tapping saves the preset and applies it; no capability → no control, no constraint. Same behaviour in POS, add-unit intake and Units-page scanners (shared component). BarcodeScanner.jsx imports React so it renders under vitest. Tests: scannerZoom (1), BarcodeScanner.zoom (4: default+presets, choose→persist→reuse on next open, clamp + junk storage, no-zoom camera). vitest 426/426, build OK. Pending: user tries on the shop phone.\n\nDONE 2026-09-14: user tested on the shop phone — 'working completely fine'.",
       "completedAt": "2026-09-14T15:00:00.000Z"
+    },
+    {
+      "id": "R-62",
+      "title": "Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later): templates, engine, invoice send, birthday programme, stock alerts, campaigns",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "origin": "user (2026-09-14, Communication & Campaign spec)",
+      "deps": [
+        "R-45"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "EPIC. Design doc: docs/COMMUNICATION_PLATFORM.md (read it first). Spec from user 2026-09-14: one platform for ALL customer messages (invoices, birthday offer + wish, stock-availability alerts, festival/new-collection campaigns), provider-replaceable, A/B-ready, AI-ready later.\n\nDECISIONS (user 2026-09-14): (1) epic R-62 + lettered sub-tickets; R-47 folded into R-62e; R-46 narrowed to Instagram publishing. (2) First channels = WhatsApp via wa.me click-to-chat (hand-off: system prepares text, staff taps Open WhatsApp and presses send) AND email (real send via SMTP), built together; SMS later. (3) Invoice auto-sends on every consented channel with contact info; WhatsApp shows the hand-off button on the POS close screen. (4) NO public URL: laptop stays LAN-only (internet out only) -> no links in messages, no webhooks, no hosted receipt page; status stops at SENT/HANDOFF.\n\nARCHITECTURE: business code calls ONE function enqueue(); rows go into delivery_logs (extended = the ledger AND the queue); an in-process worker polls (FOR UPDATE SKIP LOCKED) and sends through a provider chosen by env (COMM_EMAIL_PROVIDER=smtp, COMM_WHATSAPP_PROVIDER=wame|cloud, COMM_SMS_PROVIDER=none|msg91). Provider contract returns {kind:'sent'} or {kind:'handoff', url}. Daily scheduler (Asia/Kolkata, catch-up on late boot, idempotent via dedupe_key) drives birthdays + campaign steps. pg-boss considered and rejected (ledger row is the job).\n\nPHASES: 1 = R-62a..g + i (platform, templates, engine, messages screen, invoice, birthday, stock alerts, preferences). 2 = R-62h campaigns + R-62j analytics. Later = R-62k WhatsApp Cloud API, R-62l SMS, R-62m PDF attachment, R-62n public receipt page + tunnel.\n\nORDER: a -> b -> c -> d -> e (first user-visible win: invoice on email + wa.me) -> f -> g -> i -> h -> j.\n\nUSER 2026-09-15: (1) Brevo account created -> email provider = Brevo SMTP. (2) Birthday wishes ALWAYS send (not an ad) - only do_not_contact blocks them; marketing opt-out does not. (3) Build the Customer Enquiry module first as its own ticket R-63 (a new Enquiries tab + table; creating an enquiry creates/picks the customer). R-62g now = auto-match + Notify on top of R-63.",
+      "humanQA": [
+        {
+          "q": "**Which mailbox should IMPOC send email from?**\n\nNeeded before R-62c can be tested end-to-end (SMTP host, user, password go in `backend/.env`).\n\n1. Brevo free plan (300 mails/day, needs a sender address you own)\n2. Gmail with an app password (simplest; ~500/day cap)\n3. Something else",
+          "askedAt": "2026-09-14T16:30:00.000Z",
+          "a": "Brevo — account created (2026-09-15). SMTP creds to go in backend/.env when R-62c starts.",
+          "answeredAt": "2026-09-15T05:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "R-62a",
+      "title": "Comm foundation: migrations (comm_templates, delivery_logs extension, customers prefs, stock_inquiries, comm_campaigns/steps), models, permissions, settings keys",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-45"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Migrations (ESM export style; rollback must work with db:refresh): (1) comm_templates (key+channel unique, category, subject, body, variables JSONB, is_active, is_system, archived_at, version). (2) ALTER delivery_logs: customer_id FK, template_key, template_version, category, campaign_id, campaign_step_id, variant_key, recipient, rendered_subject, rendered_body, scheduled_for, attempts, last_error, next_attempt_at, handoff_url, dedupe_key (unique partial), handed_off_at, confirmed_by_user_id; status check widened to QUEUED/SENDING/SENT/FAILED/HANDOFF/SKIPPED/CANCELLED/DELIVERED/READ; indexes (status,scheduled_for), (customer_id,created_at), (campaign_id). (3) customers: preferred_channel, marketing_opt_out_at, do_not_contact. (4) stock_inquiries. (5) comm_campaigns + comm_campaign_steps. (6) seed permissions comm.view, comm.send, comm.templates.manage, comm.campaigns.manage, comm.settings.manage (ADMIN+MANAGER; comm.send also CASHIER-type roles) following 20260905000008 pattern. (7) seed system templates (invoice, birthday_wish, birthday_offer, stock_available) for EMAIL + WHATSAPP with the spec's sample wording. Sequelize models + associations (Customer.hasMany DeliveryLog). Settings defaults in app-settings (comm.* keys, see design doc §3.6). Tests: migration up/down, model round-trip, dedupe_key uniqueness."
+    },
+    {
+      "id": "R-62b",
+      "title": "Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}}, preview) + Templates admin screen",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62a"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Backend src/modules/comm/templates.service.js: list/get/create/update/duplicate/archive/activate; render(templateKey, channel, variables) -> {subject, body}: {{var}} substitution, HTML-escape variables for EMAIL, leave template body trusted; missing variable -> render error listing the names; version++ on body/subject edit. System templates (is_system) cannot be deleted. Routes under /api/comm/templates (comm.templates.manage for writes, comm.view for reads) + POST /api/comm/templates/:uuid/preview with sample variables. Frontend: Admin -> Templates screen (DataGrid by category/channel, form dialog with subject/body, variables chips you can click to insert, live preview pane, Duplicate/Archive/Activate actions). Tests: render escaping, missing vars, duplicate naming, permissions."
+    },
+    {
+      "id": "R-62c",
+      "title": "Notification engine + provider layer: enqueue(), worker poller, retries, scheduler tick, providers email.smtp (nodemailer) + whatsapp.wame (hand-off) + none",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62a",
+        "R-62b"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "engine/enqueue.js: the single entry point (see design doc §4): resolve customer -> channels = requested ∩ consent ∩ has contact − opt-out (marketing categories) − do_not_contact; normalise phone to E.164 (10 digits -> +comm.whatsapp.default_country_code); write one delivery_logs row per channel (QUEUED or SKIPPED with reason); honour dedupe_key (ON CONFLICT DO NOTHING -> return existing). engine/worker.js: setInterval 20s, FOR UPDATE SKIP LOCKED LIMIT 20, render -> provider.send -> SENT | HANDOFF(handoff_url) | FAILED; retry 3x (1m/10m/1h) when ProviderError.retryable; runOnce() exported for tests; disabled when NODE_ENV=test or COMM_WORKER=off; started from server.js after DB ready. engine/scheduler.js: hourly tick, runs 'daily jobs' once per Asia/Kolkata day (marker in app_settings comm.last_daily_run); job registry so R-62f/R-62h plug in. providers/: index.js picks by env; email.smtp.js via nodemailer (add dep) with SMTP_HOST/PORT/USER/PASS, from = comm.email.from_name <SMTP_FROM>; whatsapp.wame.js builds https://wa.me/<E164>?text=<encoded> and returns {kind:'handoff', url}; *.none.js -> SKIPPED 'provider not configured'. Global kill switch comm.enabled. REST: POST /api/comm/messages/:uuid/confirm-handoff (-> SENT, handed_off_at, confirmed_by), /undo-handoff (-> HANDOFF), /retry, /resend (clones row with new dedupe suffix). Tests: enqueue consent matrix, dedupe, worker runOnce with fake providers (sent/handoff/retryable/fatal), scheduler catch-up + once-per-day, phone normalisation. HUMAN: SMTP creds (see epic humanQA)."
+    },
+    {
+      "id": "R-62d",
+      "title": "Messages screen (WhatsApp hand-off queue with Open WhatsApp, queued/sent/failed/skipped tabs, retry/resend) + Communication tab on customer profile",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Frontend: new nav item Messages (comm.view). Tabs: To send on WhatsApp (rows in HANDOFF: customer, recipient, preview, Open WhatsApp button -> window.open(handoff_url) then POST confirm-handoff -> SENT; toast with Didn't send -> undo-handoff), Queued (scheduled_for), Sent, Failed (last_error, Retry), Skipped (reason). Badge count of HANDOFF rows in the nav. Customer profile (CustomersScreen): Communication tab = GET /api/comm/messages?customerUuid= newest first, filter by category/channel. Backend: GET /api/comm/messages list with filters + pagination (MAX_PAGE_SIZE), DTO excludes rendered_body in list, includes in detail. Mobile layout check (R-44 rules, min-h-0). Tests: vitest for hand-off flow + undo, backend list filters."
+    },
+    {
+      "id": "R-62e",
+      "title": "Invoice communication: auto-enqueue receipt after sale/rental commit (email = branded HTML inline; WhatsApp = short text template + hand-off on POS close screen); resend from sale screen. Supersedes R-47",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c",
+        "R-62d"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "After createSale / createRental commit (NOT inside the tx; after-commit hook or right after tx resolves), call enqueue({templateKey:'invoice', entity:{SALE|RENTAL, uuid}, customerId, variables from buildReceipt payload, dedupeKey invoice:<TYPE>:<uuid>:<CHANNEL>}). Email body = buildReceiptHtml output embedded (template wraps it; subject 'Your SHREE receipt {{invoice_number}}'). WhatsApp body = invoice text template (number, date, N items, total ₹, thank you) - keep short for wa.me. POS PaymentDialog / close-transaction step: after Close transaction poll GET /api/comm/messages?entityUuid= and show chips: Email sent / WhatsApp: Open WhatsApp (hand-off inline, confirm on click) / Skipped: no consent; never block closing. Sale + rental detail screens: Send again button (channels picker). Cancel/refund: optional invoice_cancelled template (system, inactive by default). Idempotent on checkout retry via dedupe_key. Tests: backend enqueue on sale, no enqueue when comm.enabled=false, dedupe on retry; vitest for POS chips + hand-off."
+    },
+    {
+      "id": "R-62f",
+      "title": "Birthday programme: daily job (offer N days before, wish on the day), settings page (on/off, days before, validity, offer text, channels), due-soon preview",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Scheduler job 'birthday' (registered in R-62c scheduler): at comm.send_hour Asia/Kolkata select customers with dob where (month,day) == today + days_before -> enqueue birthday_offer (variables customer_name, offer_text, valid_till = today+days_before+validity); (month,day)==today -> enqueue birthday_wish (mention offer only if an offer row exists this year). 29 Feb handled as 28 Feb in non-leap years. dedupe_key birthday_offer:<customer>:<year>:<CHANNEL> etc. Category RELATIONSHIP (respects marketing opt-out? NO - relationship messages are sent unless do_not_contact; document this). Admin -> Birthday programme screen (comm.settings.manage): toggle, days before, validity days, offer text, channels checkboxes, 'Due in next 14 days' list with customer + channel readiness (missing dob/consent shown as hints), 'Sent this year' counter. Manual 'Send now' per customer for the odd case. Tests: date maths incl. leap year and year boundary, idempotency, catch-up after late boot."
+    },
+    {
+      "id": "R-62g",
+      "title": "Enquiry \"available\" message through the real engine: route closeEnquiry(notify) via enqueue() + stock_available template; optional intake hint \"N open enquiries asked for this product type\"",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-63",
+        "R-62c",
+        "R-62d"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "DEPENDS ON R-63 + R-62c. User decision 2026-09-15: enquiries are closed manually only — NO auto-matching / auto-notify (a customer must never get \"it is available\" months later by accident). This ticket: (1) replace the R-63 hand-off links with enqueue({templateKey:'stock_available'}) so email really sends and WhatsApp goes through the Messages queue (or Cloud API later); (2) optional, low priority: on the add-unit / intake page show a hint \"3 open enquiries mention <product type>\" linking to the Enquiries tab filtered by that type (uses idx_customer_enquiries_open_product_type). Tests: notify path enqueues one row per channel with the enquiry variables; hint count."
+    },
+    {
+      "id": "R-62h",
+      "title": "Campaigns: CRUD/clone/pause/resume/cancel, audience segments with live count, multi-step schedule, materialise sends at each step, variants (A/B hook)",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c",
+        "R-62d",
+        "R-62b"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Backend comm/campaigns: comm_campaigns + steps; segments (all, purchased, high_value {minPaise, months}, birthday_month, inactive {days}, new {days}) as one SQL builder with count(); status machine DRAFT->SCHEDULED->RUNNING->DONE, PAUSED/CANCELLED; scheduler job 'campaign-steps' materialises delivery_logs rows per customer x channel at step.send_at with campaign_id/step_id/variant_key (weighted pick); PAUSED -> worker skips rows whose campaign is paused; CANCELLED -> rows CANCELLED. Marketing category -> respects marketing_opt_out. Frontend: Campaigns screen (list, status chips, counts), composer (name, category, template per channel, audience picker with live count, steps list of dates e.g. 15/7/3/0 days before an event with a 'generate from event date' helper, variants section collapsed by default), actions Clone/Pause/Resume/Cancel, per-campaign message counts by status. WhatsApp campaign sends land in the hand-off queue (R-62d) until R-62k. Tests: segment SQL counts, step materialisation idempotent, pause/resume/cancel effects, variant weighting."
+    },
+    {
+      "id": "R-62i",
+      "title": "Customer communication preferences: preferred channel, marketing opt-out, do-not-contact on the customer form + consent hints",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62a"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "CustomerFormDialog: Preferred channel select, Marketing opt-out toggle (records marketing_opt_out_at), Do not contact toggle with confirm; show hints 'WhatsApp needs a phone' / 'Email needs an address' next to consent boxes. customers.validation + service accept the new fields. Customers grid: small icons for consented channels. Engine (R-62c recipients.js) already reads these columns - this ticket is the UI + validation. Tests: form submit shape, engine skips on opt-out/do_not_contact (backend)."
+    },
+    {
+      "id": "R-62j",
+      "title": "Communication analytics (phase 2): counts per campaign / template / channel / variant, birthday programme stats, simple dashboard cards",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62h",
+        "R-62f"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "GET /api/comm/stats?from&to&groupBy=campaign|template|channel|variant -> queued/sent/handoff/failed/skipped counts + rates; birthday: offers/wishes sent per year, customers with dob vs without. Frontend: Messages -> Stats tab or Reports section cards (reuse reports chart patterns). Open/click/conversion/revenue-attribution need links or webhooks -> later, keep columns free. Tests: SQL aggregates."
+    },
+    {
+      "id": "R-62k",
+      "title": "LATER: WhatsApp Cloud API provider (whatsapp.cloud.js) + status webhooks; swap from wa.me by env only",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c",
+        "R-62n"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Needs: Meta Business + WABA + dedicated number + approved UTILITY (invoice, stock) and MARKETING (campaign) templates + a public webhook URL (R-62n). Provider maps our template keys to Meta template names + components; webhook updates SENT->DELIVERED->READ on delivery_logs by provider_message_id. Paid per delivered message. See R-46 research for accounts/approvals timeline."
+    },
+    {
+      "id": "R-62l",
+      "title": "LATER: SMS provider (MSG91 or similar) + India DLT registration; sms.msg91.js",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Needs DLT sender ID + registered templates before any send. Text only, 160 chars: invoice = one line + amount; birthday = short wish. Provider returns providerMessageId; status webhook optional (needs R-62n)."
+    },
+    {
+      "id": "R-62m",
+      "title": "LATER: PDF receipt attachment on invoice email (pdfkit already a dependency)",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62e"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Render the branded receipt to PDF server-side (pdfkit or html->pdf), attach to the invoice email; store nothing, regenerate on resend. Also usable as a WhatsApp document once R-62k exists."
+    },
+    {
+      "id": "R-62n",
+      "title": "LATER: public receipt page /r/:token + Cloudflare tunnel from the shop laptop (exposes only /r/* and /webhooks/*)",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62e"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "User decision 2026-09-14: not now; the system stays LAN-only. When wanted: cloudflared as a Windows service in setup.ps1 (additive step), tokenised unguessable receipt route rendered outside RouteGuard (reuse the R-35 public-route split), expiring tokens, links in WhatsApp/SMS/email, unsubscribe link for marketing email, provider webhooks."
+    },
+    {
+      "id": "R-63",
+      "title": "Customer Enquiry module: Enquiries tab (Open / Closed), customer_enquiries table, log an enquiry = pick or create the customer + what they want; close = \"it's available — tell the customer\" (tap-to-send WhatsApp / email / SMS) or \"close quietly\"",
+      "status": "done",
+      "priority": "high",
+      "assignee": "claude (direct, no worker)",
+      "origin": "user (2026-09-15)",
+      "deps": [
+        "R-62"
+      ],
+      "createdAt": "2026-09-15T05:00:00.000Z",
+      "details": "USER: \"we need a new tab where we note down the customer enquiries; one migration because we introduce a table; creating an enquiry is basically creating a new customer with the enquiry details.\" First building block of the stock-availability feature (R-62g adds matching + notify later).\n\nSCOPE: migration 20260915000001 creates customer_enquiries (uuid, customer_id FK, product_type_id/colour_id/size_id nullable FKs, description NOT NULL, notes, promised_date DATEONLY, status OPEN|MATCHED|NOTIFIED|CLOSED (CHECK), matched_stock_id/matched_at/notified_at reserved for R-62g, closed_at/closed_reason (FULFILLED|NOT_AVAILABLE|CUSTOMER_DROPPED|OTHER)/closed_note/closed_by_user_id, created_by_user_id, soft delete, indexes (status, created_at), (customer_id), partial (product_type_id) WHERE status='OPEN'); migration 20260915000002 seeds enquiries.view / enquiries.create / enquiries.update (ADMIN, MANAGER, CASHIER). Backend module src/modules/enquiries: POST /api/enquiries accepts customerUuid OR an inline customer {name, phone, email, dob, consent*} (created in the same transaction; duplicate phone/email -> 409 so staff picks the existing one), GET list ?status&search (customer name/phone/description) with counts per status, GET :uuid, PATCH :uuid, POST :uuid/close {reason, note}, POST :uuid/reopen. Frontend: nav item Enquiries under POS / Counter (/enquiries), EnquiriesScreen with tabs Open / Closed + search + DataGrid (customer + phone, wanted = type · colour · size + description, promised date with Overdue badge, taken by, age, Edit / Close), EnquiryFormDialog = CustomerPicker (search or inline create - reuses the existing picker) + product type / colour / size Selects + description + notes + promised date; CloseEnquiryDialog with reason + note; enquiriesApi.js + routes + permission constants. Tests: backend (create with new customer, create with existing, 409 on duplicate phone, list filters + counts, close/reopen, permissions), vitest (screen list + tabs, form submit shape, close flow), navigation test updated.\n\nNOT in scope (flagged): a separate WhatsApp number on the customer (customers has one phone + consent_whatsapp); POS 'log enquiry' shortcut; matching/notify (R-62g).\n\nBUILT 2026-09-15 (awaiting user test): migrations 20260915000001 (customer_enquiries + CHECKs + indexes) and 20260915000002 (enquiries.view/create/update -> ADMIN, MANAGER, CASHIER), model CustomerEnquiry + associations; module src/modules/enquiries (validation/service/controller/routes) mounted at /api/enquiries; customers.service createCustomer now accepts { transaction } so the inline customer is created in the enquiry's transaction (duplicate phone/email -> 409, nothing saved). Frontend: ENQUIRY_ROUTES, PERMISSIONS.ENQUIRIES, services/enquiriesApi.js, screens/enquiries/{EnquiriesScreen,EnquiryFormDialog,CloseEnquiryDialog}.jsx, nav item 'Enquiries' under POS / Counter (icon MessageSquareText). Tests: jest tests/enquiries (11) + test-setup now builds the customers phone/email partial unique indexes (they were missing, so the 409 path was never exercised) + CASHIER permission assertions in auth.test updated; vitest enquiriesScreen (8) + navigation expectation. jest 764/764 (sales suite flaked once under parallel contention, green alone), vitest 434/434, build OK. Migrations applied on impoc_dev.\n\nREWORKED 2026-09-15 after user feedback: enquiries close MANUALLY only, with exactly two outcomes — (a) \"It's available — tell the customer\": server builds the message (enquiries.notify.js, shop name from branding, first name, \"Saree Red (free text)\"), checks consent + contact per chosen channel (400 'Cannot reach the customer on WHATSAPP: No consent' otherwise), writes one delivery_logs row per channel (entity_type ENQUIRY, provider 'handoff', status SENT) and returns tap-to-send links: wa.me / mailto: / sms:; the dialog then shows one 'Open WhatsApp / Open email / Open SMS' button per link + Done. (b) \"Close quietly\": nothing sent. NO other close reasons (bought / not interested are not recorded — user: \"we will not save any other details\"). No auto-matching. Schema simplified: status OPEN|CLOSED, closed_reason NOTIFIED|NOT_NOTIFIED, notified_at + notified_channels; matched_* columns dropped (migration rewritten in place, re-applied on impoc_dev). DTO carries channelReadiness {WHATSAPP,EMAIL,SMS: {ok, reason}} so the dialog pre-ticks reachable channels and explains blocked ones; if none reachable the dialog defaults to quiet close. src/utils/phone.js toE164Digits (10-digit -> 91…) is the shared normaliser for R-62c. error.middleware allow-list gained the enquiry messages. Tests: jest enquiries 14 + phone 2 -> 769/769; vitest enquiriesScreen 10 -> 436/436; build OK.\n\nWHEN R-62c LANDS: closeEnquiry() calls enqueue() with template 'stock_available' instead of building links; the dialog's hand-off step becomes the Messages queue (R-62d). Screen contract unchanged.\n\nDONE 2026-09-15: user tested (log enquiry, close with tell-the-customer -> WhatsApp opened with the message) — \"working\".",
+      "completedAt": "2026-09-15T07:00:00.000Z"
     }
   ]
 }

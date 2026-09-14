@@ -231,7 +231,8 @@ Human tested after R-16 integrated and reported 3 UI bugs:
 
 # ADD-STOCK 400 (Phase R-V5 --- human-reported API error, 2026-09-06)
 
-Human reported: adding stock fails with \POST /api/trips/:tripUuid/stocks 400 (Bad Request)\ in the console (fired from tripsApi.js:176). The \eportAllChanges startTime\ TypeError in the same console is unrelated web-vitals noise.
+Human reported: adding stock fails with \POST /api/trips/:tripUuid/stocks 400 (Bad Request)\ in the console (fired from tripsApi.js:176). The \
+eportAllChanges startTime\ TypeError in the same console is unrelated web-vitals noise.
 
 ## Root cause (god, verified live against :3000)
 Backend zod \createStockSchema\ (backend/src/modules/intake/stock.validation.js:4-8) **requires \	ripUuid\ in the request BODY**. But frontend \createStock(tripUuid, payload)\ (frontend/src/services/tripsApi.js ~line 176) posts only \payload\, putting tripUuid **only in the URL path** (STOCK_ROUTES.CREATE = \/trips/:tripUuid/stocks\). \stock.controller.js\ does \createStockSchema.parse(req.body)\, so every UI submission 400s with \Invalid input: expected string, received undefined\ on field \	ripUuid\. Reproduced: POST without body tripUuid -> 400; with it -> 201.
@@ -241,7 +242,8 @@ Backend zod \createStockSchema\ (backend/src/modules/intake/stock.validation.js:
 - **R-18** frontend: \createStock\ sends \{ ...payload, tripUuid }\ in the body + NEW \rontend/src/services/__tests__/tripsApi.test.js\ regression test (mock apiClient, assert body includes tripUuid + passthrough of all original payload fields). Worker: **worker-stock-create-400-r18** (kevin, isolate:true, worktrees/worker-stock-create-400-r18 on agent/worker-stock-create-400-r18, base master 32c8706, baseline 242 vitest). FRONTEND ONLY; uncommitted (god integrates); no R-08 files.
 
 
-- **R-18** frontend: add-stock 400 fix (createStock sends tripUuid in body). &rarr; **DONE, INTEGRATED on master 00a7fba** (2026-09-06, ff from 32c8706). Worker **worker-stock-create-400-r18** (kevin, isolate:true) delivered: 	ripsApi.js createStock now posts { ...payload, tripUuid } (+ JSDoc) and NEW rontend/src/services/__tests__/tripsApi.test.js (2 tests per BarcodePrintScreen apiClient-mock convention). Worktree verify: 251/251 vitest (249 baseline + 2 new) + build PASS; god re-verify MAIN: **255/255** + build PASS. Live 201 confirmed against :3000 (left a stock row in dev DB; no DELETE route). Clean ff-merge (only tripsApi.js + new test; R-08 dirty set untouched); worktree removed + pruned, branch deleted. Frontend only, uncommitted (god integrated). The \eportAllChanges startTime\ TypeError in the console is unrelated web-vitals plugin noise.
+- **R-18** frontend: add-stock 400 fix (createStock sends tripUuid in body). &rarr; **DONE, INTEGRATED on master 00a7fba** (2026-09-06, ff from 32c8706). Worker **worker-stock-create-400-r18** (kevin, isolate:true) delivered: 	ripsApi.js createStock now posts { ...payload, tripUuid } (+ JSDoc) and NEW rontend/src/services/__tests__/tripsApi.test.js (2 tests per BarcodePrintScreen apiClient-mock convention). Worktree verify: 251/251 vitest (249 baseline + 2 new) + build PASS; god re-verify MAIN: **255/255** + build PASS. Live 201 confirmed against :3000 (left a stock row in dev DB; no DELETE route). Clean ff-merge (only tripsApi.js + new test; R-08 dirty set untouched); worktree removed + pruned, branch deleted. Frontend only, uncommitted (god integrated). The \
+eportAllChanges startTime\ TypeError in the console is unrelated web-vitals plugin noise.
 
 ---
 
@@ -990,3 +992,36 @@ R-59 done. Board: 146 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) /
 
 **User:** default 2× zoom when the camera supports it; never ask each time — three presets only, remembered on the device. **Built:** `platform/scannerZoom.js` (presets `[1,2,3]`, default 2, localStorage `impoc-scanner-zoom`); `BarcodeScanner` reads the stored preset on open, applies it only when `getCapabilities().zoom` exists (clamped), and shows three pill buttons (role group *Camera zoom*) in place of the old ± stepper; a tap saves + applies. No-zoom cameras: no control, no constraint. Shared by POS, intake and Units scanners. vitest **426/426**.
 **CLOSED 2026-09-14:** user tested on device — working. Board: 147 done / 1 doing (R-60 backups, awaiting laptop run) / 1 blocked (R-52) / 2 todo (R-46, R-47).
+
+---
+
+# R-62 — CUSTOMER COMMUNICATION & CAMPAIGN PLATFORM (2026-09-14, PLANNED — not started)
+
+**User (spec, 2026-09-14):** one platform for every customer message — invoices, birthday offer (7 days before) + wish (on the day), stock-availability alerts ("stock comes next week" and the customer actually hears back), festival / new-collection campaigns with multi-date schedules, audience segments, A/B-ready, AI-ready later. Providers must be swappable by config only. Full design: `docs/COMMUNICATION_PLATFORM.md`.
+
+**Decisions (user):** epic **R-62** + sub-tickets R-62a…n; **R-47 folded into R-62e** (closed), **R-46 narrowed** to Instagram publishing. First channels = **WhatsApp via `wa.me` hand-off** (system writes the message, staff taps *Open WhatsApp*, presses send) **and email via SMTP (real auto-send)**, built together; **SMS later**. Invoice **auto-sends** on consented channels after *Close transaction* (WhatsApp shows the hand-off button on the POS screen). **No public URL** — the laptop stays LAN-only, so no links, no hosted receipt page, no webhooks; status stops at *sent / handed off*.
+
+**Shape:** `delivery_logs` is extended to be both ledger and queue (customer, template, campaign/variant, rendered text, `scheduled_for`, retries, `handoff_url`, `dedupe_key`). Business code calls one `enqueue()`; an in-process worker (FOR UPDATE SKIP LOCKED, 20 s) renders and sends through a provider chosen by env (`COMM_WHATSAPP_PROVIDER=wame|cloud`, `COMM_EMAIL_PROVIDER=smtp`); providers return `sent` or `handoff{url}`. Hourly scheduler runs the daily jobs once per Asia/Kolkata day with catch-up (birthdays, campaign steps). pg-boss considered, rejected — the ledger row is the job. New tables `comm_templates`, `comm_campaigns`/`steps`, `stock_inquiries`; `customers` gains preferred channel / marketing opt-out / do-not-contact.
+
+**Order:** a foundation → b templates → c engine+providers → d Messages screen (hand-off queue) + customer history → **e invoice (first visible win)** → f birthday → g stock inquiries → i preferences → h campaigns → j analytics. Later: k WhatsApp Cloud API, l SMS+DLT, m PDF attachment, n public receipt page + tunnel.
+
+**Open ask (R-62 humanQA):** which mailbox to send from (Brevo free / Gmail app password / other) — needed to test R-62c end-to-end.
+
+# SHIFT CLOSE #9 (2026-09-14)
+R-62 planned (15 cards added, none dispatched). Board: 148 done (R-47 closed as folded) / 1 doing (R-60) / 1 blocked (R-52) / 15 todo (R-62 + a–n, R-46 narrowed).
+
+---
+
+# R-63 — CUSTOMER ENQUIRY MODULE (2026-09-15, DONE — user-tested)
+
+**User:** a new tab where staff note customer enquiries ("do you have X?"); one migration for the new table; logging an enquiry = creating (or picking) the customer with the enquiry details. Build this first; matching + notify come later (R-62g). Also: birthday wishes always send (not an ad); Brevo account created for email.
+
+**Built:** `customer_enquiries` (customer FK, optional product type / colour / size, free-text description, notes, promised date, status `OPEN|CLOSED`, close reason `NOTIFIED|NOT_NOTIFIED`, `notified_at` + `notified_channels`, taken-by / closed-by users). `/api/enquiries` (list by status + search + counts, create with `customerUuid` **or** inline `customer{}` in one transaction, patch, close, reopen) behind `enquiries.view/create/update` (ADMIN, MANAGER, CASHIER). **Enquiries** page under *POS / Counter*: Open / Closed tabs with counts, search, grid (customer + phone, "Saree · Red" + description, promised-by with **Overdue** badge, age, taken by), *Log enquiry* dialog reusing `CustomerPicker`, *Reopen*.
+
+**Close = two outcomes only (user, 2026-09-15):** *It's available — tell the customer* → server writes the message (shop name, first name, item), checks consent + contact per ticked channel, logs a `delivery_logs` row per channel (`ENQUIRY`, provider `handoff`) and returns **tap-to-send links** (`wa.me` / `mailto:` / `sms:`); the dialog shows *Open WhatsApp / Open email / Open SMS* buttons. *Close quietly* → nothing sent. Nothing else is recorded (no "bought it" / "not interested"), and there is **no auto-matching** — a customer must never be told "it's available" months later by accident. When the R-62c engine lands, the same close calls `enqueue()` instead. jest **769/769**, vitest **436/436**, build OK.
+
+**Side fix:** the test DB never had the customers phone/email unique indexes — added to `test-setup.js`, so duplicate-phone 409s are now really tested.
+**CLOSED 2026-09-15:** user tested — working. Board: 148 done / 1 doing (R-60) / 1 blocked (R-52) / 15 todo (R-62 + a–n, R-46).
+
+# SHIFT CLOSE #10 (2026-09-15)
+R-63 done. Next: R-62a (comm foundation) when the user says go.

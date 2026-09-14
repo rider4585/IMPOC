@@ -380,3 +380,18 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 ## [2026-09-14 ~14:00Z] R-61 scanner zoom presets BUILT (awaiting user test). Zoom preference is device-local (localStorage), not server-side — deliberate: phones and laptops have different cameras. Uncommitted.
 
 ## [2026-09-14 ~15:00Z] R-61 CLOSED (user-tested). Open: R-60 (backups, laptop run pending), R-52 parked, R-46/R-47 todo.
+
+## [2026-09-14 ~16:30Z] R-62 Communication & Campaign platform PLANNED (15 cards, not started)
+- User spec: templates, campaigns, notification engine, provider abstraction, delivery tracking, birthday programme, stock alerts, invoice send, A/B + AI later. Design in `docs/COMMUNICATION_PLATFORM.md`; cards R-62 (epic, humanQA: which mailbox) + R-62a..n.
+- User decisions: wa.me hand-off + email SMTP first, together; SMS later; invoice auto-send on consent; NO public URL (LAN-only laptop) → no links/webhooks/hosted receipt for now. R-47 closed as folded into R-62e; R-46 narrowed to Instagram only.
+- Design locks: extend `delivery_logs` (don't add a second ledger); single `enqueue()` entry point; provider result `sent | handoff{url}` so wa.me→Cloud API is an env change; in-process worker + hourly scheduler with once-per-day catch-up (Asia/Kolkata forced in code); `dedupe_key` for idempotency; worker off under NODE_ENV=test (`runOnce()` for tests). Phone normalisation needed (customers.phone is free text).
+- Nothing dispatched; wait for user go + mailbox answer.
+
+## [2026-09-15 ~05:30Z] R-63 Customer Enquiry module BUILT (awaiting user test)
+- User decisions: enquiries first (own ticket R-63; R-62g = match + notify on top), birthday wishes always send, Brevo created (R-62 humanQA answered).
+- Built: customer_enquiries table + enquiries.* perms (ADMIN/MANAGER/CASHIER), /api/enquiries, Enquiries screen under POS / Counter. createCustomer(payload, { transaction }) is the reuse hook for "create customer inside another unit of work".
+- Gotcha: test-setup.js sync() skips partial unique indexes; customers phone/email ones were missing until now. Adding CASHIER perms changes the sorted-permissions assertions in tests/auth/auth.test.js (two spots).
+- REWORK (user, same day): close has exactly two outcomes — tell the customer it's available (tap-to-send wa.me/mailto:/sms: links, delivery_logs rows entity_type ENQUIRY provider 'handoff') or close quietly; no other reasons, NO auto-match/auto-notify ever (stale "available" messages are worse than none). R-62g re-scoped to "route the notify through enqueue()". `src/utils/phone.js` toE164Digits = shared phone normaliser. error.middleware allow-list must include any new user-facing 4xx message or it is masked to 'Request could not be processed'.
+- Flagged, not done: a separate WhatsApp number per customer (spec lists mobile + WhatsApp); POS "log enquiry" shortcut.
+
+## [2026-09-15 ~07:00Z] R-63 CLOSED (user-tested). Open: R-60 (laptop run pending), R-52 parked, R-62 epic + subs todo (Brevo ready).
