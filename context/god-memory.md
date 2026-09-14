@@ -356,3 +356,11 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 ## [2026-09-13 ~22:30Z] R-57 BUILT (awaiting user test) — the Select's `creatable`/`onCreate` row only shows when the query matches NOTHING (cmdk filter is fuzzy + case-insensitive), so an 'existing name' dedupe path is unreachable from the UI. Uncommitted.
 
 ## [2026-09-13 ~23:00Z] R-57 CLOSED. Board 144 done / R-52 blocked / R-46, R-47 todo. Pushed context + main.
+
+## [2026-09-14 ~10:15Z] R-58 BUILT (awaiting user test)
+- SHOP_NAME is now a re-export of DEFAULT_SHOP_NAME from theme/BrandingProvider.jsx (ShopLogo importing the provider AND the provider importing ShopLogo was a circular import that blanked the page). Read the brand via useBranding(); never hard-code the name again.
+- Theme drawer is always mounted inside AppShell → anything in it must tolerate missing providers (useOptionalToast; useBranding falls back to defaults).
+- GET /api/branding is deliberately public; keep it to name + logo only.
+- Uncommitted: R-58 + docs.
+
+## [2026-09-14 ~10:45Z] R-58 CLOSED (user-tested). Board 145 done / R-52 blocked / R-46, R-47 todo. Pushed.

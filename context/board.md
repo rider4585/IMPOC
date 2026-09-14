@@ -945,3 +945,19 @@ R-56 done. Board: 143 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) /
 
 # SHIFT CLOSE #6 (2026-09-13)
 R-57 done. Board: 144 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). All pushed. `main` still lacks the Windows deployment commits (6b6ca91 + 0efe6ed) — user's call.
+
+---
+
+# R-58 — THEME DRAWER: SHOP NAME + LOGO, CUSTOM ACCENT PICKER (2026-09-14, DONE — user-tested)
+
+**User:** edit the shop name and logo/monogram from the top-right gear drawer; add a colour picker beside the accent presets.
+
+**Branding (shared, server-side):** `branding` module → `app_settings` rows `shop_name` / `shop_logo` (data-URL ≤ 200 KB). `GET /api/branding` is **public** (sign-in page + `/display` need it before login; exposes only name + logo). `PUT` needs the new **`branding.manage`** permission (ADMIN; migration `20260914000001`). Receipts now read the shop name from settings (env `STORE_NAME` is the fallback) and print the uploaded logo instead of the monogram. Frontend `BrandingProvider` (fetch once + localStorage cache for first paint) feeds `ShopLogo`, the display, the POS UPI payee name, both QR centres and the branded receipt dialog.
+
+**Drawer:** *Color preset* row gains a **Custom** swatch that opens the native colour picker; `ThemeProvider` derives `--primary` / hover (12 % darker) / foreground (black or white by luminance) / focus ring from the hex and sets them inline (presets clear them). Per-browser like the rest of the theme. New **Shop** section: name input, Upload / Change / Remove logo (client-resized to 256 px PNG), Save — read-only for users without `branding.manage`.
+
+**Verified:** jest **753/753**, vitest **420/420**, build OK; live: `PUT` renamed the shop and the public `/display` showed it without login. **PENDING user test** in the drawer (rename, upload logo, custom colour).
+**CLOSED 2026-09-14:** user found the desktop header still hard-coded (fixed: AppShell uses `useBranding`), then confirmed — 'working super nice'.
+
+# SHIFT CLOSE #7 (2026-09-14)
+R-58 done. Board: 145 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) / 2 todo (R-46, R-47). Committed + pushed: code on `context` and `main`, docs on `context`. `main` still lacks the Windows deployment commits (6b6ca91, 0efe6ed) — user's call.
