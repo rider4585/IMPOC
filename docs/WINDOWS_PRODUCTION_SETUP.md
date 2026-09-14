@@ -112,13 +112,39 @@ Every run is logged to `backend\logs\update.log`. Options: `update.ps1 -Branch m
 
 ## 8. Backups
 
-Daily `pg_dump` via Task Scheduler. Create `C:\impoc-backups`, then a Basic Task, daily at closing time, action *Start a program*:
+Set up automatically by `setup.cmd` (steps 9–10). Everything lives in **`C:\IMPOC-backups\`** — outside the code folder, so updates never touch it.
 
-- Program: `C:\Program Files\PostgreSQL\16\bin\pg_dump.exe` (adjust version)
-- Arguments: `-U postgres -Fc -f C:\impoc-backups\impoc-%date:~-4%%date:~-7,2%%date:~-10,2%.dump impoc`
-- Set a `PGPASSWORD` environment variable for that user, or add a `%APPDATA%\postgresql\pgpass.conf` line: `localhost:5432:impoc:postgres:<password>`
+### Local — twice a day, automatic
+Two Windows scheduled tasks, **IMPOC database backup 1 / 2**, run at the times you gave during setup (24h, e.g. `13:00,18:00`). Each run:
+1. `pg_dump` the database (compressed) → `local\impoc-YYYY-MM-DD_HHmm.dump`
+2. checks the file with `pg_restore --list` — a bad dump is thrown away, never kept
+3. deletes local dumps older than 14 days
+4. writes `last-status.json` + `logs\backup-YYYY-MM.log`
 
-Copy the folder to a USB stick or cloud drive weekly. Restore with `pg_restore -U postgres -d impoc -c <file>.dump`.
+The app keeps running; sales are not interrupted. If the laptop was off at the scheduled time, the backup runs at the next boot. Take one by hand any time: double-click `deploy\windows\backup-local.cmd`. To change the times, re-run `setup.cmd` (or `setup.ps1 -BackupTimes 12:30,19:00`).
+
+### Cloud — Google Drive, manual, encrypted
+Double-click **`deploy\windows\backup-cloud.cmd`** whenever you want an off-site copy (once a day at closing is a good habit). It takes a fresh verified backup and uploads it with **rclone** to Google Drive as
+`IMPOC-backups / 2026 / 09 / 14 / impoc-2026-09-14_1830.dump` (date-wise folders), plus `backend\.env` under `config/`. Cloud copies older than 90 days are removed.
+
+Files are **encrypted on the laptop before upload** — Google only sees scrambled names and contents. The encryption password + salt were shown once during setup and written to `C:\IMPOC-backups\CLOUD-BACKUP-PASSWORD-SAVE-ME.txt`: **save them in your password manager and delete that file.** Without them the cloud backups cannot be read on another computer.
+
+Health at a glance: `C:\IMPOC-backups\last-status.json` shows the last local and cloud result and time.
+
+**If the cloud upload starts failing with a token / login error** (Google logins expire every few months): open PowerShell and run `rclone config reconnect gdrive:` — sign in again, done.
+
+### Restore
+From an **Administrator** PowerShell in the code folder:
+```
+.\deploy\windows\restore-db.ps1               # choose from local backups
+.\deploy\windows\restore-db.ps1 -FromCloud    # list + download from Google Drive first
+```
+It shows the backups newest-first, asks you to type the database name to confirm, takes a safety copy of the current data, stops the app, restores, runs migrations and starts the app again. If a restore fails, the safety copy path is printed so you can go back.
+
+### On a brand-new laptop
+Install PostgreSQL, Node, Git, rclone; sign in to the same Google account (`rclone config create gdrive drive scope drive.file`); recreate the encrypted remote with the saved password + salt:
+`rclone config create gdrive-crypt crypt remote gdrive:IMPOC-backups password <password> password2 <salt>`
+then run `setup.cmd` and `restore-db.ps1 -FromCloud`.
 
 ## 9. Known limits
 

@@ -106,21 +106,15 @@ Pop-Location
 $envVars = Read-DotEnv (Join-Path $Backend '.env')
 if (-not $SkipBackup -and $migrationsChanged) {
     Step 'Backing up the database before migrating'
-    $pgDump = Get-Command pg_dump -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
-    if (-not $pgDump) {
-        $pgDump = Get-ChildItem 'C:\Program Files\PostgreSQL\*\bin\pg_dump.exe' -ErrorAction SilentlyContinue |
-                  Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-    }
-    if ($pgDump) {
-        $backupDir = Join-Path $RepoRoot 'backups'
-        New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
-        $file = Join-Path $backupDir ("pre-update-{0}-{1}.dump" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $after.Substring(0,7))
-        $env:PGPASSWORD = $envVars['DB_PASSWORD']
-        & $pgDump -U $envVars['DB_USER'] -h $envVars['DB_HOST'] -p $envVars['DB_PORT'] -Fc -f $file $envVars['DB_NAME']
-        if ($LASTEXITCODE -ne 0) { Fail 'pg_dump failed. Use -SkipBackup to update anyway.' }
+    # R-60: shared verified-dump helper; backups live outside the repo in C:\IMPOC-backups\pre-update
+    . (Join-Path $PSScriptRoot 'lib\backup-common.ps1')
+    try {
+        $dirs = Initialize-BackupDirs
+        $file = Invoke-VerifiedDump $envVars $dirs.preUpdate ("pre-update-{0}-{1}.dump" -f (Get-Date -Format 'yyyy-MM-dd_HHmm'), $after.Substring(0,7))
+        Remove-OldDumps $dirs.preUpdate 60 | Out-Null
         Ok "saved $file"
-    } else {
-        Log '    !!  pg_dump.exe not found - skipping backup' 'Yellow'
+    } catch {
+        Fail "backup failed: $($_.Exception.Message). Use -SkipBackup to update anyway."
     }
 }
 
