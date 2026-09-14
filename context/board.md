@@ -983,3 +983,9 @@ R-59 done. Board: 146 done / 0 doing / 1 blocked (R-52, parked to ~2026-10-13) /
 **Verified here:** all 7 scripts parse under pwsh 7.6; the helper ran for real against the dev DB (181 KB verified dump, prune, corrupt-file rejection, status/log, no `.partial` leftovers). **Windows-only parts untested locally** (Task Scheduler, rclone install/sign-in) — user re-runs `setup.cmd` on the laptop.
 
 **Scanner zoom (2026-09-14, no ticket — user request):** `BarcodeScanner` now takes a `zoom` prop, **default 2×**. Applied only when the camera reports a zoom capability (optical or digital) and clamped to its min/max; cameras without zoom get no stepper and no constraint. The ± stepper (0.5 steps) already existed. Tests +3 (vitest 424/424).
+
+---
+
+# R-61 — SCANNER ZOOM PRESETS 1× / 2× / 3× (2026-09-14, BUILT — awaiting user test)
+
+**User:** default 2× zoom when the camera supports it; never ask each time — three presets only, remembered on the device. **Built:** `platform/scannerZoom.js` (presets `[1,2,3]`, default 2, localStorage `impoc-scanner-zoom`); `BarcodeScanner` reads the stored preset on open, applies it only when `getCapabilities().zoom` exists (clamped), and shows three pill buttons (role group *Camera zoom*) in place of the old ± stepper; a tap saves + applies. No-zoom cameras: no control, no constraint. Shared by POS, intake and Units scanners. vitest **426/426**.

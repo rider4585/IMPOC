@@ -376,3 +376,5 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 - Uncommitted: R-60.
 
 - Scanner default zoom is 2x (prop `zoom`), clamped to capabilities.zoom; BarcodeScanner.jsx now imports React so it can render in vitest (classic runtime) — mock @zxing/browser AND @zxing/library in tests.
+
+## [2026-09-14 ~14:00Z] R-61 scanner zoom presets BUILT (awaiting user test). Zoom preference is device-local (localStorage), not server-side — deliberate: phones and laptops have different cameras. Uncommitted.
