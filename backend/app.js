@@ -32,6 +32,7 @@ import rentalRoutes from './src/modules/rentals/rental-agreement.routes.js';
 import expensesRoutes from './src/modules/expenses/expenses.routes.js';
 import reportsRoutes from './src/modules/reports/reports.routes.js';
 import customerRoutes from './src/modules/customers/customers.routes.js';
+import enquiryRoutes from './src/modules/enquiries/enquiries.routes.js';
 import deliveryRoutes from './src/modules/delivery/delivery.routes.js';
 import receiptRoutes from './src/modules/receipts/receipts.routes.js';
 import errorMiddleware from './src/middleware/error.middleware.js';
@@ -104,6 +105,7 @@ app.use('/api/rentals', rentalRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/receipts', receiptRoutes);
 

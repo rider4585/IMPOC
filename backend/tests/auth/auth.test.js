@@ -153,7 +153,7 @@ describe('Auth Module - /api/auth', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.data).toHaveProperty('permissions');
       expect(Array.isArray(res.body.data.permissions)).toBe(true);
-      expect(res.body.data.permissions).toEqual(['inventory.view', 'sales.create', 'sales.view']);
+      expect(res.body.data.permissions).toEqual(['enquiries.create', 'enquiries.update', 'enquiries.view', 'inventory.view', 'sales.create', 'sales.view']);
       expect(res.body.data).not.toHaveProperty('preferences');
       expect(res.body.data).not.toHaveProperty('refreshToken');
       expect(res.body.data).toHaveProperty('refreshTokenExpiresAt');
@@ -538,7 +538,7 @@ describe('Auth Module - /api/auth', () => {
       expect(meRes.body.data).toHaveProperty('permissions');
       expect(Array.isArray(meRes.body.data.permissions)).toBe(true);
       expect(meRes.body.data.permissions).toEqual(loginPermissions);
-      expect(meRes.body.data.permissions).toEqual(['inventory.view', 'sales.create', 'sales.view']);
+      expect(meRes.body.data.permissions).toEqual(['enquiries.create', 'enquiries.update', 'enquiries.view', 'inventory.view', 'sales.create', 'sales.view']);
       expect(meRes.body.data).not.toHaveProperty('preferences');
     });
 

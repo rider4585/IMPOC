@@ -17,6 +17,7 @@ import SalesListScreen from '../screens/pos/SalesListScreen';
 import RentalsScreen from '../screens/rentals/RentalsScreen';
 import ExpensesScreen from '../screens/expenses/ExpensesScreen';
 import CustomersScreen from '../screens/customers/CustomersScreen';
+import EnquiriesScreen from '../screens/enquiries/EnquiriesScreen';
 import Dashboard from './Dashboard';
 
 /**
@@ -41,6 +42,7 @@ export const navigationRegistry = [
   { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Units', path: '/units', element: UnitsScreen },
   { permission: PERMISSIONS.SALES.CREATE, label: 'POS', path: '/pos', element: POSScreen },
   { permission: PERMISSIONS.SALES.VIEW, label: 'Sales', path: '/sales', element: SalesListScreen },
+  { permission: PERMISSIONS.ENQUIRIES.VIEW, label: 'Enquiries', path: '/enquiries', element: EnquiriesScreen },
   { permission: PERMISSIONS.RENTALS.VIEW, label: 'Rentals', path: '/rentals', element: RentalsScreen },
   { permission: PERMISSIONS.EXPENSES.VIEW, label: 'Expenses', path: '/expenses', element: ExpensesScreen },
   { permission: PERMISSIONS.CUSTOMERS.VIEW, label: 'Customers', path: '/customers', element: CustomersScreen },
@@ -75,6 +77,7 @@ export const navigationSections = [
     items: [
       { permission: PERMISSIONS.SALES.CREATE, label: 'POS', path: '/pos' },
       { permission: PERMISSIONS.SALES.VIEW, label: 'Sales', path: '/sales' },
+      { permission: PERMISSIONS.ENQUIRIES.VIEW, label: 'Enquiries', path: '/enquiries' },
     ],
   },
   {

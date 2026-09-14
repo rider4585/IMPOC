@@ -53,6 +53,11 @@ const SAFE_4XX_MESSAGES = Object.freeze([
     'Review link already exists',
     'Review links must start with https://',
     'Customer source already exists',
+    // R-63 enquiries
+    'Enquiry not found',
+    'Enquiry is already closed',
+    'Only a closed enquiry can be reopened',
+    'Cannot reach the customer on',
     'UPI account already exists',
     'UPI account not found',
     'Sub type must belong to a parent product type',
