@@ -23,10 +23,11 @@ export const LOGO_SRC = `data:image/svg+xml;base64,${btoa(MONOGRAM_SVG)}`;
  * Shared qrcode.react `imageSettings` for a center logo at `qrSize`.
  * Keep the logo modest (~19%) so `level="H"` error correction easily covers it.
  */
-export function qrLogoSettings(qrSize) {
+export function qrLogoSettings(qrSize, logoSrc = LOGO_SRC) {
   const logoSize = Math.round(qrSize * 0.19);
   return {
-    src: LOGO_SRC,
+    // R-58: the uploaded shop logo replaces the monogram when one is set
+    src: logoSrc || LOGO_SRC,
     height: logoSize,
     width: logoSize,
     excavate: true,

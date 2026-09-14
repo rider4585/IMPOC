@@ -33,6 +33,10 @@ export const PERMISSIONS = Object.freeze({
     REFUND: 'sales.refund',
   },
 
+  BRANDING: {
+    MANAGE: 'branding.manage',
+  },
+
   CUSTOMERS: {
     VIEW: 'customers.view',
     CREATE: 'customers.create',

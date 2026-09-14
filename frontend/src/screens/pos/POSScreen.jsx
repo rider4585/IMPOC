@@ -29,7 +29,7 @@ import { CustomerPicker } from '../../components/customers/CustomerPicker.jsx';
 import { ReceiptSection } from '../../components/receipts/ReceiptSection.jsx';
 import { SaleReceipt } from './SaleReceipt.jsx';
 import { PaymentDialog } from './PaymentDialog.jsx';
-import { SHOP_NAME } from '../../components/ShopLogo.jsx';
+import { useBranding } from '../../theme/BrandingProvider.jsx';
 import { BARCODE_MAX_LENGTH } from '../../constants/barcode.js';
 
 function todayISO() {
@@ -120,6 +120,7 @@ function SalePriceInput({ valuePaise, floorPaise, onChange, name }) {
 export function POSScreen() {
   const { permissions } = useAuth();
   const toast = useToast();
+  const { shopName } = useBranding();
   const can = useCallback((p) => permissions && permissions.includes(p), [permissions]);
 
   const canCheckoutSale = can(PERMISSIONS.SALES.CREATE);
@@ -273,14 +274,14 @@ export function POSScreen() {
     if (paymentMethod !== 'UPI' || !selectedUpiAccount || !checkoutKeyRef.current) return null;
     return buildUpiUri({
       vpa: selectedUpiAccount.vpa,
-      payee: SHOP_NAME,
+      payee: shopName,
       amountRupees: totalPaise / 100,
-      note: `${SHOP_NAME} sale`,
+      note: `${shopName} sale`,
       txnRef: checkoutKeyRef.current,
     });
     // paymentDialogOpen forces a recompute once the idempotency key is minted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paymentMethod, selectedUpiAccount, totalPaise, paymentDialogOpen]);
+  }, [paymentMethod, selectedUpiAccount, totalPaise, paymentDialogOpen, shopName]);
 
   const displayUrl = useMemo(
     () => `${window.location.origin}/display/${displayCode}`,

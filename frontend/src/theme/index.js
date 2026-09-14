@@ -1,5 +1,6 @@
 export { ThemeProvider, useTheme } from './ThemeProvider.jsx';
 export { SettingsDrawer } from './SettingsDrawer.jsx';
+export { BrandingProvider, useBranding } from './BrandingProvider.jsx';
 export {
   COLOR_SCHEMES,
   PRIMARY_PRESETS,

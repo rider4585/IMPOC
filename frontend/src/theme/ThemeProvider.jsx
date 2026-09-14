@@ -2,7 +2,9 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import {
   DEFAULT_SETTINGS,
   THEME_STORAGE_KEY,
+  CUSTOM_PRIMARY,
 } from './theme-config';
+import { isHexColor, primaryVarsFor } from './color-utils.js';
 
 const ThemeContext = createContext(null);
 
@@ -29,6 +31,14 @@ function applyToDocument(settings, effectiveScheme) {
   root.setAttribute('data-theme', effectiveScheme);
   root.setAttribute('data-primary', settings.primaryColor);
   root.setAttribute('data-font', settings.fontFamily);
+  // R-58: a custom accent overrides the preset variables inline; presets clear them
+  const custom = settings.primaryColor === CUSTOM_PRIMARY && isHexColor(settings.customPrimary)
+    ? primaryVarsFor(settings.customPrimary)
+    : null;
+  for (const name of ['--primary', '--primary-hover', '--primary-foreground', '--focus-ring']) {
+    if (custom) root.style.setProperty(name, custom[name]);
+    else root.style.removeProperty(name);
+  }
   const meta = document.querySelector('meta[name="color-scheme"]');
   if (meta) meta.setAttribute('content', effectiveScheme);
 }
@@ -80,6 +90,12 @@ export function ThemeProvider({ children }) {
     setSettings((s) => ({ ...s, primaryColor }));
   }, []);
 
+  /** R-58: pick a custom accent (#RRGGBB) — also switches the preset to 'custom'. */
+  const setCustomPrimary = useCallback((hex) => {
+    if (!isHexColor(hex)) return;
+    setSettings((s) => ({ ...s, primaryColor: CUSTOM_PRIMARY, customPrimary: hex.toUpperCase() }));
+  }, []);
+
   const setFontFamily = useCallback((fontFamily) => {
     setSettings((s) => ({ ...s, fontFamily }));
   }, []);
@@ -89,8 +105,8 @@ export function ThemeProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ settings, resolvedColorScheme, setColorScheme, setPrimaryColor, setFontFamily, reset }),
-    [settings, resolvedColorScheme, setColorScheme, setPrimaryColor, setFontFamily, reset],
+    () => ({ settings, resolvedColorScheme, setColorScheme, setPrimaryColor, setCustomPrimary, setFontFamily, reset }),
+    [settings, resolvedColorScheme, setColorScheme, setPrimaryColor, setCustomPrimary, setFontFamily, reset],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

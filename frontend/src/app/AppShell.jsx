@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { navigationSections } from './navigation';
 import { ShopLogo } from '../components/ShopLogo';
-import { SettingsDrawer } from '../theme/index.js';
+import { SettingsDrawer, useBranding } from '../theme/index.js';
 import { NavItem } from '../components/ui';
 import { primeMediaPermissions } from '../platform/mediaPermissions.js';
 import {
@@ -120,6 +120,7 @@ const DESKTOP_BREAKPOINT = 768;
  */
 export function AppShell({ children }) {
   const { permissions, signOut } = useAuth();
+  const { shopName } = useBranding();
   const location = useLocation();
   const navigate = useNavigate();
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= DESKTOP_BREAKPOINT);
@@ -380,9 +381,9 @@ export function AppShell({ children }) {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {isDesktop && (
           <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--surface-raised)] px-6">
-            <h1 className="typography-heading mb-0">{currentTitle || 'Shree Fashion Store'}</h1>
+            <h1 className="typography-heading mb-0">{currentTitle || shopName}</h1>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-[var(--ink-muted)]">Shree Fashion Store</span>
+              <span className="text-sm font-medium text-[var(--ink-muted)]">{shopName}</span>
               <button
                 type="button"
                 className="flex h-11 w-11 items-center justify-center rounded-md text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"

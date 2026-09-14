@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { useBranding, DEFAULT_SHOP_NAME } from '../theme/BrandingProvider.jsx';
 
 /**
  * SHOP_NAME — single source of truth for the brand shown alongside the logo.
  */
-export const SHOP_NAME = 'Shree Fashion Store';
+export const SHOP_NAME = DEFAULT_SHOP_NAME;
 
 /**
  * ShopLogo — reusable brand lockup (logo mark + full shop name).
@@ -26,6 +27,11 @@ export function ShopLogo({
   className = '',
 }) {
   const [failed, setFailed] = useState(false);
+  // R-58: name + logo come from the shared branding (server-side); the props/file are fallbacks
+  const branding = useBranding();
+  const src = branding.logoDataUrl || logoUrl;
+  const name = branding.shopName || SHOP_NAME;
+  const initial = (name.trim()[0] || 'S').toUpperCase();
 
   const logoSize = typeof size === 'object' ? size.logo : { sm: 32, md: 40, lg: 56 }[size] || 40;
   const textCls =
@@ -43,11 +49,11 @@ export function ShopLogo({
           style={{ width: logoSize, height: logoSize, fontSize: logoSize * 0.42 }}
           aria-hidden="true"
         >
-          S
+          {initial}
         </span>
       ) : (
         <img
-          src={logoUrl}
+          src={src}
           alt=""
           width={logoSize}
           height={logoSize}
@@ -57,7 +63,7 @@ export function ShopLogo({
         />
       )}
       <span className={`font-semibold tracking-tight text-[var(--ink)] ${textCls}`.trim()}>
-        {SHOP_NAME}
+        {name}
       </span>
     </div>
   );

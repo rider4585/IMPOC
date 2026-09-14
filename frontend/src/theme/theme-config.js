@@ -21,8 +21,12 @@ export const FONT_PRESETS = [
   { value: 'classic', label: 'Classic (Instrument Sans + Bricolage)', font: 'Instrument Sans' },
 ];
 
+/** R-58: `primaryColor: 'custom'` uses `customPrimary` (#RRGGBB) instead of a preset. */
+export const CUSTOM_PRIMARY = 'custom';
+
 export const DEFAULT_SETTINGS = {
   colorScheme: 'dark',
   primaryColor: 'default',
+  customPrimary: '#FAAF00',
   fontFamily: 'minimals',
 };

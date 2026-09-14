@@ -1,5 +1,6 @@
 import { Sale, RentalAgreement } from '../../../database/models/index.js';
 import { buildBrandedReceiptHtml } from './receipts.html.js';
+import { getShopName, getBranding } from '../branding/branding.service.js';
 
 const LINE_PRODUCT_INCLUDE = {
     association: 'unit',
@@ -24,9 +25,10 @@ const RENTAL_FIND_OPTIONS = {
     ],
 };
 
-function storeInfo() {
+// R-58: the shop name is editable in the app (app_settings shop_name); env is the fallback.
+async function storeInfo() {
     return {
-        name: process.env.STORE_NAME || 'Shree Fashion Store',
+        name: await getShopName(),
         address: process.env.STORE_ADDRESS || '',
         phone: process.env.STORE_PHONE || '',
     };
@@ -118,7 +120,7 @@ async function buildSaleReceipt(uuid, isPrivileged = false) {
     const balancePaise = 0n;
 
     return {
-        store: storeInfo(),
+        store: await storeInfo(),
         transaction: {
             type: 'SALE',
             number: sale.saleNumber,
@@ -182,7 +184,7 @@ async function buildRentalReceipt(uuid, isPrivileged = false) {
     const amountPaidPaise = BigInt(agreement.depositRefundablePaise || 0);
 
     return {
-        store: storeInfo(),
+        store: await storeInfo(),
         transaction: {
             type: 'RENTAL',
             number: agreement.agreementNumber,
@@ -325,5 +327,7 @@ export const buildReceiptText = async ({ entityType, entityUuid, isPrivileged = 
 export const buildReceiptHtml = async ({ entityType, entityUuid, isPrivileged = false }) => {
     const receipt = await buildReceipt({ entityType, entityUuid, isPrivileged });
     if (!receipt) return null;
-    return buildBrandedReceiptHtml(receipt);
+    // R-58: uploaded shop logo replaces the monogram on the branded receipt
+    const { logoDataUrl } = await getBranding();
+    return buildBrandedReceiptHtml(receipt, logoDataUrl ? { logoSrc: logoDataUrl } : {});
 };
