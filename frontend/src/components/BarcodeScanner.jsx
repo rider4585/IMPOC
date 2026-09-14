@@ -9,7 +9,7 @@ import {
     BinaryBitmap,
     HybridBinarizer,
 } from '@zxing/library';
-import {
+import React, {
     useEffect,
     useRef,
     useState,
@@ -20,11 +20,14 @@ import '../BarcodeScanner.css';
 const SCAN_PAUSE_DURATION = 5;
 
 /*
- * Default zoom level.
+ * Default zoom level. 2x makes a 15-char Code128 label fill more of the
+ * frame at counter distance; it is only applied when the camera reports a
+ * zoom capability (optical or digital) and is clamped to its range.
+ * Callers can override with the `zoom` prop.
  */
-const DEFAULT_ZOOM = 1;
+const DEFAULT_ZOOM = 2;
 
-function BarcodeScanner({ onDetected, onError }) {
+function BarcodeScanner({ onDetected, onError, zoom: requestedZoom = DEFAULT_ZOOM }) {
     const videoRef = useRef(null);
     const streamRef = useRef(null);
 
@@ -101,7 +104,11 @@ function BarcodeScanner({ onDetected, onError }) {
      */
 
     const [zoom, setZoom] =
-        useState(DEFAULT_ZOOM);
+        useState(
+            typeof requestedZoom === 'number' && requestedZoom > 0
+                ? requestedZoom
+                : DEFAULT_ZOOM
+        );
 
     /*
      * Actual camera zoom range.
