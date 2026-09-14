@@ -374,3 +374,5 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 - Local pwsh is installed (brew) — parse-check with /tmp/parse.ps1 pattern; smoke-test helpers by shimming `cmd` with sh and prepending Postgres.app's bin (pg_dump version must match the server).
 - Google login token expiry is the one chore: `rclone config reconnect gdrive:`. Crypt password+salt shown once; without them cloud backups are unreadable.
 - Uncommitted: R-60.
+
+- Scanner default zoom is 2x (prop `zoom`), clamped to capabilities.zoom; BarcodeScanner.jsx now imports React so it can render in vitest (classic runtime) — mock @zxing/browser AND @zxing/library in tests.
