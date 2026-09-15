@@ -14,32 +14,64 @@ Bug fixes in-session: logout-on-reload StrictMode race (26c0ead dedupedBootRefre
 Spawn-request JSON lesson: command:'opencode' MANDATORY; forward-slash paths only (C:/ not C:\); BOM-free; objective as SCALAR STRING.
 Worker patterns: check memory.md+worktree+outbox/.sent/bad-* for completion evidence (inbox done msgs can fail silently); breaker steer/constrain on reads=false-positives.
 Test DB contention: impoc_test shared; jest --runInBand CAUSES failures; use default parallel; migrations don't run in jest (use test-setup.js).
-Branch: framework/md-impoc (vendored md-framework on top of main @ 4e55c3a). Git HEAD 421514b. All 35 migrations UP on dev DB impoc_dev.
+Branch: context (handoff). Main branch: 8fa271a. Framework branch: framework/md-impoc. All 45 migrations UP on dev DB impoc_dev.
 
 ## 🗜 Condensed history
 
 **Project IMPOC** (Inventory/POS/rental management, SHREE Fashion Store) on branch framework/md-impoc @ 421514b. Backend: Express 5 + Sequelize/Postgres (16.15), JWT+argon2 auth. Frontend: React 19 + Vite 8.2, @zxing barcode, minimals dark-primary Tailwind+shadcn light-only design.
 
-**Completed: 110/111 cards, 1 in-flight (R-33).** All major phases delivered:
+**Completed: 148/165 cards.** All major phases delivered:
 - Foundation (T-00..02, dace5ca): auth+cleanup+design system
 - Backend core (T-06/08/10/12/14): units, sales, rentals, expenses, reports
 - Frontend (T-03/05/07/09/11/13/15/16/21): admin/ops/service screens, dashboard, full QA
 - Schema V2 (R-09..13): templates, vendor-scoped stocks, trips/vendors/stocks/units nav
 - UI revamp (R-01..07, 4e55c3a): Tailwind restyle all screens
-- Security remediations: SEC-CR-1..3 (money TOCTOU/role privesc/JWT forgery), SEC-H-1..10 (rate-limit/PII/IDOR/localStorage/money>2^53), SEC-M-1..10 (idempotency/scoping/validation/delivery), SEC-L-1..8 (timing/creds/error-masking). All integrated (796ea5b..648318c). Backend reviews (R-27/28, hive/BACKEND-REVIEW-FINDINGS.md, hive/POSTGRES-REVIEW-FINDINGS.md) confirmed + fixed. Backend 669/669 jest (38 suites, 3 pre-existing auth failures eliminated after SEC fixes).
-- UI/UX remediation (R-26, 1182611): 25 UX cards (3C/8H/10M/4L findings) all implemented. Frontend 294/294 vitest.
+- Security remediations: SEC-CR-1..3 (money TOCTOU/role privesc/JWT forgery), SEC-H-1..10 (rate-limit/PII/IDOR/localStorage/money>2^53), SEC-M-1..10 (idempotency/scoping/validation/delivery), SEC-L-1..8 (timing/creds/error-masking). All integrated (796ea5b..648318c). Backend reviews (R-27/28, hive/BACKEND-REVIEW-FINDINGS.md, hive/POSTGRES-REVIEW-FINDINGS.md) confirmed + fixed. Backend 769/769 jest (45 suites).
+- UI/UX remediation (R-26, 1182611): 25 UX cards (3C/8H/10M/4L findings) all implemented. Frontend 436/436 vitest.
 - Database optimization (R-32, 4ed6479): 5 grid views, 34 indexes (24 FK + dates + 7 composite), matviews (mv_dashboard_*, mv_inventory_snapshot), pagination MAX_PAGE_SIZE 200.
 - Bug fixes (26c0ead, 421514b, 408f626): logout-on-reload StrictMode (dedupedBootRefresh + isMountedRef re-arm), modal focus-ring clip (-mx offset in overflow), POS sticky bar bleed (top offset by main padding).
 
 **Key architectural locks:** Money=integer paise, never UPDATE completed, append-only reversals, partial-unique backstop indexes. Auth=JWT+httpOnly cookie+session_id separate from sub, no localStorage tokens. Permissions=role-based+per-resource scopes, ADMIN-only privileged-role. Transactions=FOR UPDATE + CAS on status, reuse tx where possible. Idempotency=requestUuid on money-writes (SEC-M-3, R-31, 96acfbd, 8 functions), mint-on-intent reuse-on-retry. Rentals=days+deposit refunded on return minus damage, late-fees at return. POS=dual-mode retail/rental, single cart. Dashboard=MATVIEW REFRESH CONCURRENTLY, 60s staleness check.
 
-**Test baselines:** Backend 669/669 (35 suites post-consolidation from 38), frontend 294/294 vitest (25 files post-UX), vite build PASS (>500kB chunk pre-existing non-blocking). All 35 migrations UP on dev DB (20260903000001..20260910000003).
+**Test baselines:** Backend 769/769 jest (45 suites), frontend 436/436 vitest (30 files), vite build PASS. All 45 migrations UP on dev DB.
 
 **Critical protocols:** (1) Spawn-request JSON: ASCII-only, NO BOM, forward-slash paths (C:/ not C:\), command:'opencode' MANDATORY, cwd required, objective=SCALAR STRING. (2) Worker patterns: check memory.md+worktree+outbox/.sent/bad-* (done msgs can fail silently); breaker steer/constrain on rapid reads=known false-positives; NO reply to scheduler (bounces). (3) Test contention: impoc_test shared; jest --runInBand CAUSES failures; use default parallel; migrations don't run in jest. (4) Integration: verify worktree suite → commit on agent branch → ff-merge to framework/md-impoc → re-verify MAIN. (5) Frontend vitest runs from frontend/ subdir; backend jest needs NODE_OPTIONS='--experimental-vm-modules' npx jest --forceExit. (6) Money ALWAYS BigInt in SQL + String in DTO (never Number). (7) RequestUuid on all 8 money-write POST paths (SEC-M-3). (8) Focus rings need -mx offset in overflow; sticky elements offset top by parent padding. (9) Dev creds in postman/.env.template/.env.example now 'Impoc-Devseed-2026!' (not stored in code beyond examples, per L-4). (10) Auth-session: now separate from JWT sub; JWT bound to user_id (SEC-CR-3, commit 8ef04b4). (11) Floor guard: sellingPricePaise below floorPricePaise returns 400 'Price cannot be below floor price' (R-30, 4ed6479).
 
 **Unresolved:** (1) Dark mode tokens still in index.css (user chose light-only; decision pending strip). (2) AppShell nav collapsible + focus-ring width (ring-2/offset-2 -> ring-1/offset-1) parked backlog. (3) DashboardPlaceholder vs full Dashboard.jsx (T-15 delivered screens but placeholder may still exist; verify). (4) Code-splitting chunk warning (pre-existing, non-blocking).
 
-**Current state:** framework/md-impoc @ 421514b, working tree clean (untracked: colors.zip, colors/, frontend/doc/, tunnels.json, worktrees/). Kanban: 111 tasks, 110 done, 1 in-flight (R-33 expense-type picklist). Fleet: god only, worker-r33 active. All migrations applied to impoc_dev. No blocked/unowned cards.
+**Current state:** context branch, HEAD 74a2ee3. Main: 8fa271a. Kanban: 165 tasks, 148 done, 17 todo (R-46, R-47, R-62 + R-62a–n). Fleet: god only. All 45 migrations applied to impoc_dev.
+
+## 📦 Features delivered offline (R-48–R-63, user commits on main 2026-09-13→15)
+
+All committed directly to main by user; pulled to context branch (9f9c7cb→8fa271a).
+
+**R-48 (barcode values):** SHREE prefix + base-36 timestamp + counter (15 chars, unique even if seq reset). Columns widened to 32. Follow-up `4f5086e`: fixed 3 barcode inputs still capped at maxLength=12.
+**R-49 (print labels):** Toast + fresh request key after download so the screen stays usable. Label price box takes space under barcode.
+**R-50 (barcode sheet configurator):** Single-row `barcode_layouts` table (mm), "Configure barcode sheet" on Print labels with live SVG preview + `GET /api/barcodes/preview`. Generator no longer reads `app_settings` barcode keys.
+**R-51 (GST on purchases):** CGST/SGST % on stocks, ₹ on vendor bills. Migration `20260913000004`. Total paid is GST-inclusive; no reconciliation. Landed cost computed client-side.
+**R-52 (Buying templates):** PARKED by user ~2026-10-13. No changes made.
+**R-53 (digital pet):** Customer display idle screen — `petEngine.js` (sprite engine + weighted random scheduler), `DigitalPet.jsx`, `pet-sheet.png`, dev tuning page `/pet/pet-engine.html`.
+**R-54 (Google review QR):** Post-payment Google review QR on customer display. `review_links` table, `GET/PATCH /api/picklists/review-links`. Held until POS *Close transaction*.
+**R-55 (vendor bill photo):** `PhotoCapture.jsx` reusable image input. Take photo (in-app camera, native fallback) / gallery → review / retake. Downscaled to 1600px JPEG via `imageResize.js`.
+**R-56 (barcode sheet configurator templates):** `barcode_layout_templates` table + page sizes A3/A4/A5/Letter/Custom (mm/cm/inch, stored mm). No 10-row cap — fit-check rules.
+**R-57 (inline colour/size):** Add new colour/size inline from the (searchable) dropdowns on the add-unit page in StockIntake.
+**R-58 (branding/theme):** Editable shop name + logo (server-side, public `GET /api/branding`, admin `branding.manage`). `BrandingProvider.jsx`, `color-utils.js`. Custom accent colour picker in theme drawer.
+**R-59 (unit search):** Scan a barcode on the Units page to find a unit by camera.
+**R-60 (durable backups):** pg_dump twice daily via Task Scheduler, manual encrypted Google Drive upload (rclone, date folders), restore script. `deploy/windows/` scripts. IN TEST — awaiting laptop run.
+**R-61 (scanner zoom):** Zoom presets 1×/2×/3× (default 2×), remembered per device (`scannerZoom.js`).
+**R-62 (communication platform):** PLANNED, not started. Epic + R-62a–n sub-tickets. Phase 1 = email (SMTP) + WhatsApp via `wa.me` hand-off. Design: `docs/COMMUNICATION_PLATFORM.md`.
+**R-63 (customer enquiries):** `customer_enquiries` table, `/api/enquiries`, Enquiries page (Open/Closed tabs). Close = tell the customer (tap-to-send WhatsApp/email/SMS links) or close quietly.
+
+## 🛠️ Infrastructure & tooling (offline commits)
+
+- **Windows production setup** (`d3f2702`): `deploy/windows/` — setup.ps1, start.ps1, update.ps1, backup scripts, restore-db.ps1, ecosystem.config.cjs for pm2.
+- **pm2 fix** (`41cb026`): `pm2 delete/restart` no longer aborts Windows scripts on first install.
+- **db:refresh fix** (`4ac163a`): `db:refresh` (undo:all) handles column-aware grid views and tolerates rollback failures.
+- **dev:host** (`c4f91a4`): Frontend script for LAN access from other devices.
+- **mojibake fix** (`51542dd`): Repaired mojibake glyphs on Dashboard + POS (arrow, middot, em-dash).
+- **Clean main** (`9f9c7cb`): Stripped md-framework + postman from main for clean push.
+- **Friendly errors** (`ede549c`): User-facing wording when backend is down or returns 5xx.
+- **Branding rename** (`d617e06`): "SHREE Fashion Store" → "Shree Fashion Store" across codebase.
 
 ## Recent
 

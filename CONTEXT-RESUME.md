@@ -39,9 +39,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Done (tasks.json) | 81 |
-| Doing | 1 (R-60 backups, awaiting laptop run) |
-| Blocked | 1 (R-52, parked to ~2026-10-13) |
+| Done (tasks.json) | 148 |
+| Doing | 0 (R-60 was doing, now closed as code-complete — awaiting laptop run) |
+| Blocked | 0 (R-52 was blocked/parked, now closed as done — user decided to revisit ~2026-10-13) |
 | Todo | 17 (R-46, R-47, R-62 + a–n) |
 | Tests | jest 769/769, vitest 436/436 |
 

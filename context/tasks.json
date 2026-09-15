@@ -1114,7 +1114,7 @@
     {
       "id": "R-52",
       "title": "Decide the fate of the Buying templates module (disable now, remove later?)",
-      "status": "blocked",
+      "status": "done",
       "priority": "low",
       "assignee": null,
       "origin": "user (2026-09-13)",
@@ -1231,7 +1231,7 @@
     {
       "id": "R-60",
       "title": "Durable backups on the shop laptop: verified pg_dump twice daily (Task Scheduler) + manual encrypted upload to Google Drive via rclone + restore script; setup.ps1 registers it all",
-      "status": "doing",
+      "status": "done",
       "priority": "high",
       "assignee": "claude (direct, no worker)",
       "origin": "user (2026-09-14)",

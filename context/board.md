@@ -1069,6 +1069,21 @@ R-63 done. Next: R-62a (comm foundation) when the user says go.
 
 ---
 
+# INFRASTRUCTURE & TOOLING (offline commits, 2026-09-13→15)
+
+These are developer/production infrastructure changes committed alongside features, not user-facing feature cards.
+
+- **Windows production setup** (`d3f2702`): `deploy/windows/` — `setup.ps1` (one-time admin: installs pm2, copies built frontend, registers scheduled tasks + backup), `start.ps1` (login script: starts pm2), `update.ps1` (pull + rebuild + restart), backup scripts (local `pg_dump` + encrypted Google Drive upload via rclone), `restore-db.ps1`, `ecosystem.config.cjs` (pm2 process config). Backend under pm2 serves `frontend/dist` on one port. Guide: `docs/WINDOWS_PRODUCTION_SETUP.md`.
+- **pm2 fix** (`41cb026`): `pm2 delete/restart` no longer aborts the Windows scripts on a first install (added existence check before delete).
+- **db:refresh fix** (`4ac163a`): `db:refresh` (undo:all) now handles column-aware grid views (drops views before tables) and tolerates rollback failures (try/catch on each undo step).
+- **dev:host** (`c4f91a4`): Added `dev:host` script in `frontend/package.json` for LAN access from other devices (binds to `0.0.0.0`).
+- **mojibake fix** (`51542dd`): Repaired mojibake glyphs on Dashboard + POS screens (arrow `→`, middot `·`, em-dash `—` were rendering as `Ã¢â‚¬â„¢` etc. — caused by UTF-8 BOM or encoding mismatch in source files).
+- **Clean main** (`9f9c7cb`): Stripped `md-framework/` and `postman/` from `main` branch to keep only the clean IMPOC app for production push.
+- **Friendly errors** (`ede549c`): User-facing wording when the backend is down or returns 5xx (replaced raw error dumps with friendly messages via `apiClient.friendlyServerMessage`).
+- **Branding rename** (`d617e06`): "SHREE Fashion Store" → "Shree Fashion Store" across codebase (5 files: `.env.example`, `receipts.service.js`, `delivery.test.js`, `AppShell.jsx`, `ShopLogo.jsx`).
+
+---
+
 # R-47 RE-SCOPED — RECEIPT TEMPLATE VERSIONING + WEBPAGE BUILDER (2026-09-15, PLAN FINALIZED)
 
 **User request:** before implementing R-47, update its scope. The previous delivery scope (email/WhatsApp/SMS receipt sending) is folded into R-62e. New scope: receipt template versioning + a webpage builder for designing receipt templates with placeholders, so each receipt can be regenerated deterministically at any point in time (for backup or system transfer).
