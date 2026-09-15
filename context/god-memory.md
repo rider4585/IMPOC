@@ -43,6 +43,14 @@ Branch: framework/md-impoc (vendored md-framework on top of main @ 4e55c3a). Git
 
 ## Recent
 
+## [2026-09-15 ~16:00Z] R-47 scope finalized — user answered all 4 open questions
+- **Builder:** use an npm module, NOT custom-built. Must support tables and inline CSS. Candidates: react-email-editor (Unlayer), @bolttech/template-editor (Craft.js), email-block-builder.
+- **Snapshots:** store BOTH structured JSON (`receipt_payload` JSONB) AND rendered HTML.
+- **Bulk export:** admin-triggered folder export keyed by invoice number (recovery if PDFs lost; daily DB backup covers DB itself).
+- **Two active templates:** one retail, one rental. Older versions inactive but in DB for export-all-receipts.
+- **Deterministic regeneration:** fetch `receipt_snapshots.rendered_html` directly; no re-render. Template changes never affect old receipts.
+- tasks.json R-47 card updated with answers. Board R-47 section updated.
+
 ## [2026-09-10 ~04:10Z] R-34 DONE — collapsible desktop nav sections (user request, god did it)
 - User: "plan and do one task, please make the nav items collapsable" = the parked AppShell nav-collapsible item. god implemented directly (small self-contained AppShell.jsx change; no file conflict with the running R-33 worker which touches expenses/admin/picklist files).
 - Impl (commit 5a2ad64): desktop left-rail railSection header is now a <button aria-expanded aria-controls> with a ChevronDown (rotates -90 when collapsed); click toggles that section's items (conditional render). Collapsed map persisted in localStorage key 'appshell:nav-collapsed' (loadCollapsedSections + toggleSection, both try/catch). Default expanded so existing item-presence tests stay green. Mobile flat tab bar untouched (no groups there). Added AppShell collapse/expand test + localStorage.clear() in beforeEach (state leaks across tests otherwise). Frontend 295 green, build passes.
@@ -395,3 +403,19 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 - Flagged, not done: a separate WhatsApp number per customer (spec lists mobile + WhatsApp); POS "log enquiry" shortcut.
 
 ## [2026-09-15 ~07:00Z] R-63 CLOSED (user-tested). Open: R-60 (laptop run pending), R-52 parked, R-62 epic + subs todo (Brevo ready).
+
+## [2026-09-15 ~15:00Z] R-47 SCOPE UPDATE — receipt template versioning + webpage builder (user request, PLAN ONLY)
+- User wants to update R-47 scope BEFORE implementation. R-47 was folded into R-62e (delivery), now being re-scoped.
+- PROBLEM: receipts are computed on the fly from sale/rental data. No stored receipt snapshot. If template changes (store name, logo, layout), old receipts would render differently. For backup/system transfer, need each receipt generated exactly as it was originally.
+- NEW SCOPE for R-47:
+  1. **Receipt template versioning**: save the template version with each order record. Each receipt snapshot stored with its template hash + rendered HTML, linked to sale/rental.
+  2. **Webpage builder module**: visual editor for receipt templates with placeholders (customer name, row-wise item data, totals, store info). Supports drag-and-drop blocks.
+  3. **Deterministic regeneration**: at any point, regenerate all receipts exactly as originally generated (for backup/system transfer).
+- ARCHITECTURE DIRECTION:
+  - `receipt_templates` table: id, name, version, html/CSS template, placeholder definitions, is_active, created_at
+  - `receipt_snapshots` table: id, sale_uuid/rental_uuid, template_id, template_version, rendered_html, rendered_at
+  - On sale/rental creation: render receipt with active template, store snapshot
+  - Template editor: blocks (header, item-table, footer, text, image), placeholders wrapped in `{{variable}}` syntax
+  - Placeholder registry: `{{customer.name}}`, `{{customer.phone}}`, `{{items}}` (loop), `{{item.productName}}`, `{{item.quantity}}`, `{{item.unitPrice}}`, `{{totals.total}}`, `{{store.name}}`, `{{transaction.number}}`, `{{transaction.date}}`, etc.
+- STATUS: User said "plan this, don't start implementation yet". Board to be updated. R-47 card will be reopened with new scope.
+- NEXT: design the template builder UI + backend API + snapshot storage strategy, then present to user for approval before dispatch.

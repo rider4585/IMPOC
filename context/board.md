@@ -14,6 +14,47 @@
 
 ---
 
+## KANBAN BOARD (as of 2026-09-15)
+
+### DOING (1)
+- **R-60** — Durable backups on the shop laptop: pg_dump twice daily, manual encrypted Google Drive upload, restore script. Code complete; awaiting user to run `setup.cmd` on the laptop.
+
+### BLOCKED (1)
+- **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use.
+
+### TODO (17)
+- **R-46** — Instagram publishing module: posts + stories + insights (narrowed; WhatsApp moved to R-62). Needs Meta accounts + app review.
+- **R-47** — Receipt template versioning + webpage builder (plan finalized 2026-09-15). Two active templates (retail + rental), npm module for builder, both JSON+HTML snapshots, admin folder export by invoice#.
+- **R-62** — Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later). 15 sub-cards below.
+  - **R-62a** — Comm foundation: migrations (comm_templates, delivery_logs extension, customers preferences)
+  - **R-62b** — Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}})
+  - **R-62c** — Notification engine + provider layer: enqueue(), worker poller, retries, scheduler
+  - **R-62d** — Messages screen (WhatsApp hand-off queue with Open WhatsApp, queued/sent/failed/delivered)
+  - **R-62e** — Invoice communication: auto-enqueue receipt after sale/rental commit (email = Brevo SMTP; WhatsApp = wa.me)
+  - **R-62f** — Birthday programme: daily job (offer N days before, wish on the day), settings page
+  - **R-62g** — Enquiry "available" message through the real engine: route closeEnquiry(notify) through enqueue()
+  - **R-62h** — Campaigns: CRUD/clone/pause/resume/cancel, audience segments with live count, multi-step
+  - **R-62i** — Customer communication preferences: preferred channel, marketing opt-out, do-not-contact
+  - **R-62j** — Communication analytics (phase 2): counts per campaign / template / channel / variant
+  - **R-62k** — LATER: WhatsApp Cloud API provider (whatsapp.cloud.js) + status webhooks; swap from wa.me
+  - **R-62l** — LATER: SMS provider (MSG91 or similar) + India DLT registration; sms.msg91.js
+  - **R-62m** — LATER: PDF receipt attachment on invoice email (pdfkit already a dependency)
+  - **R-62n** — LATER: public receipt page /r/:token + Cloudflare tunnel from the shop laptop
+
+### DONE (129)
+**Foundation (T-series, 16):** T-00 Auth fix, T-01 Gitignore, T-02 Seed, T-03 Admin UI, T-05 Ops UI, T-06 Units backend, T-07 Service UI, T-08 Sales backend, T-09 Dashboard UI, T-10 Rentals backend, T-11 Receipt UI, T-12 Expenses backend, T-13 Reports backend, T-15 Dashboard frontend, T-16 Final QA.
+
+**Security (SEC-*, 28):** SEC-CR-1..3 (money TOCTOU/role privesc/JWT forgery), SEC-H-1..10 (rate-limit/PII/IDOR/localStorage), SEC-M-3..9 (idempotency/scoping/validation/delivery), SEC-L-1..8 (timing/creds/error-masking).
+
+**Revamp (R-01..R-07, 7):** R-01 Tailwind foundation, R-02 Auth polish, R-03 Admin restyle, R-04 Inventory restyle, R-05 POS/Receipts restyle, R-06 Expenses restyle, R-07 Inventory workflow rewrite.
+
+**UI/UX (R-26, 25 cards):** UX-CR-1..3, UX-H-1..8, UX-M-1..10, UX-L-1..4.
+
+**Feature cards (R-24, R-30..R-45, R-48..R-51, R-53..R-61, R-63, 53):**
+R-24 Security umbrella, R-30 POS price edit, R-32 DB views/matviews, R-31 requestUuid frontend, R-33 Expense picklist, R-34 Collapsible nav, R-35 UPI QR + R-35a..f, R-36 Modal polish, R-37 DataGrid, R-38 Scrollbar, R-39 Sidebar rail, R-40 Nav rail toggle, R-41 Barcode scanner, R-42 Display polish + R-42a..d, R-43 Intake scan, R-44 Mobile responsiveness, R-45 Receipt redesign, R-48 Barcode SHREE prefix, R-49 Print labels toast, R-50 Label configurator, R-51 GST on purchases, R-53 Digital pet, R-54 Review QR, R-55 Vendor bill photo, R-56 Sheet configurator, R-57 Inline colour/size, R-58 Theme drawer, R-59 Units scan, R-61 Scanner zoom, R-63 Customer enquiries.
+
+---
+
 ## Phase 0 — Foundation & Auth fix (DO FIRST — unblocks everything)
 - Fix auth refresh bug (backend cookie path/domain/cleanup + frontend vite proxy + AuthProvider getter + apiClient token propagation).
 - Add `.gitignore` (root + verify backend/frontend). Seed, if absent.
@@ -636,28 +677,28 @@ File disjointness: H-5 (receipts module), H-7 (pg-pool-config + service arithmet
 ## Standup (scheduler 00:25Z 09-10)
 - Fleet: only god live (healthy), all workers archived, no pending spawn-requests. Board reconciled (M-3/5/7 done, R-31 added). Nothing stale/blocked/unowned.
 
-## R-32 � DB read-layer (views + trigger/materialized summaries) � PLANNED (2026-09-10)
+## R-32 � DB read-layer (views + trigger/materialized summaries) � PLANNED (2026-09-10)
 - Human request: reduce DB calls/improve perf via view tables + triggers for grids and dashboard items. ANALYSED -> FEASIBLE -> card R-32 (todo, medium, deps R-28).
 - Phase A: grids = SQL views + missing date/FK indexes + pagination (list endpoints query views, DTO shapes unchanged).
 - Phase B: dashboard/analytics = MATVIEW CONCURRENTLY or trigger-maintained reporting summary over append-only ledger; money stays BIGINT, derived-only, reversals subtracted.
 - Evidence: reports.service.js aggregates whole tables in Node; R-28 already flags no-pushdown/unindexed-FK/no-date-index/unpaginated. Queued behind SEC-M/L + R-31.
 
-## R-31 � SEC-M-3 requestUuid frontend � DONE + MERGED (2026-09-10)
+## R-31 � SEC-M-3 requestUuid frontend � DONE + MERGED (2026-09-10)
 - Worker finished but harness dropped its done/status msgs (malformed-json) - payloads recovered from outbox/.sent/bad-*, filed to god inbox/.done/.
 - 8 money-write fns (salesApi/rentalsApi/expensesApi) now carry requestUuid (mint-or-honor); POS/Rentals/Expenses screens mint one key per intent, reuse on retry, reset on success/close.
 - Verified by god: vitest 277/26 + build PASS in worktree AND main. Commit 2fb73dd -> merged 96acfbd (framework/md-impoc). Card R-31 done; worker archived.
 
-## SEC-L-1..L-8 (low security batch) � IN FLIGHT (2026-09-10)
+## SEC-L-1..L-8 (low security batch) � IN FLIGHT (2026-09-10)
 - Batch A backend worker-sec-l1-l6: L-1 login timing oracle / L-2 email+phone to privileged scope / L-3 customerId out of sale-rental DTOs / L-4 rotate admin password123 dev creds / L-5 escape LIKE wildcards / L-6 req.user?.id in intake scan controller.
 - Batch B frontend worker-sec-l7-l8: L-7 frontend buildError lockstep w/ backend M-7 allow-list / L-8 vite server host localhost (was 0.0.0.0).
 - Fix applied to spawn flow: spawn-request must include command:'opencode' (defaults to claude elsewhere). Both spawned + contract-delivery re-sent after earlier no-inbox drops.
 
-## SEC-L-7..L-8 � DONE + MERGED (2026-09-10)
+## SEC-L-7..L-8 � DONE + MERGED (2026-09-10)
 - worker-sec-l7-l8: L-7 shared src/platform/buildError.js (mirrors backend M-7 allow-list; masks opaque/UUID/(status:) strings; 15 services + authApi/tripsApi refactored, -199/+23), L-8 vite host true->localhost.
 - Verified by god: vitest 291/27 + build PASS (worktree + main). Commit 7b19765 -> merged 981fa2f. Tasks SEC-L-7/8 done; worker deregistered; worktree auto-reclaimed.
 - REMAINS in SEC-L: backend batch worker-sec-l1-l6 (L-1..L-6) in flight.
 
-## SEC-L-1..L-6 � DONE + MERGED (2026-09-10)
+## SEC-L-1..L-6 � DONE + MERGED (2026-09-10)
 - worker-sec-l1-l6: L-1 dummy argon2 on unknown-user/inactive login (timing oracle); L-2 new users.view_pii (ADMIN-only, stricter than M-5 broad-read; no current FE screen consumes email/phone); L-3 customerId dropped from sale/agreement DTOs (no FE usage); L-4 dev seed pw rotated Impoc-Devseed-2026!; L-5 escapeLike() helper on customers/units/stock LIKEs; L-6 req.user?.id.
 - Verified: jest 665/665 (worktree + main); commit 005b320 -> merged 648318c. SEC-L-1..6 done; SECURITY TRACK 100% CLOSED (H/M/CR/L all done).
 
@@ -1025,3 +1066,36 @@ R-62 planned (15 cards added, none dispatched). Board: 148 done (R-47 closed as 
 
 # SHIFT CLOSE #10 (2026-09-15)
 R-63 done. Next: R-62a (comm foundation) when the user says go.
+
+---
+
+# R-47 RE-SCOPED — RECEIPT TEMPLATE VERSIONING + WEBPAGE BUILDER (2026-09-15, PLAN FINALIZED)
+
+**User request:** before implementing R-47, update its scope. The previous delivery scope (email/WhatsApp/SMS receipt sending) is folded into R-62e. New scope: receipt template versioning + a webpage builder for designing receipt templates with placeholders, so each receipt can be regenerated deterministically at any point in time (for backup or system transfer).
+
+**Problem:** receipts are currently computed on the fly from sale/rental data. The HTML template is hardcoded in `receipts.html.js`. If the template changes (store name, logo, layout), old receipts would render differently. For backup/system transfer, each receipt must be generated exactly as it was originally.
+
+**User decisions (2026-09-15):**
+1. **Builder:** use an npm module (NOT custom-built). Must support tables and inline CSS edits. Candidates: react-email-editor (Unlayer), @bolttech/template-editor (Craft.js), email-block-builder.
+2. **Snapshots:** store BOTH structured JSON (`receipt_payload` JSONB) AND rendered HTML in `receipt_snapshots`.
+3. **Bulk export:** admin-triggered folder export keyed by invoice number. Purpose: recovery if PDFs lost (daily DB backup covers DB itself).
+4. **Two active templates:** one for retail sales, one for rentals. Only the latest iteration of each is active; older versions marked inactive but kept in DB for export-all-receipts.
+5. **Deterministic regeneration:** fetch `receipt_snapshots.rendered_html` directly — no re-render. Template changes never affect old receipts.
+
+**Architecture direction:**
+1. **`receipt_templates` table**: id, name, version (integer), html_content (TEXT, full HTML/CSS with `{{placeholders}}`), block_layout (JSONB, block arrangement for the builder), is_active (boolean), created_by, timestamps.
+2. **`receipt_snapshots` table**: id, entity_type (SALE|RENTAL), entity_uuid, template_id, template_version, receipt_payload (JSONB), rendered_html (TEXT), rendered_at. Unique on (entity_type, entity_uuid) — one snapshot per order.
+3. **Placeholder registry**: `{{store.name}}`, `{{store.address}}`, `{{store.phone}}`, `{{transaction.number}}`, `{{transaction.date}}`, `{{customer.name}}`, `{{customer.phone}}`, `{{items}}` loop, `{{item.productName}}`, `{{item.colour}}`, `{{item.size}}`, `{{item.quantity}}`, `{{item.unitPrice}}`, `{{item.lineTotal}}`, `{{totals.total}}`, `{{totals.amountInWords}}`, `{{totals.itemsCount}}`.
+4. **Snapshot capture**: after sale/rental creation, render with active template → store both JSON + HTML.
+5. **Bulk export**: admin function exports all snapshots into folder keyed by invoice number.
+
+**API endpoints planned:** `GET/POST /api/receipt-templates`, `PUT /:id`, `POST /:id/activate`, `GET /active`, `POST /preview`, `GET /api/receipt-snapshots/:entityType/:entityUuid`, `GET /snapshots/export`.
+
+**Frontend planned:** Receipt Templates screen (Admin), Template Builder (block-based editor + live preview), ReceiptSection gains "View original receipt" button.
+
+**Status:** plan finalized, not yet dispatched. Awaiting implementation kickoff.
+
+---
+
+# SHIFT CLOSE #11 (2026-09-15)
+R-47 re-scoped + finalized (plan only, not dispatched). Board: 148 done / 1 doing (R-60) / 1 blocked (R-52) / 15 todo (R-62 + a–n, R-46) + R-47 re-scoped (plan finalized, awaiting implementation kickoff).
