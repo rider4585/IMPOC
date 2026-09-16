@@ -16,6 +16,13 @@ Worker patterns: check memory.md+worktree+outbox/.sent/bad-* for completion evid
 Test DB contention: impoc_test shared; jest --runInBand CAUSES failures; use default parallel; migrations don't run in jest (use test-setup.js).
 Branch: context (handoff). Main branch: 8fa271a. Framework branch: framework/md-impoc. All 45 migrations UP on dev DB impoc_dev.
 
+- **DB migration verification rule:** Any task that creates/modifies a migration, model, seeders, or database schema MUST run all three verification steps before marking done. This is non-negotiable — a broken migration or seeder blocks all other devs and the production deploy:
+  1. `npm run db:migrate` — verify new migrations apply cleanly on an existing DB.
+  2. `npm run db:seed` — verify seeders run without errors (if your task touches seeders).
+  3. `npm run db:refresh` — verify the full lifecycle (undo-all → migrate → seed) completes without errors. This catches backward-compatibility issues: a migration that works on a fresh DB but breaks when un-done, or a seeder that conflicts with earlier migrations.
+  After all three pass, run the backend test suite (`NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules npx jest --forceExit`) to confirm no regressions.
+- **sequelize-cli ESM gotcha:** `sequelize-cli` 6.6.5 with Node ESM (`"type": "module"`) caches named replacements from earlier file revisions. If a migration uses `:roleId` named replacements and fails with `Named replacement ":roleId" has no entry in the replacement map`, switch to direct SQL interpolation with IDs from your own SELECT queries (safe since values are integer IDs from the DB, not user input). See `20260915000006-seed-receipt-template-permissions.js` for the pattern.
+
 ## 🗜 Condensed history
 
 **Project IMPOC** (Inventory/POS/rental management, SHREE Fashion Store) on branch framework/md-impoc @ 421514b. Backend: Express 5 + Sequelize/Postgres (16.15), JWT+argon2 auth. Frontend: React 19 + Vite 8.2, @zxing barcode, minimals dark-primary Tailwind+shadcn light-only design.
@@ -39,7 +46,11 @@ Branch: context (handoff). Main branch: 8fa271a. Framework branch: framework/md-
 
 **Unresolved:** (1) Dark mode tokens still in index.css (user chose light-only; decision pending strip). (2) AppShell nav collapsible + focus-ring width (ring-2/offset-2 -> ring-1/offset-1) parked backlog. (3) DashboardPlaceholder vs full Dashboard.jsx (T-15 delivered screens but placeholder may still exist; verify). (4) Code-splitting chunk warning (pre-existing, non-blocking).
 
-**Current state:** context branch, HEAD 74a2ee3. Main: 8fa271a. Kanban: 165 tasks, 148 done, 17 todo (R-46, R-47, R-62 + R-62a–n). Fleet: god only. All 45 migrations applied to impoc_dev.
+**Current state:** context branch, HEAD 74a2ee3. Main: 8fa271a. Kanban: 164 tasks, 148 done, 16 todo (R-47, R-62 + R-62a–n). Fleet: god only. All 45 migrations applied to impoc_dev.
+
+## 🗑️ Removed tickets
+
+- **R-46 (Instagram publishing):** REMOVED 2026-09-15 — user said "too soon to plan." Was narrowed to IG-only (WhatsApp part had moved to R-62). Needed Meta accounts + app review. Historical references in board.md shift-close records kept as-is.
 
 ## 📦 Features delivered offline (R-48–R-63, user commits on main 2026-09-13→15)
 
@@ -451,3 +462,21 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
   - Placeholder registry: `{{customer.name}}`, `{{customer.phone}}`, `{{items}}` (loop), `{{item.productName}}`, `{{item.quantity}}`, `{{item.unitPrice}}`, `{{totals.total}}`, `{{store.name}}`, `{{transaction.number}}`, `{{transaction.date}}`, etc.
 - STATUS: User said "plan this, don't start implementation yet". Board to be updated. R-47 card will be reopened with new scope.
 - NEXT: design the template builder UI + backend API + snapshot storage strategy, then present to user for approval before dispatch.
+
+## [2026-09-16 ~08:35Z] R-47 REOPENED - user new spec (publish-first, 2 templates, physical-receipt structure); implemented, UNCOMMITTED, awaiting user check
+- USER FEEDBACK: only 2 receipts (Sale+Rental), no create-new; each change = new version; Publish button marks latest saved version active; see all versions; only ACTIVE version used on POS; template must replicate the attached physical receipt photo (I CANNOT READ IMAGES - used the R-45 branded A5 design the seed already encodes as the faithful proxy; flagged to user to report differences); bug reported: editing a template was EMPTY.
+- ROOT CAUSE of empty-on-edit: TemplateBuilder was react-email-editor (Unlayer) drag-drop; it can only load its own JSON "design" (editor_state), but seeded templates store raw HTML and editorState=NULL -> blank canvas. FIX: rewrote TemplateBuilder as an HTML source editor (textarea + insert-placeholder + server Preview via POST /preview). react-email-editor no longer used.
+- MODEL FIXES (important gotchas): (1) updateTemplate previously set the old row isActive=false when saving -> dirty drafts deactivated the published receipt. Now save creates max(version)+1 draft WITHOUT touching the published row; explicit Publish sets it active. (2) previewTemplate + captureSnapshot rendered via static buildBrandedReceiptHtml IGNORING the template html + engine. Now both render the ACTIVE template's html through the engine (renderReceiptFromPayload); captureSnapshot falls back to the static builder on template error. (3) seed had RENTAL inactive -> rentals would have no published receipt; now active. (4) engine context added store.wordmark (seed uses {{store.wordmark}} which rendered ''). (5) removed POST /receipt-templates (create) - only 2 templates exist; frontend + api + tests updated.
+- POS pipeline: sale/rental completion -> captureSnapshot renders ACTIVE template -> ReceiptSection shows "Branded receipt"/"View original" from snapshot.renderedHtml (active-template output), fallback to static builder.
+- VERIFIED: db:migrate/seed/refresh clean (migration 20260916000001 idempotent), seeded 2 published templates, backend jest 802 (51 suites, was 803 - net -1 from removing create tests), frontend vitest 436, build clean. R-47 status card -> doing; NOT committed (user checks first). If user re-prompts on diff vs photo: update the SALE/RENTAL v1 html in the seeder + existing rows.
+- GOTCHA for later: hive/tasks.json currently holds 22 live cards (earlier PowerShell truncation); a context-based 164-card rebuild was described but is NOT on disk - board file may need a re-rebuild pass before it is trusted (do NOT attempt without Node + care).
+
+## [2026-09-16 ~08:50Z] R-47 += image-slot placeholders (still uncommitted, user check pending)
+- USER REQ: 'leave placeholders for images in receipt that i will add later'. Implementation: engine renders <div class="receipt-image-slot"> as a dashed box in editor preview but STRIPS it from final snapshots (renderReceiptFromPayload(templateHtml, receipt, {preview}) - default final = strip). The owner later replaces the div with a real <img> tag (or deletes it). Seeder HTML (SALE_TEMPLATE_HTML, now exported) carries the CSS + one slot after the header; migration 20260916000002 patches published rows in place (no new version) - content-only + idempotent + no-op down; db:refresh happy. TemplateBuilder Insert-placeholder menu gained 'Image slot (add a picture later)' (IMAGE_SLOT_SNIPPET). Tests: 4 new, backend 806 total. NOTE the html_content patch migration edits the ACTIVE row in place, so receipts pick it up immediately without a version bump - correct for a template-content seed; if the owner later customises via the builder it becomes a draft version as usual.
+
+## [2026-09-16 ~09:00Z] Scheduler reply bounced again - reconfirmed
+- Replied to the hourly 'scheduler' standup via outbox (to: scheduler) -> bounced straight back undeliverable (from god, to god). CONFIRMED AGAIN: never write outbox replies to scheduler; handle standups locally (review floor + board, fix stale) and file the request to .done. Bounce message filed. Inbox empty.
+
+## [2026-09-16 ~09:45Z] R-47 SHIPPED - user go: docs updated + pushed to context and main
+- User: 'update the context docs, memory and push the changes to remote, context related changes to context branch only and only clean code to main'. Did: CONTEXT.md (149 done, R-47 rework bullet, receipt-template conventions) + CONTEXT-RESUME.md fully refreshed; context/{board.md,god-memory.md,tasks.json} synced from hive (08:50Z image-slots + 09:00Z bounce entries now also in snapshots; R-47 card -> done both files). Committed app code (backend + frontend + 2 migrations) as its own commit on context, docs as a second commit; pushed context; cherry-picked the app-code commit onto main (context and main had diverged - 38/21 - because both carry their own earlier R-47 commit; the delta applied cleanly) and pushed main. colors.zip/colors/, frontend/doc/, tunnels.json left untracked on purpose.
+- OPEN FOLLOW-UP (non-blocking, logged): the physical-receipt photo is unreadable by god; template replicates the R-45 branded A5 design. Any structural difference the user notices on the printed receipt = a small tweak to the seeded SALE/RENTAL v1 HTML (seeder 20260915000007) + a migration patch like 20260916000002.

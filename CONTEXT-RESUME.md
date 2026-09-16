@@ -1,6 +1,6 @@
 # CONTEXT-RESUME.md — Handoff for Other AI Tools
 
-**Last updated:** 2026-09-15
+**Last updated:** 2026-09-16
 **Branch:** `context` (all planning docs live here; clean code goes to `main`)
 
 ---
@@ -15,23 +15,21 @@
 
 ---
 
-## What Happened in the Last Session (2026-09-15)
+## What Happened in the Last Sessions (2026-09-16)
 
 ### Completed
-- **R-63 Customer Enquiries** — fully done and user-tested. `customer_enquiries` table, `/api/enquiries`, Enquiries page under POS / Counter. Open/Closed tabs, log with CustomerPicker, close = tap-to-send WhatsApp/email/SMS links or close quietly. jest 769/769, vitest 436/436.
-- **R-47 scope update** — receipt template versioning + webpage builder re-scoped. Previous delivery scope folded into R-62e. Plan finalized with user's answers to all 4 open questions (see below).
-- **Board visibility fix** — added task summary table to top of `board.md` showing all tasks by status.
+- **R-47 receipt-template rework** (user re-scope) — shipped to `context` and cherry-picked to `main` (clean code only). Recaps:
+  - Only **2 templates** (Sale/Rental), creation removed from backend + frontend.
+  - Each save = **new version** row (draft, `max+1`); the published version stays live; **Publish** (`POST /:uuid/activate`) marks a version active.
+  - POS/rentals render the **ACTIVE** template via the engine (`renderReceiptFromPayload`) through `captureSnapshot`; preview + snapshots no longer silently used `buildBrandedReceiptHtml`.
+  - Fixed the **blank-on-edit** editor: `TemplateBuilder.jsx` rewritten from `react-email-editor` (Unlayer can't load raw HTML) to an HTML source editor with insert-placeholder / item-loop / image-slot + server Preview.
+  - Engine gained `store.wordmark` and **image slots** (`<div class="receipt-image-slot">`): dashed box in preview, stripped from printed receipts until replaced with a real `<img>` — the shop will add images later.
+  - Migrations `20260916000001` (publish rules) + `20260916000002` (image-slot content onto published rows); seeder `20260915000007` updated (RENTAL active, names 'Sale Receipt'/'Rental Receipt', HTML now exports `SALE_TEMPLATE_HTML`).
+  - Verified: `db:migrate`/`db:seed`/`db:refresh` clean, backend jest 806/806, frontend vitest 436/436, build clean.
+- **Hive ops**: scheduler standup handled + filed; a reply to `scheduler` bounced again (not a floor agent — never reply to scheduler, handle standups locally). R-47 card set to done; board + memory + `context/` snapshots synced.
 
-### R-47 Finalized Decisions (user answered 2026-09-15)
-1. **Builder:** use an npm module (NOT custom-built). Must support tables and inline CSS edits. Candidates: react-email-editor (Unlayer), @bolttech/template-editor (Craft.js), email-block-builder.
-2. **Snapshots:** store BOTH structured JSON (`receipt_payload` JSONB) AND rendered HTML in `receipt_snapshots`.
-3. **Bulk export:** admin-triggered folder export keyed by invoice number. Purpose: recovery if PDFs lost.
-4. **Two active templates:** one for retail sales, one for rentals. Older versions inactive but in DB for export.
-
-### Files Updated
-- `context/tasks.json` — R-47 card updated with user answers in humanQA + details
-- `context/board.md` — R-47 section rewritten with finalized decisions + task summary table at top
-- `context/god-memory.md` — R-47 user decisions logged
+### Open item (non-blocking)
+- The physical-receipt photo could not be machine-read by the orchestrator; the template replicates the R-45 branded A5 design. If the printed receipt differs (address/phone block, GST lines, extra note), that is a small seed-HTML tweak — tell the team when convenient.
 
 ---
 
@@ -39,70 +37,49 @@
 
 | Metric | Value |
 |--------|-------|
-| Done (tasks.json) | 148 |
-| Doing | 0 (R-60 was doing, now closed as code-complete — awaiting laptop run) |
-| Blocked | 0 (R-52 was blocked/parked, now closed as done — user decided to revisit ~2026-10-13) |
-| Todo | 17 (R-46, R-47, R-62 + a–n) |
-| Tests | jest 769/769, vitest 436/436 |
+| Done (tasks) | 149 |
+| Doing | 0 |
+| Blocked | 0 |
+| Todo | 15 (R-62 + a–n, all parked by user) |
+| Tests | jest 806/806, vitest 436/436 |
 
-### Active Tickets
-- **R-60** (doing): durable backups — verified `pg_dump` twice daily, manual encrypted Google Drive upload, restore script. `setup.cmd` re-run registers it all. **Awaiting user run on laptop.**
-- **R-47** (todo): receipt template versioning + webpage builder. Plan finalized, not yet dispatched. Needs: npm module evaluation → implementation kickoff.
-- **R-62 + a–n** (todo): Customer Communication & Campaign platform. 15 sub-cards planned, none dispatched. Waiting on: user go + which mailbox to send from.
-- **R-46** (todo): Instagram publishing (narrowed). Needs Meta accounts + app review. Parked.
-- **R-52** (blocked): Buying templates module. User parked to ~2026-10-13 to decide Hide/Remove/Keep after production use.
+### Notable Passive Items
+- **R-60** (done code-wise, **awaiting laptop run**): durable backups — `pg_dump` twice daily + manual encrypted Google Drive upload + restore script. `docs/WINDOWS_PRODUCTION_SETUP.md` §8.
+- **R-52** (parked done, revisit ~2026-10-13): Buy/templates module — Hide/Remove/Keep decision after production use.
+- **R-62 + a–n** (todo, **parked**): Customer Communication & Campaign platform. User: "dont start any work on R-62 tasks". Do not dispatch until user says go. Phase 1 = email (Brevo SMTP) + WhatsApp `wa.me` hand-off; no public URL.
 
 ---
 
 ## What to Do Next
 
-### Immediate (when user says go)
-1. **R-47 implementation** — evaluate npm modules for template builder, then build receipt template versioning + snapshot system. Start with Phase 1 (DB schema + template CRUD API + snapshot capture).
-2. **R-62a** — comm platform foundation. Waiting on user go + mailbox decision.
-
-### Not Blocking
-- R-60 is done code-wise, waiting on user to run `setup.cmd` on the laptop.
-- R-46 needs Meta accounts (external dependency).
-- R-52 is parked by user decision.
+1. **R-47 follow-ups** (only if the user raises them): visual diff vs physical receipt → tweak seed HTML; add a real `<img>` in the template editor once the shop has the artwork (replace the `.receipt-image-slot` div).
+2. **R-62** — awaiting user go + mailbox decision. NOT to be started before that.
+3. **R-60** — awaiting user to run `setup.cmd` on the shop laptop.
 
 ---
 
-## Key Files for R-47 (receipt builder)
+## Key Files for R-47 (receipt templates)
 
 | File | Purpose |
 |------|---------|
-| `backend/src/modules/receipts/receipts.service.js` | Core receipt builder (buildSaleReceipt/buildRentalReceipt) — snapshot capture goes here |
-| `backend/src/modules/receipts/receipts.html.js` | Hardcoded branded HTML template (to be replaced by versioned templates) |
-| `frontend/src/platform/brandedReceiptHtml.js` | Frontend copy of receipt HTML (keep in sync) |
-| `backend/database/models/DeliveryLog.js` | `receipt_payload` JSONB (continues for email/WhatsApp via R-62) |
-| `backend/src/modules/sales/sales.service.js` | Will trigger snapshot on sale creation |
-| `backend/src/modules/rentals/rental-agreement.service.js` | Will trigger snapshot on rental creation |
-| `backend/database/models/ReceiptTemplate.js` | To be created |
-| `backend/database/models/ReceiptSnapshot.js` | To be created |
+| `backend/src/modules/receipt-templates/` | Controller/routes/service/validation + `receipt-template-engine.js` (Handlebars-style renderer, `store.wordmark`, image-slot strip/preview) |
+| `backend/src/modules/receipt-templates/receipt-templates.service.js` | Publish-first `updateTemplate` (max+1 draft), `activateTemplate`, `previewTemplate` (`{preview:true}`), `captureSnapshot` |
+| `backend/database/migrations/20260916000001-publish-rules.js`, `20260916000002-image-slot.js` | R-47 rework data migrations |
+| `backend/database/seeders/20260915000007-receipt-templates-seed.js` | Seeded SALE/RENTAL HTML (exported `SALE_TEMPLATE_HTML`) |
+| `backend/tests/receipt-templates/receipt-templates.test.js` | Publish-first + image-slot tests (37) |
+| `frontend/src/components/TemplateBuilder.jsx` | HTML source editor + Insert placeholder/item-row/image-slot + server Preview |
+| `frontend/src/screens/admin/ReceiptTemplatesScreen.jsx` | 2 grouped templates, version history, Published/Draft badges, Publish |
+| `frontend/src/components/receipts/BrandedReceiptDialog.jsx`, `ReceiptSection.jsx` | POS prints `snapshot.renderedHtml` from the ACTIVE template |
 
 ---
 
 ## Conventions to Follow
 
-- **Branch:** `context` for planning/docs, `main` for clean code only.
-- **Migrations:** ESM export style (`const migration = {...}; export const up = migration.up.bind(migration)`). CommonJS `module.exports` breaks under `type: module`.
+- **Branch:** `context` for planning/docs, `main` for clean code only. Context-only changes (docs, `context/`, root `CONTEXT*`) never go to `main`; app code (backend/frontend) ships to both via cherry-pick.
+- **Migrations:** ESM export style; CommonJS `module.exports` breaks under `type: module`.
 - **Money:** BIGINT paise end-to-end; DTOs return strings; never coerce to JS `Number`.
-- **Tests:** frontend `npx vitest run`; backend `NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules npx jest --forceExit`.
-- **Branding:** shop name/logo in `app_settings`; never hard-code. Use `useBranding()` (frontend) / `getShopName()` (backend).
-- **Internal-scroll layout:** every flex ancestor needs `min-h-0` for internal-scroll child to bound.
-- **Context branch policy:** planning docs in `context/` and `hive/` (gitignored). Only clean code merges to `main`.
-
----
-
-## Files in `context/`
-
-| File | What |
-|------|------|
-| `board.md` | Shift log / freeform plan (full project history) |
-| `tasks.json` | Kanban ticket log with per-ticket detail |
-| `tasks-archive.json` | Archived/completed ticket log |
-| `god-memory.md` | Orchestrator's durable memory |
-| `memory-index.md` | Index of all agent memories |
-| `PROTOCOL.md` | Hive orchestration protocol |
-| `COMMANDS.md` | Command reference |
-| `findings/*` | Security, UI/UX, backend, Postgres reviews |
+- **Tests:** frontend `npx vitest run` (from frontend/); backend `NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules npx jest --forceExit` (never `--runInBand`).
+- **DB verification rule:** any migration/seeder change → `db:migrate` + `db:seed` + `db:refresh`, then full backend jest.
+- **Branding:** shop name/logo in `app_settings`; never hard-code (frontend `useBranding()` / backend `getShopName()`).
+- **Hive:** scheduler is NOT a floor agent — never reply to it via outbox (bounces); handle standups locally and file to `.done`. Edit `hive/*.json` with Node, not PowerShell.
+- **Receipt templates:** HTML lives in the DB; only the active version renders POS receipts; `.receipt-image-slot` divs are stripped from printed output until replaced with a real `<img>`.

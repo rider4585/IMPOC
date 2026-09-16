@@ -23,7 +23,7 @@
 - **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use.
 
 ### TODO (17)
-- **R-46** — Instagram publishing module: posts + stories + insights (narrowed; WhatsApp moved to R-62). Needs Meta accounts + app review.
+- **R-46** — ~~Instagram publishing module~~ — REMOVED (too soon to plan, user 2026-09-15).
 - **R-47** — Receipt template versioning + webpage builder (plan finalized 2026-09-15). Two active templates (retail + rental), npm module for builder, both JSON+HTML snapshots, admin folder export by invoice#.
 - **R-62** — Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later). 15 sub-cards below.
   - **R-62a** — Comm foundation: migrations (comm_templates, delivery_logs extension, customers preferences)
@@ -1114,3 +1114,18 @@ These are developer/production infrastructure changes committed alongside featur
 
 # SHIFT CLOSE #11 (2026-09-15)
 R-47 re-scoped + finalized (plan only, not dispatched). Board: 148 done / 1 doing (R-60) / 1 blocked (R-52) / 15 todo (R-62 + a–n, R-46) + R-47 re-scoped (plan finalized, awaiting implementation kickoff).
+
+---
+
+# R-46 REMOVED (2026-09-15, user)
+User: "R-46 too soon to plan." Instagram publishing module removed from the board. WhatsApp part already lives in R-62. Historical shift-close references to R-46 kept as-is (immutable history).
+
+**Board: 148 done / 0 doing / 0 blocked / 16 todo (R-47, R-62 + R-62a–n). Total: 164 tasks.**
+
+- BOARD 2026-09-16 ~08:35Z: R-47 REOPENED BY USER (new requirements, NOT done until user checks). User attached physical receipt photo (god cannot read images; R-45 branded design used as proxy). Spec: only 2 receipts (Sale + Rental); NO creating new templates; every change = new version; Publish button marks latest saved version active; see all previous versions; only active version generates POS invoices; template must replicate physical receipt. Also reported bug: editing a template showed EMPTY (cause: TemplateBuilder used react-email-editor drag-drop which only loads editor JSON; seeded templates have editorState NULL). IMPLEMENTED (uncommitted, working tree on context): removed POST /receipt-templates + frontend create buttons/API; updateTemplate now saves max+1 DRAFT and does NOT deactivate the published version; activate = Publish; migration 20260916000001 normalizes 1 published version per entity_type + renames Sale/Rental Receipt; seeder RENTAL now active; previewTemplate + captureSnapshot now render ACTIVE template through the engine (previously silently used buildBrandedReceiptHtml); engine store.wordmark added; TemplateBuilder rewritten as HTML code editor + placeholder insert + server preview; ReceiptTemplatesScreen = 2 grouped templates, version history, Publish button; POS BrandedReceiptDialog prefers snapshot.renderedHtml (active template output). VERIFIED: db:migrate/seed/refresh clean, seeded both active, backend jest 802 (51 suites), frontend vitest 436, build clean. R-47 card -> doing (not done). Uncommitted pending user check.
+
+- BOARD 2026-09-16 ~08:50Z: R-47 (still doing, uncommitted) += IMAGE-SLOT placeholders per user ("leave placeholders for images in receipt that i will add later"). Engine (receipt-template-engine.js) now supports <div class="receipt-image-slot">: rendered as dashed box in editor PREVIEW (previewTemplate passes {preview:true}), stripped from FINAL sale/rental snapshots until the owner replaces it with a real <img>. Seeder 20260915000007 HTML += .receipt-image-slot CSS + one slot div after the header (SALE+RENTAL share the same HTML, constant now exported SALE_TEMPLATE_HTML). New migration 20260916000002-receipt-templates-image-slot.js patches the published SALE/RENTAL rows in place (content-only, idempotent, no-op down). TemplateBuilder.jsx += 'Image slot (add a picture later)' entry in Insert placeholder dropdown. Tests += 4 (preview keeps slot, final strips, engine default strips, capture-path render strips). VERIFIED: db:migrate + db:refresh clean, published rows confirmed has_slot=true, backend jest 806 (51 suites), frontend vitest 436, build clean, eslint unchanged (2 pre-existing). Still UNCOMMITTED, still awaiting user check.
+
+- BOARD 2026-09-16 ~09:00Z: Scheduler standup (02:55Z) handled + filed to .done. My 02:56Z outbox reply to `scheduler` bounced as undeliverable (scheduler is not a floor agent - known, memory line 292). Bounce filed to .done; no reply sent (convention). Inbox now empty.
+
+- BOARD 2026-09-16 ~09:45Z: USER GO - update docs/memory + push. Committed in two steps: (1) app code commit (backend receipt-templates module + engine + seeder + migrations 20260916000001/2 + frontend TemplateBuilder/ReceiptTemplatesScreen/BrandedReceiptDialog/ReceiptSection/receiptTemplateApi) on context; (2) docs commit (CONTEXT.md, CONTEXT-RESUME.md, context/{board.md,god-memory.md,tasks.json}). Pushed context; cherry-picked the app-code commit onto main + pushed main. Leave-alone untracked files (colors.zip, colors/, frontend/doc/, tunnels.json) NOT committed. R-47 card -> done (shipped on both branches). Reminder logged: physical-receipt photo unreadable - visual diff vs printed receipt remains an open follow-up (seed HTML tweak only).
