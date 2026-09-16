@@ -281,6 +281,14 @@ const createRentalOnce = async ({ customerName, customerUuid, startDate, rentalD
 
         await transaction.commit();
 
+        // Capture receipt snapshot (fire-and-forget, non-blocking)
+        try {
+            const { captureSnapshot } = await import('../receipt-templates/receipt-templates.service.js');
+            await captureSnapshot({ entityType: 'RENTAL', entityUuid: agreement.uuid });
+        } catch (snapshotErr) {
+            console.error('[rentals] Failed to capture receipt snapshot:', snapshotErr.message);
+        }
+
         const fullAgreement = await RentalAgreement.findByPk(agreement.id, {
             include: [
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }, { association: 'returns' }] },

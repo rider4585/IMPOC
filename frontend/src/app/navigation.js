@@ -5,6 +5,7 @@ import RolesScreen from '../screens/admin/RolesScreen';
 import PermissionsScreen from '../screens/admin/PermissionsScreen';
 import PicklistManagementScreen from '../screens/admin/PicklistManagementScreen';
 import VendorsScreen from '../screens/admin/VendorsScreen';
+import ReceiptTemplatesScreen from '../screens/admin/ReceiptTemplatesScreen';
 import TripsScreen from '../screens/inventory/TripsScreen';
 import TripDetailScreen from '../screens/inventory/TripDetailScreen';
 import StockForm from '../screens/inventory/StockForm';
@@ -46,6 +47,7 @@ export const navigationRegistry = [
   { permission: PERMISSIONS.RENTALS.VIEW, label: 'Rentals', path: '/rentals', element: RentalsScreen },
   { permission: PERMISSIONS.EXPENSES.VIEW, label: 'Expenses', path: '/expenses', element: ExpensesScreen },
   { permission: PERMISSIONS.CUSTOMERS.VIEW, label: 'Customers', path: '/customers', element: CustomersScreen },
+  { permission: PERMISSIONS.RECEIPT_TEMPLATES.VIEW, label: 'Receipt Templates', path: '/receipt-templates', element: ReceiptTemplatesScreen },
   { permission: PERMISSIONS.REPORTS.VIEW, label: 'Dashboard', path: '/dashboard', element: Dashboard },
 ];
 
@@ -102,6 +104,7 @@ export const navigationSections = [
       { permission: PERMISSIONS.ROLES.VIEW, label: 'Permissions', path: '/permissions' },
       { permission: PERMISSIONS.PICKLISTS.VIEW, label: 'Picklists', path: '/picklists' },
       { permission: PERMISSIONS.CUSTOMERS.VIEW, label: 'Customers', path: '/customers' },
+      { permission: PERMISSIONS.RECEIPT_TEMPLATES.VIEW, label: 'Receipt Templates', path: '/receipt-templates' },
     ],
   },
   {

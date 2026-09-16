@@ -37,6 +37,11 @@ export const PERMISSIONS = Object.freeze({
     MANAGE: 'branding.manage',
   },
 
+  RECEIPT_TEMPLATES: {
+    VIEW: 'receipt_templates.view',
+    MANAGE: 'receipt_templates.manage',
+  },
+
   CUSTOMERS: {
     VIEW: 'customers.view',
     CREATE: 'customers.create',

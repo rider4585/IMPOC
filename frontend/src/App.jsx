@@ -15,6 +15,7 @@ import VendorDetail from './screens/inventory/VendorDetail';
 import StocksScreen from './screens/inventory/StocksScreen';
 import UnitsScreen from './screens/inventory/UnitsScreen';
 import PosDisplayScreen from './screens/display/PosDisplayScreen';
+import ReceiptTemplateBuilderPage from './screens/admin/ReceiptTemplateBuilderPage';
 
 /**
  * App.jsx — top-level router and auth setup
@@ -128,6 +129,9 @@ function App() {
 
                       {/* Nested vendor detail route */}
                       <Route path="/vendors/:uuid" element={<VendorDetail />} />
+
+                      {/* Receipt template builder page */}
+                      <Route path="/receipt-templates/builder" element={<ReceiptTemplateBuilderPage />} />
 
                       {/* UX-C1: post-login landing — redirect `/` to the first permitted screen */}
                       <Route path="/" element={<LandingRedirect />} />

@@ -35,6 +35,7 @@ import customerRoutes from './src/modules/customers/customers.routes.js';
 import enquiryRoutes from './src/modules/enquiries/enquiries.routes.js';
 import deliveryRoutes from './src/modules/delivery/delivery.routes.js';
 import receiptRoutes from './src/modules/receipts/receipts.routes.js';
+import { receiptTemplateRoutes, receiptSnapshotRoutes } from './src/modules/receipt-templates/receipt-templates.routes.js';
 import errorMiddleware from './src/middleware/error.middleware.js';
 
 import { assertJwtSecrets } from './src/modules/auth/token.service.js';
@@ -108,6 +109,8 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/receipts', receiptRoutes);
+app.use('/api/receipt-templates', receiptTemplateRoutes);
+app.use('/api/receipt-snapshots', receiptSnapshotRoutes);
 
 /*
  * Production: serve the built frontend from the same origin as the API, so a

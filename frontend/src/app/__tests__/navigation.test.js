@@ -40,7 +40,7 @@ describe('navigationSections — grouped, labelled, iconed', () => {
     expect(sectionItems.pos).toEqual(['/pos', '/sales', '/enquiries']);
     expect(sectionItems.rentals).toEqual(['/rentals']);
     expect(sectionItems.expenses).toEqual(['/expenses']);
-    expect(sectionItems.admin).toEqual(['/users', '/roles', '/permissions', '/picklists', '/customers']);
+    expect(sectionItems.admin).toEqual(['/users', '/roles', '/permissions', '/picklists', '/customers', '/receipt-templates']);
     expect(sectionItems.dashboard).toEqual(['/dashboard']);
   });
 
