@@ -9,7 +9,7 @@
  * All content lives in the database — no HTML files on disk.
  */
 
-const SALE_TEMPLATE_HTML = `<!DOCTYPE html>
+export const SALE_TEMPLATE_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -107,6 +107,20 @@ const SALE_TEMPLATE_HTML = `<!DOCTYPE html>
   .sign-line { display: block; width: 110px; border-top: 1px solid var(--ink); margin-bottom: 3px; }
   .sign-label { font-size: 9px; font-style: italic; }
 
+  .receipt-image-slot {
+    border: 1px dashed var(--tan-border);
+    background: rgba(201, 174, 142, 0.14);
+    color: var(--ink-soft);
+    font-size: 9px;
+    font-style: italic;
+    letter-spacing: 0.5px;
+    text-align: center;
+    padding: 12px 8px;
+    margin: 8px 0;
+    position: relative;
+    z-index: 1;
+  }
+
   @media print {
     @page { size: A5; margin: 0; }
     html, body { width: 148mm; }
@@ -145,6 +159,9 @@ const SALE_TEMPLATE_HTML = `<!DOCTYPE html>
         <div class="field"><span class="label">Date :</span><span class="value">{{transaction.date}}</span></div>
       </div>
     </header>
+
+    <!-- IMAGE SLOT: replace this whole div with your image later, e.g. <img src="your-image.png" style="width:100%" />. Delete the div to leave no gap. Hidden on printed receipts until you add a real image. -->
+    <div class="receipt-image-slot" data-label="IMAGE SLOT - add your image here later">IMAGE SLOT - add your image here later</div>
 
     <div class="customer">
       <div class="field field--wide"><span class="label">Name :</span><span class="value">{{customer.name}}</span></div>
@@ -240,7 +257,7 @@ export async function up(queryInterface) {
 
     const now = new Date();
 
-    // Insert SALE template (active)
+    // Insert SALE template (published)
     await queryInterface.sequelize.query(
         `INSERT INTO receipt_templates
             (uuid, name, entity_type, version, html_content, editor_state, is_active, created_by, created_at, updated_at)
@@ -248,7 +265,7 @@ export async function up(queryInterface) {
             (gen_random_uuid(), :name, 'SALE', 1, :html, NULL, true, :userId, :now, :now)`,
         {
             replacements: {
-                name: 'Default Sale Receipt',
+                name: 'Sale Receipt',
                 html: SALE_TEMPLATE_HTML,
                 userId: adminId,
                 now,
@@ -256,15 +273,15 @@ export async function up(queryInterface) {
         }
     );
 
-    // Insert RENTAL template (same design, not active yet)
+    // Insert RENTAL template (published — one active template per entity type)
     await queryInterface.sequelize.query(
         `INSERT INTO receipt_templates
             (uuid, name, entity_type, version, html_content, editor_state, is_active, created_by, created_at, updated_at)
          VALUES
-            (gen_random_uuid(), :name, 'RENTAL', 1, :html, NULL, false, :userId, :now, :now)`,
+            (gen_random_uuid(), :name, 'RENTAL', 1, :html, NULL, true, :userId, :now, :now)`,
         {
             replacements: {
-                name: 'Default Rental Receipt',
+                name: 'Rental Receipt',
                 html: SALE_TEMPLATE_HTML,
                 userId: adminId,
                 now,
@@ -276,6 +293,6 @@ export async function up(queryInterface) {
 /** @type {import('sequelize').QueryInterface} */
 export async function down(queryInterface) {
     await queryInterface.sequelize.query(
-        `DELETE FROM receipt_templates WHERE name IN ('Default Sale Receipt', 'Default Rental Receipt')`
+        `DELETE FROM receipt_templates WHERE name IN ('Sale Receipt', 'Rental Receipt')`
     );
 }

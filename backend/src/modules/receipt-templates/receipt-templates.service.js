@@ -2,6 +2,7 @@ import { ReceiptTemplate, ReceiptSnapshot, User, sequelize } from '../../../data
 import { buildReceipt } from '../receipts/receipts.service.js';
 import { getBranding } from '../branding/branding.service.js';
 import { buildBrandedReceiptHtml } from '../receipts/receipts.html.js';
+import { renderReceiptFromPayload } from './receipt-template-engine.js';
 
 // ---- DTO Mappers ----
 
@@ -112,42 +113,36 @@ export async function getTemplateByUuid(uuid) {
     return mapTemplateDTO(template);
 }
 
-export async function createTemplate({ name, entityType, htmlContent, editorState, createdByUserId }) {
-    const template = await ReceiptTemplate.create({
-        name,
-        entityType,
-        htmlContent,
-        editorState: editorState ?? null,
-        version: 1,
-        isActive: false,
-        createdBy: createdByUserId || null,
-    });
-
-    const created = await ReceiptTemplate.findByPk(template.id, {
-        include: [
-            { model: User, as: 'createdByUser', attributes: ['firstName', 'lastName'] },
-        ],
-        paranoid: true,
-    });
-
-    return mapTemplateDTO(created);
-}
-
+/**
+ * Save a NEW version (draft) of a template.
+ *
+ * Versioning model (R-47):
+ *   - Each save creates a new row: version = max(version for entityType) + 1.
+ *   - The new version starts as a DRAFT (isActive = false) and the currently
+ *     published version stays active — a draft only becomes the live receipt
+ *     after an explicit Publish (activateTemplate).
+ *   - Only two templates exist (SALE + RENTAL); creation of new templates is
+ *     intentionally not supported.
+ */
 export async function updateTemplate({ uuid, name, htmlContent, editorState }) {
     const existing = await ReceiptTemplate.findOne({ where: { uuid }, paranoid: true });
     if (!existing) return null;
 
     const transaction = await sequelize.transaction();
     try {
-        await existing.update({ isActive: false }, { transaction });
+        const [[{ max }]] = await sequelize.query(
+            `SELECT COALESCE(MAX(version), 0) AS max FROM receipt_templates WHERE entity_type = :entityType`,
+            { replacements: { entityType: existing.entityType }, transaction }
+        );
 
+        const newVersion = Number(max || 0) + 1;
         const newTemplate = await ReceiptTemplate.create(
             {
                 name: name ?? existing.name,
                 entityType: existing.entityType,
                 htmlContent: htmlContent ?? existing.htmlContent,
                 editorState: editorState !== undefined ? editorState : existing.editorState,
-                version: existing.version + 1,
+                version: newVersion,
                 isActive: false,
                 createdBy: existing.createdBy,
             },
@@ -200,13 +195,6 @@ export async function activateTemplate({ uuid }) {
     }
 }
 
-export async function deactivateAllTemplates(entityType) {
-    await ReceiptTemplate.update(
-        { isActive: false },
-        { where: { entityType, isActive: true } }
-    );
-}
-
 export async function getActiveTemplate(entityType) {
     const template = await ReceiptTemplate.findOne({
         where: { entityType, isActive: true },
@@ -234,9 +222,7 @@ export async function getActiveTemplate(entityType) {
 
 export async function previewTemplate({ htmlContent, entityType }) {
     const sampleReceipt = renderSampleData(entityType);
-    const { logoDataUrl } = await getBranding();
-    const renderedHtml = buildBrandedReceiptHtml(sampleReceipt, { logoSrc: logoDataUrl || undefined });
-
+    const renderedHtml = renderReceiptFromPayload(htmlContent, sampleReceipt, { preview: true });
     return { renderedHtml };
 }
 
@@ -256,8 +242,16 @@ export async function captureSnapshot({ entityType, entityUuid }) {
     const receipt = await buildReceipt({ entityType, entityUuid, isPrivileged: true });
     if (!receipt) throw new Error(`${entityType} with UUID ${entityUuid} not found`);
 
-    const { logoDataUrl } = await getBranding();
-    const renderedHtml = buildBrandedReceiptHtml(receipt, { logoSrc: logoDataUrl || undefined });
+    // Render the PUBLISHED template through the engine. If the template has
+    // malformed HTML/placeholders, fall back to the static branded builder so
+    // a receipt is still captured.
+    let renderedHtml;
+    try {
+        renderedHtml = renderReceiptFromPayload(rawTemplate.htmlContent, receipt);
+    } catch {
+        const { logoDataUrl } = await getBranding();
+        renderedHtml = buildBrandedReceiptHtml(receipt, { logoSrc: logoDataUrl || undefined });
+    }
 
     const snapshot = await ReceiptSnapshot.create({
         entityType,

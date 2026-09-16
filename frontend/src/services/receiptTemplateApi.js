@@ -26,16 +26,6 @@ export const receiptTemplateApi = {
     }
   },
 
-  async createTemplate(data) {
-    try {
-      const response = await apiClient.post(BASE, data);
-      if (response.data?.success && response.data?.data) return response.data.data;
-      throw new Error(response.data?.message || 'Failed to create template');
-    } catch (error) {
-      throw buildError(error, 'Failed to create template');
-    }
-  },
-
   async updateTemplate(uuid, data) {
     try {
       const response = await apiClient.put(`${BASE}/${encodeURIComponent(uuid)}`, data);

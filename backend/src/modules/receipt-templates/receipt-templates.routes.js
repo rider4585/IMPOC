@@ -7,7 +7,6 @@ import { PERMISSIONS } from '../../constants/permissions.js';
 import {
     handleListTemplates,
     handleGetTemplate,
-    handleCreateTemplate,
     handleUpdateTemplate,
     handleActivateTemplate,
     handleGetActiveTemplate,
@@ -34,10 +33,7 @@ router.post('/preview', authenticate, authorize(PERMISSIONS.RECEIPT_TEMPLATES.VI
 // GET /:uuid — get single template
 router.get('/:uuid', authenticate, authorize(PERMISSIONS.RECEIPT_TEMPLATES.VIEW), handleGetTemplate);
 
-// POST / — create a new template (version 1)
-router.post('/', authenticate, authorize(PERMISSIONS.RECEIPT_TEMPLATES.MANAGE), handleCreateTemplate);
-
-// PUT /:uuid — create a new version from an existing template
+// PUT /:uuid — save a NEW VERSION (draft) from an existing template
 router.put('/:uuid', authenticate, authorize(PERMISSIONS.RECEIPT_TEMPLATES.MANAGE), handleUpdateTemplate);
 
 // POST /:uuid/activate — make this template active for its entityType

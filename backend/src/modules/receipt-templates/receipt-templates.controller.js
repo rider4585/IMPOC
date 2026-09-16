@@ -1,5 +1,4 @@
 import {
-    createTemplateBody,
     updateTemplateBody,
     templateUuidParam,
     listTemplatesQuery,
@@ -11,7 +10,6 @@ import {
 import {
     listTemplates,
     getTemplateByUuid,
-    createTemplate,
     updateTemplate,
     activateTemplate,
     getActiveTemplate,
@@ -42,19 +40,6 @@ export const handleGetTemplate = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Template not found' });
         }
         return res.status(200).json({ success: true, data });
-    } catch (error) {
-        next(error);
-    }
-};
-
-export const handleCreateTemplate = async (req, res, next) => {
-    try {
-        const body = createTemplateBody.parse(req.body);
-        const data = await createTemplate({
-            ...body,
-            createdByUserId: req.auth?.userId || null,
-        });
-        return res.status(201).json({ success: true, data });
     } catch (error) {
         next(error);
     }
