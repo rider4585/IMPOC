@@ -1,149 +1,158 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import EmailEditor from 'react-email-editor';
 import { Button, Dialog, useToast } from './ui';
 import { receiptTemplateApi } from '../services/receiptTemplateApi.js';
 
+/**
+ * Placeholders must match the server-side template engine
+ * (backend/src/modules/receipt-templates/receipt-template-engine.js).
+ * item.* keys only resolve inside a {{#each items}}…{{/each}} loop.
+ */
 const PLACEHOLDERS = [
-  { label: 'Store Name', value: '{{store.name}}' },
-  { label: 'Store Address', value: '{{store.address}}' },
-  { label: 'Store Phone', value: '{{store.phone}}' },
-  { label: 'Transaction Number', value: '{{transaction.number}}' },
-  { label: 'Transaction Date', value: '{{transaction.date}}' },
-  { label: 'Transaction Time', value: '{{transaction.time}}' },
-  { label: 'Transaction Total', value: '{{transaction.total}}' },
-  { label: 'Transaction Subtotal', value: '{{transaction.subtotal}}' },
-  { label: 'Transaction Tax', value: '{{transaction.tax}}' },
-  { label: 'Transaction Discount', value: '{{transaction.discount}}' },
-  { label: 'Transaction Payment Method', value: '{{transaction.paymentMethod}}' },
-  { label: 'Customer Name', value: '{{customer.name}}' },
-  { label: 'Customer Phone', value: '{{customer.phone}}' },
-  { label: 'Item Name', value: '{{item.name}}' },
-  { label: 'Item Quantity', value: '{{item.quantity}}' },
-  { label: 'Item Price', value: '{{item.price}}' },
-  { label: 'Item Total', value: '{{item.total}}' },
-  { label: 'Footer Text', value: '{{footer.text}}' },
+  { label: 'Store name', value: '{{store.name}}' },
+  { label: 'Store wordmark', value: '{{store.wordmark}}' },
+  { label: 'Store address', value: '{{store.address}}' },
+  { label: 'Store phone', value: '{{store.phone}}' },
+  { label: 'Transaction number', value: '{{transaction.number}}' },
+  { label: 'Transaction date', value: '{{transaction.date}}' },
+  { label: 'Transaction time', value: '{{transaction.time}}' },
+  { label: 'Transaction type', value: '{{transaction.type}}' },
+  { label: 'Payment method', value: '{{transaction.paymentMethod}}' },
+  { label: 'Transaction status', value: '{{transaction.status}}' },
+  { label: 'Customer name', value: '{{customer.name}}' },
+  { label: 'Customer phone', value: '{{customer.phone}}' },
+  { label: 'Customer email', value: '{{customer.email}}' },
+  { label: 'Subtotal', value: '{{totals.subtotal}}' },
+  { label: 'Discount', value: '{{totals.discount}}' },
+  { label: 'Total', value: '{{totals.total}}' },
+  { label: 'Amount paid', value: '{{totals.amountPaid}}' },
+  { label: 'Balance', value: '{{totals.balance}}' },
+  { label: 'Item count', value: '{{totals.itemsCount}}' },
+  { label: 'Amount in words', value: '{{amountInWords}}' },
+  { label: 'Footer text', value: '{{footer.text}}' },
 ];
 
+const LOOP_START = '{{#each items}}\n';
+const LOOP_END = '\n{{/each}}';
+
+const IMAGE_SLOT_SNIPPET = `<!-- IMAGE SLOT: replace this whole div with your image later, e.g. <img src="your-image.png" style="width:100%" />. Delete the div to leave no gap. Hidden on printed receipts until you add a real image. -->
+<div class="receipt-image-slot" data-label="IMAGE SLOT - add your image here later">IMAGE SLOT - add your image here later</div>`;
+
+/**
+ * TemplateBuilder — edit a receipt template's HTML source directly and preview
+ * it rendered with sample data through the backend engine.
+ *
+ * Saving always creates a NEW VERSION (a draft). It never replaces the
+ * published receipt — use the "Publish" action on the templates screen to make
+ * a draft the live receipt.
+ *
+ * Props: template, entityType, onSave, onCancel
+ */
 export function TemplateBuilder({ template, entityType, onSave, onCancel }) {
-  const editorRef = useRef(null);
-  const containerRef = useRef(null);
+  const textareaRef = useRef(null);
   const toast = useToast();
 
-  const [editorHeight, setEditorHeight] = useState(600);
+  const [html, setHtml] = useState(template?.htmlContent || '');
+  const [templateName, setTemplateName] = useState(template?.name || '');
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [showPreview, setShowPreview] = useState(false);
-  const [templateName, setTemplateName] = useState(template?.name || '');
-  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
-  const [placeholderDropdownOpen, setPlaceholderDropdownOpen] = useState(false);
+  const [placeholderOpen, setPlaceholderOpen] = useState(false);
+  const [confirmExit, setConfirmExit] = useState(false);
 
   useEffect(() => {
     if (template) {
       setTemplateName(template.name || '');
+      setHtml(template.htmlContent || '');
     }
   }, [template]);
 
-  useEffect(() => {
-    const el = containerRef.current;
+  const insertAtCursor = useCallback((value) => {
+    const el = textareaRef.current;
     if (!el) return;
-
-    const measure = () => {
-      const rect = el.getBoundingClientRect();
-      if (rect.height > 0) {
-        setEditorHeight(rect.height);
-      }
-    };
-
-    measure();
-
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const next = el.value.slice(0, start) + value + el.value.slice(end);
+    setHtml(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + value.length;
+      el.setSelectionRange(pos, pos);
+    });
   }, []);
 
-  const insertPlaceholder = useCallback((placeholder) => {
-    const editor = editorRef.current;
-    if (editor?.editor) {
-      editor.editor.insertText(placeholder);
-      editor.editor.focus();
-    }
-    setPlaceholderDropdownOpen(false);
-  }, []);
+  const insertPlaceholder = useCallback(
+    (placeholder) => {
+      insertAtCursor(placeholder.value);
+      setPlaceholderOpen(false);
+    },
+    [insertAtCursor]
+  );
+
+  const insertItemLoop = useCallback(() => {
+    insertAtCursor(LOOP_START + '  <tr>\n    <td>{{item.sno}}</td>\n    <td>{{item.description}}</td>\n    <td>{{item.quantity}}</td>\n    <td>{{item.rate}}</td>\n    <td>{{item.amount}}</td>\n  </tr>\n' + LOOP_END.trimStart());
+    setPlaceholderOpen(false);
+  }, [insertAtCursor]);
+
+  const insertImageSlot = useCallback(() => {
+    insertAtCursor(IMAGE_SLOT_SNIPPET);
+    setPlaceholderOpen(false);
+  }, [insertAtCursor]);
 
   const handlePreview = useCallback(async () => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
+    if (!html.trim()) {
+      toast.error({ title: 'Preview failed', description: 'Template HTML is empty.' });
+      return;
+    }
     setPreviewing(true);
     try {
-      const html = await new Promise((resolve) => {
-        editor.exportHtml((data) => resolve(data.html));
-      });
-
       const result = await receiptTemplateApi.previewTemplate({
         entityType,
-        html,
-        editorState: template?.editorState || null,
+        htmlContent: html,
       });
-
-      setPreviewHtml(result.html || html);
+      setPreviewHtml(result.renderedHtml);
       setShowPreview(true);
     } catch (err) {
       toast.error({ title: 'Preview failed', description: err.message });
     } finally {
       setPreviewing(false);
     }
-  }, [entityType, template, toast]);
+  }, [html, entityType, toast]);
 
   const doSave = useCallback(async () => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
+    if (!template?.uuid) return;
+    if (!html.trim()) {
+      toast.error({ title: 'Save failed', description: 'Template HTML is empty.' });
+      return;
+    }
     setSaving(true);
     try {
-      const { html, design } = await new Promise((resolve) => {
-        editor.exportHtml((data) => resolve({ html: data.html, design: data.design }));
+      const saved = await receiptTemplateApi.updateTemplate(template.uuid, {
+        name: templateName || template.name,
+        htmlContent: html,
+        editorState: null,
       });
-
-      const payload = {
-        name: templateName || `${entityType} Template`,
-        entityType,
-        html,
-        editorState: design,
-      };
-
-      if (template?.uuid) {
-        await receiptTemplateApi.updateTemplate(template.uuid, payload);
-        toast.success({ title: 'Template updated' });
-      } else {
-        await receiptTemplateApi.createTemplate(payload);
-        toast.success({ title: 'Template created' });
-      }
-
+      toast.success({
+        title: `Saved as v${saved.version}`,
+        description: saved.isActive
+          ? 'This version is published and live.'
+          : 'This is a draft. Publish it on the templates screen to make it the live receipt.',
+      });
       onSave?.();
     } catch (err) {
       toast.error({ title: 'Save failed', description: err.message });
     } finally {
       setSaving(false);
-      setConfirmOverwrite(false);
     }
-  }, [templateName, entityType, template, toast, onSave]);
+  }, [template, templateName, html, toast, onSave]);
 
-  const handleSaveClick = useCallback(() => {
-    if (template?.isActive) {
-      setConfirmOverwrite(true);
+  const handleCancelClick = useCallback(() => {
+    if (html !== (template?.htmlContent || '')) {
+      setConfirmExit(true);
     } else {
-      doSave();
+      onCancel?.();
     }
-  }, [template, doSave]);
-
-  const handleEditorLoad = useCallback(() => {
-    const editor = editorRef.current;
-    if (editor && template?.editorState) {
-      editor.loadEditor(template.editorState);
-    }
-  }, [template]);
+  }, [html, template, onCancel]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -155,6 +164,7 @@ export function TemplateBuilder({ template, entityType, onSave, onCancel }) {
           placeholder="Template name..."
           className="flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] placeholder:text-[var(--ink-muted)] focus:border-[var(--accent)] focus:outline-none"
         />
+
         <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-xs text-[var(--ink-muted)]">
           {entityType}
         </span>
@@ -163,28 +173,55 @@ export function TemplateBuilder({ template, entityType, onSave, onCancel }) {
             v{template.version}
           </span>
         )}
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs ${
+            template?.isActive
+              ? 'bg-[var(--success)]/15 text-[var(--success)]'
+              : 'bg-[var(--surface-sunken)] text-[var(--ink-muted)]'
+          }`}
+        >
+          {template?.isActive ? 'Published' : 'Draft'}
+        </span>
 
         <div className="relative">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPlaceholderDropdownOpen((p) => !p)}
+            onClick={() => setPlaceholderOpen((p) => !p)}
           >
             Insert placeholder
           </Button>
-          {placeholderDropdownOpen && (
+          {placeholderOpen && (
             <>
               <div
                 className="fixed inset-0 z-40"
-                onClick={() => setPlaceholderDropdownOpen(false)}
+                onClick={() => setPlaceholderOpen(false)}
               />
-              <div className="absolute right-0 top-full z-50 mt-1 max-h-60 w-56 overflow-auto rounded-md border border-[var(--border)] bg-[var(--surface-raised)] shadow-lg">
+              <div className="absolute right-0 top-full z-50 mt-1 max-h-80 w-72 overflow-auto rounded-md border border-[var(--border)] bg-[var(--surface-raised)] shadow-lg">
+                <p className="px-3 py-2 text-xs text-[var(--ink-muted)]">
+                  Item rows render inside a loop — click "Item row" below or wrap
+                  your <code className="font-mono">{'{{#each items}}'}</code> section yourself.
+                </p>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium hover:bg-[var(--surface-sunken)]"
+                  onClick={insertItemLoop}
+                >
+                  <span>Item row (table loop)</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium hover:bg-[var(--surface-sunken)]"
+                  onClick={insertImageSlot}
+                >
+                  <span>Image slot (add a picture later)</span>
+                </button>
                 {PLACEHOLDERS.map((ph) => (
                   <button
                     key={ph.value}
                     type="button"
                     className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-[var(--surface-sunken)]"
-                    onClick={() => insertPlaceholder(ph.value)}
+                    onClick={() => insertPlaceholder(ph)}
                   >
                     <span>{ph.label}</span>
                     <span className="font-mono text-xs text-[var(--ink-muted)]">{ph.value}</span>
@@ -198,36 +235,41 @@ export function TemplateBuilder({ template, entityType, onSave, onCancel }) {
         <Button variant="outline" size="sm" onClick={handlePreview} loading={previewing}>
           Preview
         </Button>
-        <Button size="sm" onClick={handleSaveClick} loading={saving}>
-          Save
+        <Button size="sm" onClick={doSave} loading={saving} disabled={!template?.uuid}>
+          Save as new version
         </Button>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
+        <Button variant="ghost" size="sm" onClick={handleCancelClick}>
           Cancel
         </Button>
       </div>
 
-      <div ref={containerRef} className="min-h-0 flex-1">
-        <EmailEditor
-          ref={editorRef}
-          onLoad={handleEditorLoad}
-          options={{
-            appearance: {
-              theme: 'light',
-            },
-            features: {
-              preview: false,
-              imageEditor: false,
-            },
-          }}
-          style={{ height: editorHeight }}
-        />
-      </div>
+      {!template?.uuid && (
+        <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]">
+          New templates cannot be created — only the Sale and Rental receipt can be edited.
+        </div>
+      )}
+
+      {template?.isActive && (
+        <div className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-2 text-xs text-[var(--ink-muted)]">
+          This is the published receipt. Saving creates a new draft version — the published one
+          stays live until you Publish the draft.
+        </div>
+      )}
+
+      <textarea
+        ref={textareaRef}
+        value={html}
+        onChange={(e) => setHtml(e.target.value)}
+        spellCheck={false}
+        aria-label="Template HTML source"
+        className="min-h-0 flex-1 resize-none bg-[var(--surface)] p-4 font-mono text-xs leading-relaxed text-[var(--ink)] focus:outline-none"
+      />
 
       {showPreview && (
         <Dialog
           open={showPreview}
           onClose={() => setShowPreview(false)}
-          title="Template Preview"
+          title="Template preview (sample data)"
           footer={
             <Button variant="outline" onClick={() => setShowPreview(false)}>
               Close
@@ -246,24 +288,19 @@ export function TemplateBuilder({ template, entityType, onSave, onCancel }) {
       )}
 
       <Dialog
-        open={confirmOverwrite}
-        onClose={() => setConfirmOverwrite(false)}
-        title="Overwrite active template?"
+        open={confirmExit}
+        onClose={() => setConfirmExit(false)}
+        title="Discard unsaved changes?"
         footer={
           <>
-            <Button variant="outline" onClick={() => setConfirmOverwrite(false)} disabled={saving}>
-              Cancel
+            <Button variant="outline" onClick={() => setConfirmExit(false)}>
+              Keep editing
             </Button>
-            <Button onClick={doSave} loading={saving}>
-              Yes, overwrite
-            </Button>
+            <Button onClick={onCancel}>Discard</Button>
           </>
         }
       >
-        <p className="text-sm">
-          This template is currently active. Saving will overwrite it and affect all future
-          receipts.
-        </p>
+        <p className="text-sm">Your changes have not been saved as a new version.</p>
       </Dialog>
     </div>
   );

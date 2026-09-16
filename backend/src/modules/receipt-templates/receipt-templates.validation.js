@@ -2,13 +2,6 @@ import { z } from 'zod';
 
 const uuidSchema = z.string().uuid('Invalid UUID format');
 
-export const createTemplateBody = z.object({
-    name: z.string().trim().min(1, 'Template name is required').max(100, 'Name cannot exceed 100 characters'),
-    entityType: z.enum(['SALE', 'RENTAL', 'UNIVERSAL'], { message: 'entityType must be SALE, RENTAL, or UNIVERSAL' }),
-    htmlContent: z.string().min(1, 'HTML content is required'),
-    editorState: z.union([z.record(z.unknown()), z.null()]).optional(),
-});
-
 export const updateTemplateBody = z.object({
     name: z.string().trim().min(1, 'Template name is required').max(100, 'Name cannot exceed 100 characters').optional(),
     htmlContent: z.string().min(1, 'HTML content is required').optional(),

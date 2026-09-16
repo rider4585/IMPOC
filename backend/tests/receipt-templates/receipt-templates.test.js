@@ -11,6 +11,7 @@ import {
 } from '../utils/test-setup.js';
 import authRoutes from '../../src/modules/auth/auth.routes.js';
 import { receiptTemplateRoutes, receiptSnapshotRoutes } from '../../src/modules/receipt-templates/receipt-templates.routes.js';
+import { renderReceiptFromPayload } from '../../src/modules/receipt-templates/receipt-template-engine.js';
 import errorMiddleware from '../../src/middleware/error.middleware.js';
 
 /*
@@ -176,35 +177,47 @@ describe('Receipt Templates module — /api/receipt-templates & /api/receipt-sna
             expect(res.body.success).toBe(true);
         });
 
-        it('ADMIN can create templates', async () => {
+        it('POST /api/receipt-templates is not available (no create endpoint)', async () => {
             const res = await request(testApp)
                 .post('/api/receipt-templates')
                 .set('Authorization', `Bearer ${adminToken}`)
                 .send({
-                    name: `${PREFIX}Perm Create`,
+                    name: `${PREFIX}Nope`,
                     entityType: 'SALE',
                     htmlContent: '<div>test</div>',
                 });
-            expect(res.statusCode).toBe(201);
-            // cleanup
-            await db.ReceiptTemplate.destroy({ where: { uuid: res.body.data.uuid }, force: true });
+            expect(res.statusCode).toBe(404);
         });
 
-        it('MANAGER can list templates but cannot create', async () => {
+        it('MANAGER can list templates but cannot update or publish', async () => {
             const list = await request(testApp)
                 .get('/api/receipt-templates')
                 .set('Authorization', `Bearer ${managerToken}`);
             expect(list.statusCode).toBe(200);
 
-            const create = await request(testApp)
-                .post('/api/receipt-templates')
+            const template = await db.ReceiptTemplate.create({
+                name: `${PREFIX}Mgr Template`,
+                entityType: 'SALE',
+                version: 1,
+                htmlContent: '<div>test</div>',
+                isActive: false,
+            });
+
+            const update = await request(testApp)
+                .put(`/api/receipt-templates/${template.uuid}`)
                 .set('Authorization', `Bearer ${managerToken}`)
                 .send({
                     name: `${PREFIX}Mgr Forbidden`,
-                    entityType: 'SALE',
                     htmlContent: '<div>test</div>',
                 });
-            expect(create.statusCode).toBe(403);
+            expect(update.statusCode).toBe(403);
+
+            const publish = await request(testApp)
+                .post(`/api/receipt-templates/${template.uuid}/activate`)
+                .set('Authorization', `Bearer ${managerToken}`);
+            expect(publish.statusCode).toBe(403);
+
+            await db.ReceiptTemplate.destroy({ where: { uuid: template.uuid }, force: true });
         });
 
         it('CASHIER (no receipt_templates perms) gets 403', async () => {
@@ -227,28 +240,25 @@ describe('Receipt Templates module — /api/receipt-templates & /api/receipt-sna
     describe('Template CRUD', () => {
         let createdUuid;
 
-        it('POST /api/receipt-templates — creates a template (201)', async () => {
-            const res = await request(testApp)
-                .post('/api/receipt-templates')
-                .set('Authorization', `Bearer ${adminToken}`)
-                .send({
-                    name: `${PREFIX}Sale Template`,
-                    entityType: 'SALE',
-                    htmlContent: '<html><body><h1>Sale Receipt</h1></body></html>',
-                    editorState: { zoom: 1 },
-                });
-            expect(res.statusCode).toBe(201);
-            expect(res.body.success).toBe(true);
-            const t = res.body.data;
-            expect(t.name).toBe(`${PREFIX}Sale Template`);
-            expect(t.entityType).toBe('SALE');
-            expect(t.version).toBe(1);
-            expect(t.isActive).toBe(false);
-            expect(t.uuid).toBeDefined();
+        beforeAll(async () => {
+            const t = await db.ReceiptTemplate.create({
+                name: `${PREFIX}Sale Template`,
+                entityType: 'SALE',
+                version: 1,
+                htmlContent: '<html><body><h1>Sale Receipt</h1></body></html>',
+                editorState: { zoom: 1 },
+                isActive: false,
+            });
             createdUuid = t.uuid;
         });
 
-        it('GET /api/receipt-templates — lists templates including the created one', async () => {
+        afterAll(async () => {
+            if (createdUuid) {
+                await db.ReceiptTemplate.destroy({ where: { uuid: createdUuid }, force: true });
+            }
+        });
+
+        it('GET /api/receipt-templates — lists templates', async () => {
             const res = await request(testApp)
                 .get('/api/receipt-templates')
                 .set('Authorization', `Bearer ${adminToken}`);
@@ -282,7 +292,7 @@ describe('Receipt Templates module — /api/receipt-templates & /api/receipt-sna
             expect(res.statusCode).toBe(404);
         });
 
-        it('PUT /api/receipt-templates/:uuid — creates a new version (version incremented)', async () => {
+        it('PUT /api/receipt-templates/:uuid — saves a new version (version incremented, draft)', async () => {
             const res = await request(testApp)
                 .put(`/api/receipt-templates/${createdUuid}`)
                 .set('Authorization', `Bearer ${adminToken}`)
@@ -306,20 +316,53 @@ describe('Receipt Templates module — /api/receipt-templates & /api/receipt-sna
             expect(res.statusCode).toBe(404);
         });
 
-        it('POST /api/receipt-templates — rejects empty name', async () => {
+        it('PUT keeps the published version active while the saved draft stays inactive', async () => {
+            const published = await db.ReceiptTemplate.create({
+                name: `${PREFIX}Published`,
+                entityType: 'RENTAL',
+                version: 1,
+                htmlContent: '<div>v1</div>',
+                isActive: true,
+            });
+
             const res = await request(testApp)
-                .post('/api/receipt-templates')
+                .put(`/api/receipt-templates/${published.uuid}`)
                 .set('Authorization', `Bearer ${adminToken}`)
-                .send({ name: '', entityType: 'SALE', htmlContent: '<div>x</div>' });
-            expect(res.statusCode).toBe(400);
+                .send({ name: `${PREFIX}Draft v2`, htmlContent: '<div>v2 draft</div>' });
+            expect(res.statusCode).toBe(200);
+            const draft = res.body.data;
+            expect(draft.version).toBe(2);
+            expect(draft.isActive).toBe(false);
+
+            const checkPublished = await db.ReceiptTemplate.findByPk(published.id);
+            expect(checkPublished.isActive).toBe(true);
+
+            const active = await request(testApp)
+                .get('/api/receipt-templates/active?entityType=RENTAL')
+                .set('Authorization', `Bearer ${adminToken}`);
+            expect(active.statusCode).toBe(200);
+            expect(active.body.data.uuid).toBe(published.uuid);
+
+            await db.ReceiptTemplate.destroy({ where: { uuid: [published.uuid, draft.uuid] }, force: true });
         });
 
-        it('POST /api/receipt-templates — rejects invalid entityType', async () => {
+        it('PUT version numbering survives deleted versions (next = max + 1)', async () => {
+            const t = await db.ReceiptTemplate.create({
+                name: `${PREFIX}Gap`,
+                entityType: 'SALE',
+                version: 5,
+                htmlContent: '<div>v5</div>',
+                isActive: false,
+            });
+
             const res = await request(testApp)
-                .post('/api/receipt-templates')
+                .put(`/api/receipt-templates/${t.uuid}`)
                 .set('Authorization', `Bearer ${adminToken}`)
-                .send({ name: 'Bad', entityType: 'INVALID', htmlContent: '<div>x</div>' });
-            expect(res.statusCode).toBe(400);
+                .send({ name: `${PREFIX}Gap v6`, htmlContent: '<div>v6</div>' });
+            expect(res.statusCode).toBe(200);
+            expect(res.body.data.version).toBe(6);
+
+            await db.ReceiptTemplate.destroy({ where: { uuid: [t.uuid, res.body.data.uuid] }, force: true });
         });
 
         it('GET /api/receipt-templates/active — returns 400 without entityType', async () => {
@@ -335,12 +378,6 @@ describe('Receipt Templates module — /api/receipt-templates & /api/receipt-sna
                 .set('Authorization', `Bearer ${adminToken}`);
             expect(res.statusCode).toBe(404);
         });
-
-        afterAll(async () => {
-            if (createdUuid) {
-                await db.ReceiptTemplate.destroy({ where: { uuid: createdUuid }, force: true });
-            }
-        });
     });
 
     /* ------------------------------------------------------------------ */
@@ -351,25 +388,23 @@ describe('Receipt Templates module — /api/receipt-templates & /api/receipt-sna
         let templateBUuid;
 
         beforeAll(async () => {
-            const a = await request(testApp)
-                .post('/api/receipt-templates')
-                .set('Authorization', `Bearer ${adminToken}`)
-                .send({
-                    name: `${PREFIX}Activatable A`,
-                    entityType: 'RENTAL',
-                    htmlContent: '<div>Template A</div>',
-                });
-            templateAUuid = a.body.data.uuid;
+            const a = await db.ReceiptTemplate.create({
+                name: `${PREFIX}Activatable A`,
+                entityType: 'RENTAL',
+                version: 1,
+                htmlContent: '<div>Template A</div>',
+                isActive: false,
+            });
+            templateAUuid = a.uuid;
 
-            const b = await request(testApp)
-                .post('/api/receipt-templates')
-                .set('Authorization', `Bearer ${adminToken}`)
-                .send({
-                    name: `${PREFIX}Activatable B`,
-                    entityType: 'RENTAL',
-                    htmlContent: '<div>Template B</div>',
-                });
-            templateBUuid = b.body.data.uuid;
+            const b = await db.ReceiptTemplate.create({
+                name: `${PREFIX}Activatable B`,
+                entityType: 'RENTAL',
+                version: 2,
+                htmlContent: '<div>Template B</div>',
+                isActive: false,
+            });
+            templateBUuid = b.uuid;
         });
 
         afterAll(async () => {
@@ -472,6 +507,78 @@ describe('Receipt Templates module — /api/receipt-templates & /api/receipt-sna
     });
 
     /* ------------------------------------------------------------------ */
+    /*  4a. Image slots (R-47 follow-up)                                    */
+    /* ------------------------------------------------------------------ */
+    describe('Image slots', () => {
+        const SAMPLE_RECEIPT = {
+            store: { name: 'Shree Fashion Store', address: 'x', phone: 'y' },
+            transaction: { type: 'SALE', number: 'S-1' },
+            lines: [{ productName: 'A' }],
+            totals: { totalPaise: '10000' },
+        };
+
+        it('renders the slot box in preview mode', async () => {
+            const html =
+                '<div>top</div>' +
+                '<div class="receipt-image-slot" data-label="IMAGE SLOT">slot placeholder</div>' +
+                '<div>bottom</div>';
+            const out = renderReceiptFromPayload(html, SAMPLE_RECEIPT, { preview: true });
+            expect(out).toContain('receipt-image-slot');
+            expect(out).toContain('IMAGE SLOT');
+        });
+
+        it('strips the slot from final (non-preview) output', async () => {
+            const html =
+                '<div>top</div>' +
+                '<div class="receipt-image-slot" data-label="IMAGE SLOT">slot placeholder</div>' +
+                '<div>bottom</div>';
+            const out = renderReceiptFromPayload(html, SAMPLE_RECEIPT);
+            expect(out).toContain('top');
+            expect(out).toContain('bottom');
+            expect(out).not.toContain('receipt-image-slot');
+            expect(out).not.toContain('IMAGE SLOT');
+        });
+
+        it('preview endpoint keeps slots visible for positioning', async () => {
+            const res = await request(testApp)
+                .post('/api/receipt-templates/preview')
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send({
+                    entityType: 'SALE',
+                    htmlContent:
+                        '<div class="receipt-image-slot" data-label="IMAGE SLOT">slot placeholder</div>',
+                });
+            expect(res.statusCode).toBe(200);
+            expect(res.body.data.renderedHtml).toContain('receipt-image-slot');
+        });
+
+        it('capture-path rendering (engine default) strips slot boxes', async () => {
+            const t = await db.ReceiptTemplate.create({
+                name: `${PREFIX}Slot Snapshot Template`,
+                entityType: 'RENTAL',
+                htmlContent:
+                    '<div>head</div><div class="receipt-image-slot" data-label="IMAGE SLOT">slot placeholder</div><div>tail</div>',
+                version: 1,
+                isActive: true,
+            });
+
+            const receipt = {
+                store: { name: 'Shree Fashion Store' },
+                transaction: { type: 'RENTAL' },
+                lines: [],
+                totals: { totalPaise: '0' },
+            };
+            const out = renderReceiptFromPayload(t.htmlContent, receipt);
+            await t.destroy({ force: true });
+
+            expect(out).toContain('head');
+            expect(out).toContain('tail');
+            expect(out).not.toContain('receipt-image-slot');
+            expect(out).not.toContain('IMAGE SLOT');
+        });
+    });
+
+    /* ------------------------------------------------------------------ */
     /*  5. Snapshots                                                       */
     /* ------------------------------------------------------------------ */
     describe('Snapshots', () => {
@@ -479,20 +586,15 @@ describe('Receipt Templates module — /api/receipt-templates & /api/receipt-sna
         let snapshotEntityUuid;
 
         beforeAll(async () => {
-            /* Create and activate a SALE template so snapshot capture works */
-            const t = await request(testApp)
-                .post('/api/receipt-templates')
-                .set('Authorization', `Bearer ${adminToken}`)
-                .send({
-                    name: `${PREFIX}Snapshot Template`,
-                    entityType: 'SALE',
-                    htmlContent: '<div>Sale snapshot template</div>',
-                });
-            activeSaleTemplateUuid = t.body.data.uuid;
-
-            await request(testApp)
-                .post(`/api/receipt-templates/${activeSaleTemplateUuid}/activate`)
-                .set('Authorization', `Bearer ${adminToken}`);
+            /* Seed + publish a SALE template so snapshot capture works */
+            const t = await db.ReceiptTemplate.create({
+                name: `${PREFIX}Snapshot Template`,
+                entityType: 'SALE',
+                version: 1,
+                htmlContent: '<div>Sale snapshot template</div>',
+                isActive: true,
+            });
+            activeSaleTemplateUuid = t.uuid;
 
             snapshotEntityUuid = saleUuid;
         });

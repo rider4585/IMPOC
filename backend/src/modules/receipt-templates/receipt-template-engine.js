@@ -9,6 +9,9 @@
  *   - Handlebars-style helpers: {{formatINR paiseValue}}, {{formatDate value}}, {{amountInWords paiseValue}}
  *   - Conditional sections: {{#if key}} ... {{/if}}
  *   - Nested object access inside loops: {{item.colour}}
+ *   - Image-slot placeholders (<div class="receipt-image-slot">): shown as dashed
+ *     boxes in previews, stripped from final receipts until the owner adds an
+ *     <img> tag.
  *
  * No external dependencies. All template content lives in the DB — this
  * module only receives an HTML string and a data context.
@@ -116,6 +119,24 @@ function escapeHtml(value) {
     }[c]));
 }
 
+// ---- Image slots ----
+//
+// Templates may contain image placeholders (the shop adds real <img> tags
+// later). A slot looks like:
+//
+//     <div class="receipt-image-slot" data-label="...">...</div>
+//
+// During the editor PREVIEW the slot renders as a dashed box so the owner can
+// see where the picture goes. On FINAL receipts (sales/rental snapshots) the
+// slot is stripped so no empty box reaches the customer — the owner deletes it
+// or replaces it with an <img> once they have the image.
+
+const IMAGE_SLOT_RE = /<div class="receipt-image-slot"[^>]*>[\s\S]*?<\/div>/gi;
+
+function stripImageSlots(html) {
+    return html.replace(IMAGE_SLOT_RE, '');
+}
+
 // ---- Helpers registry ----
 
 const HELPERS = {
@@ -216,19 +237,29 @@ export function renderTemplate(html, context) {
 /**
  * Build the data context from a receipt payload (the shape returned by
  * buildReceipt in receipts.service.js) and render the template.
+ *
+ * @param {string} templateHtml - The template HTML with {{placeholders}}
+ * @param {object} receipt - The receipt payload (store/transaction/customer/lines/totals)
+ * @param {object} [options]
+ * @param {boolean} [options.preview=false] - When true, image-slot placeholders
+ *   render as dashed boxes so the owner can position them; when false the slots
+ *   are stripped from the final output.
+ * @returns {string} Rendered HTML
  */
-export function renderReceiptFromPayload(templateHtml, receipt) {
+export function renderReceiptFromPayload(templateHtml, receipt, options = {}) {
     const store = receipt?.store || {};
     const transaction = receipt?.transaction || {};
     const customer = receipt?.customer || null;
     const lines = receipt?.lines || [];
     const totals = receipt?.totals || {};
 
+    const rawStoreName = store.name || '';
     const context = {
         store: {
-            name: store.name || '',
+            name: rawStoreName,
             address: store.address || '',
             phone: store.phone || '',
+            wordmark: (rawStoreName.replace(/^shree\s+/i, '').trim() || rawStoreName).toUpperCase(),
         },
         transaction: {
             type: transaction.type || '',
@@ -272,7 +303,8 @@ export function renderReceiptFromPayload(templateHtml, receipt) {
         },
     };
 
-    return renderTemplate(templateHtml, context);
+    const rendered = renderTemplate(templateHtml, context);
+    return options.preview ? rendered : stripImageSlots(rendered);
 }
 
 export default renderTemplate;

@@ -71,7 +71,9 @@ export function ReceiptSection({ entityType, entityUuid, printTitle = 'Print rec
             data-testid="snapshot-receipt-button"
           >
             View original receipt
-            <Badge variant="secondary" className="ml-1">v{snapshot.version}</Badge>
+            {snapshot.templateVersion ? (
+              <Badge variant="secondary" className="ml-1">v{snapshot.templateVersion}</Badge>
+            ) : null}
           </Button>
         )}
         <Button
@@ -126,13 +128,14 @@ export function ReceiptSection({ entityType, entityUuid, printTitle = 'Print rec
         open={brandedOpen}
         onClose={() => setBrandedOpen(false)}
         receipt={preview}
+        html={snapshot?.renderedHtml || undefined}
         title={printTitle.replace(/^Print receipt/, 'Branded receipt')}
       />
 
       <Dialog
         open={snapshotOpen}
         onClose={() => setSnapshotOpen(false)}
-        title={`Original receipt${snapshot?.version ? ` (v${snapshot.version})` : ''}`}
+        title={`Original receipt${snapshot?.templateVersion ? ` (v${snapshot.templateVersion})` : ''}`}
         footer={
           <Button variant="outline" onClick={() => setSnapshotOpen(false)}>
             Close
