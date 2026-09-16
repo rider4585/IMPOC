@@ -20,6 +20,7 @@ export const Dialog = ({
   children,
   footer,
   className = '',
+  fullScreen = false,
   role = 'dialog',
 }) => {
   useEffect(() => {
@@ -46,17 +47,21 @@ export const Dialog = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            onClick={onClose}
+            onClick={fullScreen ? undefined : onClose}
           />
           <motion.div
-            className={`fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg ${className}`.trim()}
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            className={
+              fullScreen
+                ? `fixed inset-0 z-50 flex flex-col bg-[var(--surface-raised)] ${className}`.trim()
+                : `fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-lg ${className}`.trim()
+            }
+            initial={fullScreen ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
+            animate={fullScreen ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
+            exit={fullScreen ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
           >
             {title && (
-              <div className="mb-4 flex shrink-0 items-center justify-between">
+              <div className={`flex shrink-0 items-center justify-between ${fullScreen ? 'border-b border-[var(--border)] px-6 py-4' : 'mb-4'}`}>
                 <h2 className="text-lg font-semibold leading-none tracking-tight">
                   {title}
                 </h2>
@@ -89,8 +94,8 @@ export const Dialog = ({
               padding pushes the clip boundary 8px outward while keeping content
               aligned with the title/footer, so focus rings render fully.
             */}
-            <div className="-mx-2 min-h-0 flex-1 overflow-y-auto px-2 py-0.5 text-sm text-[var(--ink)]">{children}</div>
-            {footer && <div className="mt-4 flex shrink-0 justify-end gap-2">{footer}</div>}
+            <div className={fullScreen ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : '-mx-2 min-h-0 flex-1 overflow-y-auto px-2 py-0.5 text-sm text-[var(--ink)]'}>{children}</div>
+            {footer && <div className={`flex shrink-0 justify-end gap-2 ${fullScreen ? 'border-t border-[var(--border)] px-6 py-3' : 'mt-4'}`}>{footer}</div>}
           </motion.div>
         </div>
       )}

@@ -152,3 +152,28 @@ export const RECEIPT_ROUTES = {
   /** GET /receipts/print - Plain-text monospace receipt ready for a printer */
   PRINT: '/receipts/print',
 };
+
+// Receipt template endpoints (R-47: branded receipt template builder)
+export const RECEIPT_TEMPLATE_ROUTES = {
+  /** GET /receipt-templates - List templates (?entityType=SALE|RENTAL) */
+  LIST: '/receipt-templates',
+  /** POST /receipt-templates - Create a new template */
+  CREATE: '/receipt-templates',
+  /** GET /receipt-templates/{uuid} - Get a single template */
+  GET: (uuid) => `/receipt-templates/${encodeURIComponent(uuid)}`,
+  /** PUT /receipt-templates/{uuid} - Update a template */
+  UPDATE: (uuid) => `/receipt-templates/${encodeURIComponent(uuid)}`,
+  /** POST /receipt-templates/{uuid}/activate - Set a template as the active one */
+  ACTIVATE: (uuid) => `/receipt-templates/${encodeURIComponent(uuid)}/activate`,
+  /** GET /receipt-templates/active - Get the active template for an entity type */
+  ACTIVE: '/receipt-templates/active',
+  /** POST /receipt-templates/preview - Render a template with sample data */
+  PREVIEW: '/receipt-templates/preview',
+  /** GET /receipt-snapshots/{entityType}/{entityUuid} - Get a receipt snapshot */
+  SNAPSHOT: (entityType, entityUuid) =>
+    `/receipt-snapshots/${encodeURIComponent(entityType)}/${encodeURIComponent(entityUuid)}`,
+  /** GET /receipt-snapshots - List snapshots (?entityType=SALE|RENTAL) */
+  SNAPSHOTS: '/receipt-snapshots',
+  /** GET /receipt-snapshots/export - Export all snapshots */
+  EXPORT_SNAPSHOTS: '/receipt-snapshots/export',
+};

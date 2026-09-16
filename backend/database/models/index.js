@@ -64,6 +64,8 @@ import ExpenseReversalModel from './ExpenseReversal.js';
 import CustomerModel from './Customer.js';
 import CustomerEnquiryModel from './CustomerEnquiry.js';
 import DeliveryLogModel from './DeliveryLog.js';
+import ReceiptTemplateModel from './ReceiptTemplate.js';
+import ReceiptSnapshotModel from './ReceiptSnapshot.js';
 
 const User = UserModel(sequelize);
 const Role = RoleModel(sequelize);
@@ -103,6 +105,8 @@ const ExpenseReversal = ExpenseReversalModel(sequelize);
 const Customer = CustomerModel(sequelize);
 const CustomerEnquiry = CustomerEnquiryModel(sequelize);
 const DeliveryLog = DeliveryLogModel(sequelize);
+const ReceiptTemplate = ReceiptTemplateModel(sequelize);
+const ReceiptSnapshot = ReceiptSnapshotModel(sequelize);
 
 /*
  * User ↔ Role
@@ -534,6 +538,13 @@ CustomerEnquiry.belongsTo(User, { foreignKey: 'createdByUserId', as: 'createdBy'
 CustomerEnquiry.belongsTo(User, { foreignKey: 'closedByUserId', as: 'closedBy' });
 
 /*
+ * ReceiptTemplate (R-47) ↔ ReceiptSnapshot / User
+ */
+ReceiptTemplate.hasMany(ReceiptSnapshot, { foreignKey: 'templateId', as: 'snapshots' });
+ReceiptSnapshot.belongsTo(ReceiptTemplate, { foreignKey: 'templateId', as: 'template' });
+ReceiptTemplate.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' });
+
+/*
  * DeliveryLog (no FK - designed for future WhatsApp/SMTP/SMS integration,
  * entity_id stores the target entity's uuid, not a relational id)
  */
@@ -579,4 +590,6 @@ export {
     Customer,
     CustomerEnquiry,
     DeliveryLog,
+    ReceiptTemplate,
+    ReceiptSnapshot,
 };

@@ -62,4 +62,15 @@ export const PERMISSIONS = Object.freeze({
         CREATE: 'enquiries.create',
         UPDATE: 'enquiries.update',
     },
+
+    RECEIPT_TEMPLATES: {
+        VIEW: 'receipt_templates.view',
+        MANAGE: 'receipt_templates.manage',
+    },
+
+    RECEIPT_SNAPSHOTS: {
+        VIEW: 'receipt_snapshots.view',
+        MANAGE: 'receipt_snapshots.manage',
+        EXPORT: 'receipt_snapshots.export',
+    },
 });

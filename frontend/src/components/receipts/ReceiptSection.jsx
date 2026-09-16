@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Button } from '../ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Dialog, Badge } from '../ui';
 import { getReceiptPreview } from '../../services/receiptApi.js';
+import { receiptTemplateApi } from '../../services/receiptTemplateApi.js';
 import { ReceiptPreview } from './ReceiptPreview.jsx';
 import { ReceiptPrintDialog } from './ReceiptPrintDialog.jsx';
 import { BrandedReceiptDialog } from './BrandedReceiptDialog.jsx';
@@ -18,6 +19,8 @@ export function ReceiptSection({ entityType, entityUuid, printTitle = 'Print rec
   const [error, setError] = useState('');
   const [printOpen, setPrintOpen] = useState(false);
   const [brandedOpen, setBrandedOpen] = useState(false);
+  const [snapshot, setSnapshot] = useState(null);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!entityUuid) return;
@@ -37,6 +40,21 @@ export function ReceiptSection({ entityType, entityUuid, printTitle = 'Print rec
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!entityUuid) return;
+    let cancelled = false;
+    (async () => {
+      const snap = await receiptTemplateApi.getSnapshot(entityType, entityUuid);
+      if (!cancelled && snap) setSnapshot(snap);
+    })();
+    return () => { cancelled = true; };
+  }, [entityType, entityUuid]);
+
+  const handleViewSnapshot = () => {
+    if (!snapshot) return;
+    setSnapshotOpen(true);
+  };
+
   const handlePrintClick = () => {
     if (!entityUuid) return;
     setPrintOpen(true);
@@ -45,6 +63,17 @@ export function ReceiptSection({ entityType, entityUuid, printTitle = 'Print rec
   return (
     <>
       <div className="mb-1 flex justify-end gap-2">
+        {snapshot && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleViewSnapshot}
+            data-testid="snapshot-receipt-button"
+          >
+            View original receipt
+            <Badge variant="secondary" className="ml-1">v{snapshot.version}</Badge>
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -99,6 +128,30 @@ export function ReceiptSection({ entityType, entityUuid, printTitle = 'Print rec
         receipt={preview}
         title={printTitle.replace(/^Print receipt/, 'Branded receipt')}
       />
+
+      <Dialog
+        open={snapshotOpen}
+        onClose={() => setSnapshotOpen(false)}
+        title={`Original receipt${snapshot?.version ? ` (v${snapshot.version})` : ''}`}
+        footer={
+          <Button variant="outline" onClick={() => setSnapshotOpen(false)}>
+            Close
+          </Button>
+        }
+      >
+        <div className="max-h-[60vh] overflow-auto">
+          {snapshot?.renderedHtml ? (
+            <iframe
+              srcDoc={snapshot.renderedHtml}
+              title="Original receipt"
+              className="w-full border-0"
+              style={{ minHeight: 400 }}
+            />
+          ) : (
+            <p className="text-sm text-[var(--ink-muted)]">No rendered receipt available.</p>
+          )}
+        </div>
+      </Dialog>
     </>
   );
 }

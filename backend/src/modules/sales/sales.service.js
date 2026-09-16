@@ -233,6 +233,14 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
 
         await transaction.commit();
 
+        // Capture receipt snapshot (fire-and-forget, non-blocking)
+        try {
+            const { captureSnapshot } = await import('../receipt-templates/receipt-templates.service.js');
+            await captureSnapshot({ entityType: 'SALE', entityUuid: sale.uuid });
+        } catch (snapshotErr) {
+            console.error('[sales] Failed to capture receipt snapshot:', snapshotErr.message);
+        }
+
         const fullSale = await Sale.findByPk(sale.id, {
             include: [
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
