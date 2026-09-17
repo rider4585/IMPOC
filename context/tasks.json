@@ -1,6 +1,303 @@
 {
   "tasks": [
     {
+      "id": "R-47",
+      "title": "Receipt template versioning + webpage builder (deterministic receipt regeneration)",
+      "status": "done",
+      "priority": "high",
+      "assignee": "worker-r47-finish",
+      "origin": "user (2026-09-15, scope update)",
+      "deps": [
+        "R-45"
+      ],
+      "createdAt": "2026-09-11T02:27:59.909Z",
+      "details": "STATUS 2026-09-16 (god standup): IMPLEMENTED IN WORKING TREE ON `context` â€” UNCOMMITTED, UNVERIFIED, NO SESSION LOG. A session (2026-09-15 ~22:14Zâ†’00:16Z, no memory/board/tasks record) built the full feature: migrations 20260915000005 (receipt_templates/receipt_snapshots) + 20260915000006 (permissions), seeder 20260915000007, models ReceiptTemplate/ReceiptSnapshot, backend module src/modules/receipt-templates/ (controller/routes/service/validation + receipt-template-engine.js), mounted in app.js; fire-and-forget captureSnapshot() hooked into sales.service.js createSale + rental-agreement.service.js createRental; permissions RECEIPT_TEMPLATES.* + RECEIPT_SNAPSHOTS.*; backend tests backend/tests/receipt-templates/receipt-templates.test.js; frontend package.json + react-email-editor@2.1.2, ReceiptTemplatesScreen.jsx + TemplateBuilder.jsx + ReceiptTemplateBuilderPage.jsx + receiptTemplateApi.js, routes.js RECEIPT_TEMPLATE_ROUTES, nav (Admin) + App.jsx /receipt-templates/builder route, ReceiptSection.jsx (+View original snapshot), Dialog.jsx tweaks. Also modified docs (CONTEXT.md, CONTEXT-RESUME.md, context/board.md, context/god-memory.md, context/tasks.json) â€” those ARE the R-46-removal/R-47-re-scope records, committed? NO: all 17 modified tracked files + ~15 untracked are UNCOMMITTED, HEAD still 74a2ee3 context branch.\n\nQA FLAG: nav item gated on PERMISSIONS.BRANDING.MANAGE (navigation.js) â€” looks like it should be RECEIPT_TEMPLATES.VIEW. All new backend JS passes `node --check`. DB migrate/seed/refresh + jest/vitest/build NOT yet run on this feature. `npm install --legacy-peer-deps` needed in frontend for the new dep. Gate: user asked 'plan only, don't start implementation' at re-scope; the built work contradicts that -> humanQA raised. NEXT after answer: verify (3-step rule + tests + build) then commit+push `context` + `main` per R-53..R-61 pattern, or leave uncommitted.\n\nRE-SCOPED 2026-09-15 by user. Previous scope (receipt delivery via email/WhatsApp/SMS) folded into R-62e. New scope: receipt template versioning + webpage builder for deterministic receipt regeneration.\n\nPROBLEM: receipts are computed on the fly from sale/rental data. The HTML template is hardcoded in receipts.html.js. If the template changes (store name, logo, layout), old receipts would render differently. For backup/system transfer, each receipt must be generated exactly as it was originally.\n\nGOAL: (1) Version receipt templates so each template change is tracked. (2) Provide a visual webpage builder for designing receipt templates with placeholders. (3) Capture a snapshot of each receipt at order time so it can be regenerated deterministically.\n\nARCHITECTURE:\n\n1. NEW TABLES:\n   - receipt_templates: id, name, version (integer), html_content (TEXT, the full HTML/CSS template with {{placeholders}}), block_layout (JSONB, the block arrangement for the builder), is_active (boolean, only one active at a time), created_by (FK users), created_at, updated_at.\n   - receipt_snapshots: id, entity_type (SALE|RENTAL), entity_uuid (UUID), template_id (FK), template_version (integer), rendered_html (TEXT, the final frozen HTML), rendered_at (TIMESTAMP). Unique on (entity_type, entity_uuid) â€” one snapshot per order.\n\n2. TEMPLATE BUILDER (webpage builder module):\n   - Visual editor with draggable blocks: Header (logo + store name + tagline), Item Table (loop placeholder for line items), Field Row (label + dotted-line value), Text Block (free text), Image (logo/monogram), Divider, Footer (thank-you + signature).\n   - Placeholder syntax: {{variable}} resolved at render time.\n   - Available placeholders: {{store.name}}, {{store.address}}, {{store.phone}}, {{transaction.number}}, {{transaction.date}}, {{transaction.paymentMethod}}, {{customer.name}}, {{customer.phone}}, {{customer.email}}, {{items}} (loop start), {{/items}} (loop end), {{item.sno}}, {{item.productName}}, {{item.colour}}, {{item.size}}, {{item.quantity}}, {{item.unitPrice}}, {{item.lineTotal}}, {{totals.subtotal}}, {{totals.total}}, {{totals.amountInWords}}, {{totals.itemsCount}}.\n   - Live preview panel: renders the template with sample data (hardcoded sample sale).\n   - Save as new version: creates a new receipt_templates row with incremented version; old versions remain for historical receipts.\n   - CSS is embedded in the template HTML (self-contained, like current branded receipt).\n\n3. SNAPSHOT CAPTURE:\n   - After sale/rental commits (in sales.service.js createSale / rental-agreement.service.js createRental), render receipt with the active template and store in receipt_snapshots.\n   - delivery_logs.receipt_payload continues to store structured JSON (for email/WhatsApp via R-62).\n   - receipt_snapshots.rendered_html stores the final HTML (for deterministic regeneration).\n\n4. DETERMINISTIC REGENERATION:\n   - To regenerate a single receipt: fetch receipt_snapshots.rendered_html directly â€” no re-render.\n   - For bulk export (backup/transfer): query all snapshots, output HTML files named {sale_number}.html or {agreement_number}.html.\n   - Template changes never affect old receipts because snapshots are frozen.\n\n5. API ENDPOINTS:\n   - GET /api/receipt-templates â€” list all templates (with version history)\n   - POST /api/receipt-templates â€” create new template\n   - PUT /api/receipt-templates/:id â€” update template (creates new version)\n   - POST /api/receipt-templates/:id/activate â€” set as active template\n   - GET /api/receipt-templates/active â€” get current active template\n   - POST /api/receipt-templates/preview â€” render preview with sample data\n   - GET /api/receipt-snapshots/:entityType/:entityUuid â€” get frozen receipt for an order\n   - GET /api/receipt-snapshots/export â€” bulk export all snapshots (admin)\n\n6. FRONTEND:\n   - New screen: Receipt Templates (Admin section) â€” list templates, activate, open builder.\n   - Template Builder: block-based visual editor with live preview (drag blocks, edit placeholder fields, preview with sample data).\n   - Existing ReceiptSection gains a 'View original receipt' button that loads the snapshot.\n   - Sale/Rental creation flow unchanged (snapshot captured silently in backend).\n\n7. PERMISSIONS:\n   - receipt_templates.view (ADMIN/MANAGER)\n   - receipt_templates.manage (ADMIN only â€” create/edit/activate templates)\n   - receipt_snapshots.view (ADMIN/MANAGER â€” view frozen receipts)\n   - receipt_snapshots.export (ADMIN only â€” bulk export)\n\nSEQUENCING:\n  Phase 1: DB schema + template CRUD API + snapshot capture on sale/rental creation.\n  Phase 2: Template builder UI (blocks + placeholders + live preview).\n  Phase 3: Snapshot viewer + bulk export + integration with existing receipt components.\n\nFILES AFFECTED:\n  Backend new: receipt-templates/ module (controller, service, validation, routes), ReceiptTemplate.js model, ReceiptSnapshot.js model, 2 new migrations.\n  Backend modified: receipts.service.js (add snapshot capture), sales.service.js (trigger snapshot), rental-agreement.service.js (trigger snapshot), permissions.js, app.js (mount routes).\n  Frontend new: ReceiptTemplatesScreen.jsx, TemplateBuilder.jsx, receiptTemplateApi.js.\n  Frontend modified: ReceiptSection.jsx (add View original), navigation.js (add nav item).\n\nOPEN QUESTIONS (for user):\n  1. Custom CSS in builder, or block-only (simpler)? ANSWERED: use an npm module, NOT custom-built. Must support tables and inline CSS edits. Candidates: react-email-editor (Unlayer), @bolttech/template-editor (Craft.js), email-block-builder.\n  2. Snapshots store both JSON + HTML, or just HTML? ANSWERED: BOTH â€” structured JSON (receipt_payload JSONB) AND rendered HTML.\n  3. Bulk export: HTML files or PDF (needs puppeteer)? ANSWERED: admin-triggered folder export by invoice number. Purpose: recovery if PDFs lost. HTML files; PDFs are large/expensive to backup.\n  4. Multiple active templates (one per entity type) or one global? ANSWERED: TWO active templates â€” one for retail sales, one for rentals. Older iterations marked inactive but kept in DB for export-all-receipts.\n\nPREVIOUS SCOPE (folded into R-62e): receipt delivery via email/WhatsApp/SMS at checkout. Delivery_logs + consent flags already exist. WhatsApp = wa.me hand-off; email = Brevo SMTP; SMS deferred. Architecture: async dispatch, provider-adapter layer, delivery_logs ledger, tokenized receipt page. OPEN DECISIONS answered in R-62 epic.\n\nDONE 2026-09-16 by worker-r47-finish: db:migrate/seed/refresh PASS + fixed seeder bug (users.role_id -> user_roles/roles JOIN in 20260915000007); backend jest 803 (+34); frontend vitest 436/436 + build clean; nav gate BRANDING.MANAGE -> RECEIPT_TEMPLATES.VIEW (both spots) + frontend PERMISSIONS mirror added; context fa510a9 (28 files) pushed, cherry-picked to main 98e703a pushed; docs leftovers stashed/popped clean, untracked dev artifacts untouched.\nR-47 REWORK 2026-09-16 (god, per user + attachment WhatsApp Image 2026-09-15 at 11.57.59 PM.jpeg): NOT DONE until user checks. User requirements: only 2 receipts (Sale + Rental); no creating new templates; each save = new version; a Publish button marks the latest saved version as the active one; see all previous versions; only the active version is used to generate POS invoices; template HTML must replicate the physical receipt. Implemented (uncommitted on context): removed POST /receipt-templates (no create); save creates max+1 draft WITHOUT deactivating the published version; Publish = activate; seeded RENTAL now active + names Sale Receipt/Rental Receipt; migration 20260916000001 normalizes one published version per entity type; preview + captureSnapshot now render through the template engine (were silently using buildBrandedReceiptHtml); engine store.wordmark added; TemplateBuilder rewritten from react-email-editor (empty-on-edit bug: editorState was null) to an HTML source editor + placeholder insert + server preview; ReceiptTemplatesScreen shows 2 grouped templates w/ version history + Publish; POS BrandedReceiptDialog prefers the snapshot rendered from the active template. Verified: db migrate/seed/refresh clean, backend jest 802, frontend vitest 436, build OK.\n2026-09-16 ~08:50Z (god): += image-slot placeholders - engine preview=true shows dashed box / final snapshots strip it; seeder + migration 20260916000002 (content patch, idempotent) + TemplateBuilder dropdown entry. Verified migrate/refresh, backend jest 806, vitest 436, build. Still doing/uncommitted, awaiting user.R-47 rework (2026-09-16): [2026-09-16 ~09:45Z] SHIPPED on user go: committed (app-code commit + docs commit on context), pushed origin/context, app-code commit cherry-picked to origin/main + pushed. Root tree verified (backend receipt-templates module + migrations 20260916000001/2 + frontend TemplateBuilder/ReceiptTemplatesScreen/BrandedReceiptDialog/ReceiptSection/receiptTemplateApi). db:migrate/seed/refresh clean, backend jest 806, frontend vitest 436, build clean. Leave-alone untracked (colors.zip, colors/, frontend/doc/, tunnels.json) not committed. OPEN follow-up: visual diff vs physical-receipt photo (unreadable) = seed HTML tweak if the printed receipt differs.",
+      "humanQA": [
+        {
+          "q": "**R-47 has been re-scoped to receipt template versioning + webpage builder.** The previous delivery scope is folded into R-62e. New scope: version receipt templates, build a visual editor with placeholders, capture frozen snapshots at order time for deterministic regeneration. 4 open questions: (1) custom CSS or block-only builder? (2) snapshots store JSON+HTML or just HTML? (3) bulk export HTML or PDF? (4) one active template or per-entity-type? Please review and answer.",
+          "askedAt": "2026-09-15T15:00:00.000Z",
+          "a": "All answered by user (2026-09-15): (1) Use an npm module for the builder â€” NOT custom-built. Must support tables and inline CSS edits. Candidates: react-email-editor (Unlayer), @bolttech/template-editor (Craft.js), email-block-builder. (2) Save BOTH structured JSON (receipt_payload) AND rendered HTML in receipt_snapshots. (3) Admin-triggered bulk export: exports receipt data into a folder keyed by invoice number. Purpose: if PDF data is lost, receipts can be regenerated from DB. (4) Two active templates: one for retail sales, one for rentals. Older iterations marked inactive but kept in DB for export-all-receipts.",
+          "answeredAt": "2026-09-15T16:00:00.000Z"
+        },
+        {
+          "q": "**R-47 is already fully implemented in the working tree (uncommitted) â€” how should I proceed?**\n\nA session (since your \"plan only\" note) built the whole receipt-template versioning + snapshot + builder feature on `context`: backend module + 2 migrations + seeder + tests, snapshot capture on sale/rental, Admin screens, `react-email-editor` dep. All uncommitted (HEAD 74a2ee3) and unverified. Your call:\n\n1. Verify + commit: run `db:migrate`/`db:seed`/`db:refresh` + jest/vitest/build, then commit+push to `context` and `main` (the R-53â€“R-61 pattern)\n2. Record only â€” leave the work uncommitted for now\n3. It was your own work â€” you'll commit it yourself\n\nOne review flag regardless: the nav item is gated on `branding.manage`; it should be `receipt_templates.view`.",
+          "askedAt": "2026-09-16T02:05:00.000Z",
+          "a": "User 2026-09-16: proceed â€” \"spawn some agents on the floor\" for the tasks. Option 1 (verify + commit + push to context and main) selected via the R-53â€“R-61 pattern.",
+          "answeredAt": "2026-09-16T02:20:00.000Z"
+        }
+      ],
+      "completedAt": "2026-09-16T03:31:24Z"
+    },
+    {
+      "id": "R-52",
+      "title": "Decide the fate of the Buying templates module (disable now, remove later?)",
+      "status": "blocked",
+      "priority": "low",
+      "assignee": null,
+      "origin": "user (2026-09-13)",
+      "deps": [],
+      "createdAt": "2026-09-13T09:30:00.000Z",
+      "humanQA": [
+        {
+          "q": "**What should happen to Buying templates?**\n\nYou said you rarely use it and may remove it. Options:\n\n1. `Hide` â€” remove the Templates route + the 'Apply template' picker on the stock form; keep table, API and data (reversible, ~1 hour).\n2. `Remove` â€” drop `stock_templates` (migration), the `template.*` backend module, `TemplateForm.jsx`, the picker, and their tests (one-way).\n3. `Keep` as is.\n\nNo work is done on this module until you pick.",
+          "askedAt": "2026-09-13T09:30:00.000Z",
+          "a": "Not now. I will run the system in production for about a month (until ~mid-October 2026) and then decide Hide / Remove / Keep.",
+          "answeredAt": "2026-09-13T11:00:00.000Z"
+        }
+      ],
+      "details": "Origin: while scoping R-51 the user said buying templates are rarely used and 'maybe we will remove it in future' â€” explicitly NO changes to the module in R-51 (so templates do NOT get GST fields). Footprint today: backend/src/modules/intake/template.{controller,service}.js + routes under trips, table stock_templates (has buying/whole-buying/selling/floor defaults + R-11 type/subtype), frontend TemplateForm.jsx (/trips/:tripUuid/templates) + 'Apply template' picker in StockForm.jsx + clone-stocks-for-trip helpers. Blocked on the humanQA decision above.\n\nUSER 2026-09-13: parked deliberately â€” decide after ~1 month of production use (revisit ~2026-10-13). Stays blocked; no work."
+    },
+    {
+      "id": "R-60",
+      "title": "Durable backups on the shop laptop: verified pg_dump twice daily (Task Scheduler) + manual encrypted upload to Google Drive via rclone + restore script; setup.ps1 registers it all",
+      "status": "doing",
+      "priority": "high",
+      "assignee": "claude (direct, no worker)",
+      "origin": "user (2026-09-14)",
+      "deps": [],
+      "createdAt": "2026-09-14T12:30:00.000Z",
+      "details": "USER: automatic local DB backup twice a day (times asked at setup, 24h format), a manually triggered backup that uploads the whole DB to the cloud (Google Drive, personal gmail, via rclone) into DATE-WISE folders, all registered by the initial setup script. HARD RULES: setup.ps1 has already been run on the laptop â†’ every change must be backward compatible, idempotent, and a failing new step must never affect what is already installed and running (app, DB, .env, pm2, firewall, startup). Show the rclone encryption password ONCE at setup so the user saves it.\n\nDESIGN:\n- Backups live OUTSIDE the repo at C:\\\\IMPOC-backups\\\\{local,pre-update,cloud-staging}\\\\ so git/update.ps1 never see them. Shared helpers in deploy/windows/lib/backup-common.ps1 (Read-DotEnv, Find-PgTool, Invoke-VerifiedDump = pg_dump -Fc â†’ pg_restore --list check â†’ atomic rename, Write-BackupStatus JSON, Prune).\n- backup-local.ps1/.cmd: verified dump â†’ impoc-YYYY-MM-DD_HHmm.dump, prune >14 days, log + last-status.json; exit code non-zero on failure. Registered as two Windows scheduled tasks 'IMPOC backup 1/2' (Register-ScheduledTask, run when logged on â€” the laptop auto-logs in; StartWhenAvailable so a missed time runs at next boot).\n- backup-cloud.ps1/.cmd (manual double-click; safe to schedule later): takes a fresh verified dump, uploads dump + backend\\\\.env with `rclone copy --checksum` to gdrive-crypt:YYYY/MM/DD/ (encrypted names+contents), prunes cloud copies >90 days, writes status; clear message if rclone/remote missing.\n- restore-db.ps1: list local (and cloud) dumps, pick one, confirm by typing the DB name, stop pm2, pg_dump a safety copy, drop+create DB, pg_restore, migrate, restart pm2.\n- setup.ps1: new final steps (each try/catch â†’ Warn, never Fail): 10 backup folder + times prompt (24h HH:mm, validated; -BackupTimes param to skip prompt) + task registration; 11 rclone (-SkipCloud to bypass): install via winget or zip download to C:\\\\IMPOC\\\\rclone, `rclone config create gdrive drive scope drive.file` (browser sign-in), crypt remote gdrive-crypt â†’ gdrive:IMPOC-backups with generated password+salt (rclone obscure), password shown ONCE + saved to C:\\\\IMPOC-backups\\\\CLOUD-PASSWORD-SAVE-ME.txt, connection test. Skips cleanly if already configured.\n- update.ps1: pre-migration dump via the shared helper into C:\\\\IMPOC-backups\\\\pre-update.\n- docs/WINDOWS_PRODUCTION_SETUP.md: Backups section (schedule, cloud, restore, token-reconnect chore). Hive docs updated.\n\nVERIFY: PowerShell syntax check (pwsh parser) here; logic reviewed; user runs setup.cmd again on the laptop (idempotent) and reports.\n\nBUILT 2026-09-14 (awaiting user run on the laptop): deploy/windows/lib/backup-common.ps1 (BackupRoot C:\\\\IMPOC-backups, env override; Read-DotEnv, Find-PgTool, Invoke-VerifiedDump = pg_dump -Fc â†’ .partial â†’ pg_restore --list must succeed + contain TABLE DATA â†’ rename; Remove-OldDumps; Write-BackupStatus JSON (atomic tmp+move); Write-BackupLog monthly; Find-Rclone/Test-RcloneRemote), backup-local.ps1/.cmd (14-day retention, exit code), backup-cloud.ps1/.cmd (fresh dump â†’ rclone copy --checksum to gdrive-crypt:YYYY/MM/DD + .env â†’ config/backend.env, lsl confirms, delete --min-age 90d *.dump, rmdirs; token-expiry hint), restore-db.ps1 (local or -FromCloud pick, type-DB-name confirm, safety dump, pm2 stop, terminate connections, drop/create, pg_restore --exit-on-error, migrate, pm2 start; on failure prints the safety copy path). setup.ps1: params -BackupTimes 'HH:mm,HH:mm' + -SkipCloud; step 10 (folder, validated 24h prompt, two Register-ScheduledTask 'IMPOC database backup 1/2' daily, Interactive logon, StartWhenAvailable, first backup taken) and step 11 (rclone via winget or zip â†’ C:\\\\IMPOC\\\\rclone; `config create gdrive drive scope drive.file` browser sign-in; crypt remote with New-Secret password+salt shown ONCE + CLOUD-BACKUP-PASSWORD-SAVE-ME.txt; mkdir+lsd test) â€” both try/catch â†’ Warn, placed after pm2/firewall/startup; idempotent (skips existing remotes/tasks re-registered with -Force). update.ps1 pre-migration dump now uses the helper into pre-update/ (60-day prune). docs Â§8 rewritten. All 7 scripts parse clean (pwsh 7.6); helper smoke-tested on macOS against the dev DB: 181 KB verified dump, prune, corrupt-file rejection, status/log. Windows-only parts (Task Scheduler, rclone install, cmd /c) cannot run here â€” user to re-run setup.cmd."
+    },
+    {
+      "id": "R-62",
+      "title": "Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later): templates, engine, invoice send, birthday programme, stock alerts, campaigns",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "origin": "user (2026-09-14, Communication & Campaign spec)",
+      "deps": [
+        "R-45"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "EPIC. Design doc: docs/COMMUNICATION_PLATFORM.md (read it first). Spec from user 2026-09-14: one platform for ALL customer messages (invoices, birthday offer + wish, stock-availability alerts, festival/new-collection campaigns), provider-replaceable, A/B-ready, AI-ready later.\n\nDECISIONS (user 2026-09-14): (1) epic R-62 + lettered sub-tickets; R-47 folded into R-62e; R-46 narrowed to Instagram publishing. (2) First channels = WhatsApp via wa.me click-to-chat (hand-off: system prepares text, staff taps Open WhatsApp and presses send) AND email (real send via SMTP), built together; SMS later. (3) Invoice auto-sends on every consented channel with contact info; WhatsApp shows the hand-off button on the POS close screen. (4) NO public URL: laptop stays LAN-only (internet out only) -> no links in messages, no webhooks, no hosted receipt page; status stops at SENT/HANDOFF.\n\nARCHITECTURE: business code calls ONE function enqueue(); rows go into delivery_logs (extended = the ledger AND the queue); an in-process worker polls (FOR UPDATE SKIP LOCKED) and sends through a provider chosen by env (COMM_EMAIL_PROVIDER=smtp, COMM_WHATSAPP_PROVIDER=wame|cloud, COMM_SMS_PROVIDER=none|msg91). Provider contract returns {kind:'sent'} or {kind:'handoff', url}. Daily scheduler (Asia/Kolkata, catch-up on late boot, idempotent via dedupe_key) drives birthdays + campaign steps. pg-boss considered and rejected (ledger row is the job).\n\nPHASES: 1 = R-62a..g + i (platform, templates, engine, messages screen, invoice, birthday, stock alerts, preferences). 2 = R-62h campaigns + R-62j analytics. Later = R-62k WhatsApp Cloud API, R-62l SMS, R-62m PDF attachment, R-62n public receipt page + tunnel.\n\nORDER: a -> b -> c -> d -> e (first user-visible win: invoice on email + wa.me) -> f -> g -> i -> h -> j.\n\nUSER 2026-09-15: (1) Brevo account created -> email provider = Brevo SMTP. (2) Birthday wishes ALWAYS send (not an ad) - only do_not_contact blocks them; marketing opt-out does not. (3) Build the Customer Enquiry module first as its own ticket R-63 (a new Enquiries tab + table; creating an enquiry creates/picks the customer). R-62g now = auto-match + Notify on top of R-63.",
+      "humanQA": [
+        {
+          "q": "**Which mailbox should IMPOC send email from?**\n\nNeeded before R-62c can be tested end-to-end (SMTP host, user, password go in `backend/.env`).\n\n1. Brevo free plan (300 mails/day, needs a sender address you own)\n2. Gmail with an app password (simplest; ~500/day cap)\n3. Something else",
+          "askedAt": "2026-09-14T16:30:00.000Z",
+          "a": "Brevo â€” account created (2026-09-15). SMTP creds to go in backend/.env when R-62c starts.",
+          "answeredAt": "2026-09-15T05:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "R-62a",
+      "title": "Comm foundation: migrations (comm_templates, delivery_logs extension, customers prefs, stock_inquiries, comm_campaigns/steps), models, permissions, settings keys",
+      "status": "todo",
+      "priority": "high",
+      "assignee": "",
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-45"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Migrations (ESM export style; rollback must work with db:refresh): (1) comm_templates (key+channel unique, category, subject, body, variables JSONB, is_active, is_system, archived_at, version). (2) ALTER delivery_logs: customer_id FK, template_key, template_version, category, campaign_id, campaign_step_id, variant_key, recipient, rendered_subject, rendered_body, scheduled_for, attempts, last_error, next_attempt_at, handoff_url, dedupe_key (unique partial), handed_off_at, confirmed_by_user_id; status check widened to QUEUED/SENDING/SENT/FAILED/HANDOFF/SKIPPED/CANCELLED/DELIVERED/READ; indexes (status,scheduled_for), (customer_id,created_at), (campaign_id). (3) customers: preferred_channel, marketing_opt_out_at, do_not_contact. (4) stock_inquiries. (5) comm_campaigns + comm_campaign_steps. (6) seed permissions comm.view, comm.send, comm.templates.manage, comm.campaigns.manage, comm.settings.manage (ADMIN+MANAGER; comm.send also CASHIER-type roles) following 20260905000008 pattern. (7) seed system templates (invoice, birthday_wish, birthday_offer, stock_available) for EMAIL + WHATSAPP with the spec's sample wording. Sequelize models + associations (Customer.hasMany DeliveryLog). Settings defaults in app-settings (comm.* keys, see design doc Â§3.6). Tests: migration up/down, model round-trip, dedupe_key uniqueness."
+    },
+    {
+      "id": "R-62b",
+      "title": "Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}}, preview) + Templates admin screen",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62a"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Backend src/modules/comm/templates.service.js: list/get/create/update/duplicate/archive/activate; render(templateKey, channel, variables) -> {subject, body}: {{var}} substitution, HTML-escape variables for EMAIL, leave template body trusted; missing variable -> render error listing the names; version++ on body/subject edit. System templates (is_system) cannot be deleted. Routes under /api/comm/templates (comm.templates.manage for writes, comm.view for reads) + POST /api/comm/templates/:uuid/preview with sample variables. Frontend: Admin -> Templates screen (DataGrid by category/channel, form dialog with subject/body, variables chips you can click to insert, live preview pane, Duplicate/Archive/Activate actions). Tests: render escaping, missing vars, duplicate naming, permissions."
+    },
+    {
+      "id": "R-62c",
+      "title": "Notification engine + provider layer: enqueue(), worker poller, retries, scheduler tick, providers email.smtp (nodemailer) + whatsapp.wame (hand-off) + none",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62a",
+        "R-62b"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "engine/enqueue.js: the single entry point (see design doc Â§4): resolve customer -> channels = requested âˆ© consent âˆ© has contact âˆ’ opt-out (marketing categories) âˆ’ do_not_contact; normalise phone to E.164 (10 digits -> +comm.whatsapp.default_country_code); write one delivery_logs row per channel (QUEUED or SKIPPED with reason); honour dedupe_key (ON CONFLICT DO NOTHING -> return existing). engine/worker.js: setInterval 20s, FOR UPDATE SKIP LOCKED LIMIT 20, render -> provider.send -> SENT | HANDOFF(handoff_url) | FAILED; retry 3x (1m/10m/1h) when ProviderError.retryable; runOnce() exported for tests; disabled when NODE_ENV=test or COMM_WORKER=off; started from server.js after DB ready. engine/scheduler.js: hourly tick, runs 'daily jobs' once per Asia/Kolkata day (marker in app_settings comm.last_daily_run); job registry so R-62f/R-62h plug in. providers/: index.js picks by env; email.smtp.js via nodemailer (add dep) with SMTP_HOST/PORT/USER/PASS, from = comm.email.from_name <SMTP_FROM>; whatsapp.wame.js builds https://wa.me/<E164>?text=<encoded> and returns {kind:'handoff', url}; *.none.js -> SKIPPED 'provider not configured'. Global kill switch comm.enabled. REST: POST /api/comm/messages/:uuid/confirm-handoff (-> SENT, handed_off_at, confirmed_by), /undo-handoff (-> HANDOFF), /retry, /resend (clones row with new dedupe suffix). Tests: enqueue consent matrix, dedupe, worker runOnce with fake providers (sent/handoff/retryable/fatal), scheduler catch-up + once-per-day, phone normalisation. HUMAN: SMTP creds (see epic humanQA)."
+    },
+    {
+      "id": "R-62d",
+      "title": "Messages screen (WhatsApp hand-off queue with Open WhatsApp, queued/sent/failed/skipped tabs, retry/resend) + Communication tab on customer profile",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Frontend: new nav item Messages (comm.view). Tabs: To send on WhatsApp (rows in HANDOFF: customer, recipient, preview, Open WhatsApp button -> window.open(handoff_url) then POST confirm-handoff -> SENT; toast with Didn't send -> undo-handoff), Queued (scheduled_for), Sent, Failed (last_error, Retry), Skipped (reason). Badge count of HANDOFF rows in the nav. Customer profile (CustomersScreen): Communication tab = GET /api/comm/messages?customerUuid= newest first, filter by category/channel. Backend: GET /api/comm/messages list with filters + pagination (MAX_PAGE_SIZE), DTO excludes rendered_body in list, includes in detail. Mobile layout check (R-44 rules, min-h-0). Tests: vitest for hand-off flow + undo, backend list filters."
+    },
+    {
+      "id": "R-62e",
+      "title": "Invoice communication: auto-enqueue receipt after sale/rental commit (email = branded HTML inline; WhatsApp = short text template + hand-off on POS close screen); resend from sale screen. Supersedes R-47",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c",
+        "R-62d"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "After createSale / createRental commit (NOT inside the tx; after-commit hook or right after tx resolves), call enqueue({templateKey:'invoice', entity:{SALE|RENTAL, uuid}, customerId, variables from buildReceipt payload, dedupeKey invoice:<TYPE>:<uuid>:<CHANNEL>}). Email body = buildReceiptHtml output embedded (template wraps it; subject 'Your SHREE receipt {{invoice_number}}'). WhatsApp body = invoice text template (number, date, N items, total â‚¹, thank you) - keep short for wa.me. POS PaymentDialog / close-transaction step: after Close transaction poll GET /api/comm/messages?entityUuid= and show chips: Email sent / WhatsApp: Open WhatsApp (hand-off inline, confirm on click) / Skipped: no consent; never block closing. Sale + rental detail screens: Send again button (channels picker). Cancel/refund: optional invoice_cancelled template (system, inactive by default). Idempotent on checkout retry via dedupe_key. Tests: backend enqueue on sale, no enqueue when comm.enabled=false, dedupe on retry; vitest for POS chips + hand-off."
+    },
+    {
+      "id": "R-62f",
+      "title": "Birthday programme: daily job (offer N days before, wish on the day), settings page (on/off, days before, validity, offer text, channels), due-soon preview",
+      "status": "todo",
+      "priority": "high",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Scheduler job 'birthday' (registered in R-62c scheduler): at comm.send_hour Asia/Kolkata select customers with dob where (month,day) == today + days_before -> enqueue birthday_offer (variables customer_name, offer_text, valid_till = today+days_before+validity); (month,day)==today -> enqueue birthday_wish (mention offer only if an offer row exists this year). 29 Feb handled as 28 Feb in non-leap years. dedupe_key birthday_offer:<customer>:<year>:<CHANNEL> etc. Category RELATIONSHIP (respects marketing opt-out? NO - relationship messages are sent unless do_not_contact; document this). Admin -> Birthday programme screen (comm.settings.manage): toggle, days before, validity days, offer text, channels checkboxes, 'Due in next 14 days' list with customer + channel readiness (missing dob/consent shown as hints), 'Sent this year' counter. Manual 'Send now' per customer for the odd case. Tests: date maths incl. leap year and year boundary, idempotency, catch-up after late boot."
+    },
+    {
+      "id": "R-62g",
+      "title": "Enquiry \"available\" message through the real engine: route closeEnquiry(notify) via enqueue() + stock_available template; optional intake hint \"N open enquiries asked for this product type\"",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-63",
+        "R-62c",
+        "R-62d"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "DEPENDS ON R-63 + R-62c. User decision 2026-09-15: enquiries are closed manually only â€” NO auto-matching / auto-notify (a customer must never get \"it is available\" months later by accident). This ticket: (1) replace the R-63 hand-off links with enqueue({templateKey:'stock_available'}) so email really sends and WhatsApp goes through the Messages queue (or Cloud API later); (2) optional, low priority: on the add-unit / intake page show a hint \"3 open enquiries mention <product type>\" linking to the Enquiries tab filtered by that type (uses idx_customer_enquiries_open_product_type). Tests: notify path enqueues one row per channel with the enquiry variables; hint count."
+    },
+    {
+      "id": "R-62h",
+      "title": "Campaigns: CRUD/clone/pause/resume/cancel, audience segments with live count, multi-step schedule, materialise sends at each step, variants (A/B hook)",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c",
+        "R-62d",
+        "R-62b"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Backend comm/campaigns: comm_campaigns + steps; segments (all, purchased, high_value {minPaise, months}, birthday_month, inactive {days}, new {days}) as one SQL builder with count(); status machine DRAFT->SCHEDULED->RUNNING->DONE, PAUSED/CANCELLED; scheduler job 'campaign-steps' materialises delivery_logs rows per customer x channel at step.send_at with campaign_id/step_id/variant_key (weighted pick); PAUSED -> worker skips rows whose campaign is paused; CANCELLED -> rows CANCELLED. Marketing category -> respects marketing_opt_out. Frontend: Campaigns screen (list, status chips, counts), composer (name, category, template per channel, audience picker with live count, steps list of dates e.g. 15/7/3/0 days before an event with a 'generate from event date' helper, variants section collapsed by default), actions Clone/Pause/Resume/Cancel, per-campaign message counts by status. WhatsApp campaign sends land in the hand-off queue (R-62d) until R-62k. Tests: segment SQL counts, step materialisation idempotent, pause/resume/cancel effects, variant weighting."
+    },
+    {
+      "id": "R-62i",
+      "title": "Customer communication preferences: preferred channel, marketing opt-out, do-not-contact on the customer form + consent hints",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62a"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "CustomerFormDialog: Preferred channel select, Marketing opt-out toggle (records marketing_opt_out_at), Do not contact toggle with confirm; show hints 'WhatsApp needs a phone' / 'Email needs an address' next to consent boxes. customers.validation + service accept the new fields. Customers grid: small icons for consented channels. Engine (R-62c recipients.js) already reads these columns - this ticket is the UI + validation. Tests: form submit shape, engine skips on opt-out/do_not_contact (backend)."
+    },
+    {
+      "id": "R-62j",
+      "title": "Communication analytics (phase 2): counts per campaign / template / channel / variant, birthday programme stats, simple dashboard cards",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62h",
+        "R-62f"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "GET /api/comm/stats?from&to&groupBy=campaign|template|channel|variant -> queued/sent/handoff/failed/skipped counts + rates; birthday: offers/wishes sent per year, customers with dob vs without. Frontend: Messages -> Stats tab or Reports section cards (reuse reports chart patterns). Open/click/conversion/revenue-attribution need links or webhooks -> later, keep columns free. Tests: SQL aggregates."
+    },
+    {
+      "id": "R-62k",
+      "title": "LATER: WhatsApp Cloud API provider (whatsapp.cloud.js) + status webhooks; swap from wa.me by env only",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c",
+        "R-62n"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Needs: Meta Business + WABA + dedicated number + approved UTILITY (invoice, stock) and MARKETING (campaign) templates + a public webhook URL (R-62n). Provider maps our template keys to Meta template names + components; webhook updates SENT->DELIVERED->READ on delivery_logs by provider_message_id. Paid per delivered message. See R-46 research for accounts/approvals timeline."
+    },
+    {
+      "id": "R-62l",
+      "title": "LATER: SMS provider (MSG91 or similar) + India DLT registration; sms.msg91.js",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62c"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Needs DLT sender ID + registered templates before any send. Text only, 160 chars: invoice = one line + amount; birthday = short wish. Provider returns providerMessageId; status webhook optional (needs R-62n)."
+    },
+    {
+      "id": "R-62m",
+      "title": "LATER: PDF receipt attachment on invoice email (pdfkit already a dependency)",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62e"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "Render the branded receipt to PDF server-side (pdfkit or html->pdf), attach to the invoice email; store nothing, regenerate on resend. Also usable as a WhatsApp document once R-62k exists."
+    },
+    {
+      "id": "R-62n",
+      "title": "LATER: public receipt page /r/:token + Cloudflare tunnel from the shop laptop (exposes only /r/* and /webhooks/*)",
+      "status": "todo",
+      "priority": "low",
+      "assignee": null,
+      "parent": "R-62",
+      "origin": "god (2026-09-14, R-62 breakdown)",
+      "deps": [
+        "R-62e"
+      ],
+      "createdAt": "2026-09-14T16:30:00.000Z",
+      "details": "User decision 2026-09-14: not now; the system stays LAN-only. When wanted: cloudflared as a Windows service in setup.ps1 (additive step), tokenised unguessable receipt route rendered outside RouteGuard (reuse the R-35 public-route split), expiring tokens, links in WhatsApp/SMS/email, unsubscribe link for marketing email, provider webhooks."
+    },
+    {
+      "id": "R-63",
+      "title": "Customer Enquiry module: Enquiries tab (Open / Closed), customer_enquiries table, log an enquiry = pick or create the customer + what they want; close = \"it's available â€” tell the customer\" (tap-to-send WhatsApp / email / SMS) or \"close quietly\"",
+      "status": "done",
+      "priority": "high",
+      "assignee": "claude (direct, no worker)",
+      "origin": "user (2026-09-15)",
+      "deps": [
+        "R-62"
+      ],
+      "createdAt": "2026-09-15T05:00:00.000Z",
+      "details": "USER: \"we need a new tab where we note down the customer enquiries; one migration because we introduce a table; creating an enquiry is basically creating a new customer with the enquiry details.\" First building block of the stock-availability feature (R-62g adds matching + notify later).\n\nSCOPE: migration 20260915000001 creates customer_enquiries (uuid, customer_id FK, product_type_id/colour_id/size_id nullable FKs, description NOT NULL, notes, promised_date DATEONLY, status OPEN|MATCHED|NOTIFIED|CLOSED (CHECK), matched_stock_id/matched_at/notified_at reserved for R-62g, closed_at/closed_reason (FULFILLED|NOT_AVAILABLE|CUSTOMER_DROPPED|OTHER)/closed_note/closed_by_user_id, created_by_user_id, soft delete, indexes (status, created_at), (customer_id), partial (product_type_id) WHERE status='OPEN'); migration 20260915000002 seeds enquiries.view / enquiries.create / enquiries.update (ADMIN, MANAGER, CASHIER). Backend module src/modules/enquiries: POST /api/enquiries accepts customerUuid OR an inline customer {name, phone, email, dob, consent*} (created in the same transaction; duplicate phone/email -> 409 so staff picks the existing one), GET list ?status&search (customer name/phone/description) with counts per status, GET :uuid, PATCH :uuid, POST :uuid/close {reason, note}, POST :uuid/reopen. Frontend: nav item Enquiries under POS / Counter (/enquiries), EnquiriesScreen with tabs Open / Closed + search + DataGrid (customer + phone, wanted = type Â· colour Â· size + description, promised date with Overdue badge, taken by, age, Edit / Close), EnquiryFormDialog = CustomerPicker (search or inline create - reuses the existing picker) + product type / colour / size Selects + description + notes + promised date; CloseEnquiryDialog with reason + note; enquiriesApi.js + routes + permission constants. Tests: backend (create with new customer, create with existing, 409 on duplicate phone, list filters + counts, close/reopen, permissions), vitest (screen list + tabs, form submit shape, close flow), navigation test updated.\n\nNOT in scope (flagged): a separate WhatsApp number on the customer (customers has one phone + consent_whatsapp); POS 'log enquiry' shortcut; matching/notify (R-62g).\n\nBUILT 2026-09-15 (awaiting user test): migrations 20260915000001 (customer_enquiries + CHECKs + indexes) and 20260915000002 (enquiries.view/create/update -> ADMIN, MANAGER, CASHIER), model CustomerEnquiry + associations; module src/modules/enquiries (validation/service/controller/routes) mounted at /api/enquiries; customers.service createCustomer now accepts { transaction } so the inline customer is created in the enquiry's transaction (duplicate phone/email -> 409, nothing saved). Frontend: ENQUIRY_ROUTES, PERMISSIONS.ENQUIRIES, services/enquiriesApi.js, screens/enquiries/{EnquiriesScreen,EnquiryFormDialog,CloseEnquiryDialog}.jsx, nav item 'Enquiries' under POS / Counter (icon MessageSquareText). Tests: jest tests/enquiries (11) + test-setup now builds the customers phone/email partial unique indexes (they were missing, so the 409 path was never exercised) + CASHIER permission assertions in auth.test updated; vitest enquiriesScreen (8) + navigation expectation. jest 764/764 (sales suite flaked once under parallel contention, green alone), vitest 434/434, build OK. Migrations applied on impoc_dev.\n\nREWORKED 2026-09-15 after user feedback: enquiries close MANUALLY only, with exactly two outcomes â€” (a) \"It's available â€” tell the customer\": server builds the message (enquiries.notify.js, shop name from branding, first name, \"Saree Red (free text)\"), checks consent + contact per chosen channel (400 'Cannot reach the customer on WHATSAPP: No consent' otherwise), writes one delivery_logs row per channel (entity_type ENQUIRY, provider 'handoff', status SENT) and returns tap-to-send links: wa.me / mailto: / sms:; the dialog then shows one 'Open WhatsApp / Open email / Open SMS' button per link + Done. (b) \"Close quietly\": nothing sent. NO other close reasons (bought / not interested are not recorded â€” user: \"we will not save any other details\"). No auto-matching. Schema simplified: status OPEN|CLOSED, closed_reason NOTIFIED|NOT_NOTIFIED, notified_at + notified_channels; matched_* columns dropped (migration rewritten in place, re-applied on impoc_dev). DTO carries channelReadiness {WHATSAPP,EMAIL,SMS: {ok, reason}} so the dialog pre-ticks reachable channels and explains blocked ones; if none reachable the dialog defaults to quiet close. src/utils/phone.js toE164Digits (10-digit -> 91â€¦) is the shared normaliser for R-62c. error.middleware allow-list gained the enquiry messages. Tests: jest enquiries 14 + phone 2 -> 769/769; vitest enquiriesScreen 10 -> 436/436; build OK.\n\nWHEN R-62c LANDS: closeEnquiry() calls enqueue() with template 'stock_available' instead of building links; the dialog's hand-off step becomes the Messages queue (R-62d). Screen contract unchanged.\n\nDONE 2026-09-15: user tested (log enquiry, close with tell-the-customer -> WhatsApp opened with the message) â€” \"working\".",
+      "completedAt": "2026-09-15T07:00:00.000Z"
+    },
+    {
       "id": "R-32",
       "title": "DB read-layer: SQL views for grids + trigger/materialized summaries for dashboard (performance, reduce DB calls)",
       "status": "done",
@@ -1027,28 +1324,6 @@
       "doneAt": "2026-09-11T15:22:55.967Z"
     },
     {
-      "id": "R-47",
-      "title": "Receipt template versioning + webpage builder (deterministic receipt regeneration)",
-      "status": "done",
-      "priority": "high",
-      "assignee": null,
-      "origin": "user (2026-09-15, scope update)",
-      "deps": [
-        "R-45"
-      ],
-      "createdAt": "2026-09-11T02:27:59.909Z",
-      "details": "RE-SCOPED 2026-09-15 by user. Previous scope (receipt delivery via email/WhatsApp/SMS) folded into R-62e. New scope: receipt template versioning + webpage builder for deterministic receipt regeneration.\n\nPROBLEM: All order/sale/rental data is stored in the DB. Receipts (HTML branded + plain-text printable) are generated on the fly from this data using a hardcoded template (receipts.html.js). Today the receipt is self-contained — it has all the data it needs. But if we add or remove fields from the receipt payload in the future, old receipts would render incorrectly or break entirely. There is no way to guarantee that a receipt generated today will still look correct next year.\n\nGOAL: (1) Version receipt templates so each template change is tracked and frozen. (2) Map template versions to invoices/orders so at any point in time, generating a receipt uses the exact template that was active when the order was created. (3) Provide a visual webpage builder (using an open-source npm package) for designing receipt templates — must support JSON + HTML export/import, table formats, and inline CSS edits. (4) Capture a snapshot of each receipt at order time so it can be regenerated deterministically without re-rendering.\n\nARCHITECTURE:\n\n1. NEW TABLES:\n   - receipt_templates: id, name, version (integer), html_content (TEXT, the full HTML/CSS template with {{placeholders}}), block_layout (JSONB, the block arrangement for the builder), is_active (boolean, only one active at a time), created_by (FK users), created_at, updated_at.\n   - receipt_snapshots: id, entity_type (SALE|RENTAL), entity_uuid (UUID), template_id (FK), template_version (integer), rendered_html (TEXT, the final frozen HTML), rendered_at (TIMESTAMP). Unique on (entity_type, entity_uuid) — one snapshot per order.\n\n2. TEMPLATE BUILDER (webpage builder module):\n   - Visual editor with draggable blocks: Header (logo + store name + tagline), Item Table (loop placeholder for line items), Field Row (label + dotted-line value), Text Block (free text), Image (logo/monogram), Divider, Footer (thank-you + signature).\n   - Placeholder syntax: {{variable}} resolved at render time.\n   - Available placeholders: {{store.name}}, {{store.address}}, {{store.phone}}, {{transaction.number}}, {{transaction.date}}, {{transaction.paymentMethod}}, {{customer.name}}, {{customer.phone}}, {{customer.email}}, {{items}} (loop start), {{/items}} (loop end), {{item.sno}}, {{item.productName}}, {{item.colour}}, {{item.size}}, {{item.quantity}}, {{item.unitPrice}}, {{item.lineTotal}}, {{totals.subtotal}}, {{totals.total}}, {{totals.amountInWords}}, {{totals.itemsCount}}.\n   - Live preview panel: renders the template with sample data (hardcoded sample sale).\n   - Save as new version: creates a new receipt_templates row with incremented version; old versions remain for historical receipts.\n   - CSS is embedded in the template HTML (self-contained, like current branded receipt).\n\n3. SNAPSHOT CAPTURE:\n   - After sale/rental commits (in sales.service.js createSale / rental-agreement.service.js createRental), render receipt with the active template and store in receipt_snapshots.\n   - delivery_logs.receipt_payload continues to store structured JSON (for email/WhatsApp via R-62).\n   - receipt_snapshots.rendered_html stores the final HTML (for deterministic regeneration).\n\n4. DETERMINISTIC REGENERATION:\n   - To regenerate a single receipt: fetch receipt_snapshots.rendered_html directly — no re-render.\n   - For bulk export (backup/transfer): query all snapshots, output HTML files named {sale_number}.html or {agreement_number}.html.\n   - Template changes never affect old receipts because snapshots are frozen.\n\n5. API ENDPOINTS:\n   - GET /api/receipt-templates — list all templates (with version history)\n   - POST /api/receipt-templates — create new template\n   - PUT /api/receipt-templates/:id — update template (creates new version)\n   - POST /api/receipt-templates/:id/activate — set as active template\n   - GET /api/receipt-templates/active — get current active template\n   - POST /api/receipt-templates/preview — render preview with sample data\n   - GET /api/receipt-snapshots/:entityType/:entityUuid — get frozen receipt for an order\n   - GET /api/receipt-snapshots/export — bulk export all snapshots (admin)\n\n6. FRONTEND:\n   - New screen: Receipt Templates (Admin section) — list templates, activate, open builder.\n   - Template Builder: block-based visual editor with live preview (drag blocks, edit placeholder fields, preview with sample data).\n   - Existing ReceiptSection gains a 'View original receipt' button that loads the snapshot.\n   - Sale/Rental creation flow unchanged (snapshot captured silently in backend).\n\n7. PERMISSIONS:\n   - receipt_templates.view (ADMIN/MANAGER)\n   - receipt_templates.manage (ADMIN only — create/edit/activate templates)\n   - receipt_snapshots.view (ADMIN/MANAGER — view frozen receipts)\n   - receipt_snapshots.export (ADMIN only — bulk export)\n\nSEQUENCING:\n  Phase 1: DB schema + template CRUD API + snapshot capture on sale/rental creation.\n  Phase 2: Template builder UI (blocks + placeholders + live preview).\n  Phase 3: Snapshot viewer + bulk export + integration with existing receipt components.\n\nFILES AFFECTED:\n  Backend new: receipt-templates/ module (controller, service, validation, routes), ReceiptTemplate.js model, ReceiptSnapshot.js model, 2 new migrations.\n  Backend modified: receipts.service.js (add snapshot capture), sales.service.js (trigger snapshot), rental-agreement.service.js (trigger snapshot), permissions.js, app.js (mount routes).\n  Frontend new: ReceiptTemplatesScreen.jsx, TemplateBuilder.jsx, receiptTemplateApi.js.\n  Frontend modified: ReceiptSection.jsx (add View original), navigation.js (add nav item).\n\nOPEN QUESTIONS (for user):\n  1. Custom CSS in builder, or block-only (simpler)? ANSWERED: use an npm module, NOT custom-built. Must support tables and inline CSS edits. Candidates: react-email-editor (Unlayer), @bolttech/template-editor (Craft.js), email-block-builder.\n  2. Snapshots store both JSON + HTML, or just HTML? ANSWERED: BOTH — structured JSON (receipt_payload JSONB) AND rendered HTML.\n  3. Bulk export: HTML files or PDF (needs puppeteer)? ANSWERED: admin-triggered folder export by invoice number. Purpose: recovery if PDFs lost. HTML files; PDFs are large/expensive to backup.\n  4. Multiple active templates (one per entity type) or one global? ANSWERED: TWO active templates — one for retail sales, one for rentals. Older iterations marked inactive but kept in DB for export-all-receipts.\n\nPREVIOUS SCOPE (folded into R-62e): receipt delivery via email/WhatsApp/SMS at checkout. Delivery_logs + consent flags already exist. WhatsApp = wa.me hand-off; email = Brevo SMTP; SMS deferred. Architecture: async dispatch, provider-adapter layer, delivery_logs ledger, tokenized receipt page. OPEN DECISIONS answered in R-62 epic.R-47 rework (2026-09-16): [2026-09-16 ~09:45Z] SHIPPED on user go: committed (app-code commit + docs commit on context), pushed origin/context, app-code commit cherry-picked to origin/main + pushed. Root tree verified (backend receipt-templates module + migrations 20260916000001/2 + frontend TemplateBuilder/ReceiptTemplatesScreen/BrandedReceiptDialog/ReceiptSection/receiptTemplateApi). db:migrate/seed/refresh clean, backend jest 806, frontend vitest 436, build clean. Leave-alone untracked (colors.zip, colors/, frontend/doc/, tunnels.json) not committed. OPEN follow-up: visual diff vs physical-receipt photo (unreadable) = seed HTML tweak if the printed receipt differs.",
-      "humanQA": [
-        {
-          "q": "**R-47 has been re-scoped to receipt template versioning + webpage builder.** The previous delivery scope is folded into R-62e. New scope: version receipt templates, build a visual editor with placeholders, capture frozen snapshots at order time for deterministic regeneration. 4 open questions: (1) custom CSS or block-only builder? (2) snapshots store JSON+HTML or just HTML? (3) bulk export HTML or PDF? (4) one active template or per-entity-type? Please review and answer.",
-          "askedAt": "2026-09-15T15:00:00.000Z",
-          "a": "All answered by user (2026-09-15): (1) Use an npm module for the builder — NOT custom-built. Must support tables and inline CSS edits. Candidates: react-email-editor (Unlayer), @bolttech/template-editor (Craft.js), email-block-builder. (2) Save BOTH structured JSON (receipt_payload) AND rendered HTML in receipt_snapshots. (3) Admin-triggered bulk export: exports receipt data into a folder keyed by invoice number. Purpose: if PDF data is lost, receipts can be regenerated from DB. (4) Two active templates: one for retail sales, one for rentals. Older iterations marked inactive but kept in DB for export-all-receipts.",
-          "answeredAt": "2026-09-15T16:00:00.000Z"
-        }
-      ],
-      "completedAt": "2026-09-16T03:31:24Z"
-    },
-    {
       "id": "R-48",
       "title": "Barcode values: SHREE prefix + timestamp + counter (unique across sequence resets)",
       "status": "done",
@@ -1099,25 +1374,6 @@
       "createdAt": "2026-09-13T09:30:00.000Z",
       "details": "WHY (user): vendors charge GST on every purchase; bills show a CGST + SGST rate per line and the final CGST/SGST rupee amounts at the subtotal. The system records none of it today. The inventory manager needs the true per-unit cost (buying price + GST) when picking a selling price.\n\nDECISIONS (user, 2026-09-13):\n1. STOCK level = PERCENT RATES: cgstRatePct + sgstRatePct (e.g. 2.5 + 2.5). Stored on stocks as DECIMAL(5,2) cgst_rate_pct / sgst_rate_pct (0..100, default 0). Inputs on Add/Edit stock form next to Buying price.\n2. VENDOR BILL level (Add vendor to trip) = RUPEE AMOUNTS: cgstPaise + sgstPaise (BIGINT paise, default 0) on trip_vendors, next to Total paid. Total paid is entered GST-INCLUSIVE by the user -> NO variance / reconciliation math (explicit user instruction).\n3. Buying templates: NO CHANGES (user is disabling that module; see R-52).\n4. Landed-cost hint (client-side only): under Selling price (₹) on the stock form show 'Cost per unit incl. GST: ₹X (buying ₹B + GST ₹G)'. Basis B = per-unit buying price; if only whole-stock price is given, B = whole / quantity. G = B x (cgst+sgst)/100, rounded to paise. Recomputes live on buying price / whole price / quantity / rate changes. Pure helper in platform/gst.js with tests.\n\nSCOPE:\n- Migration: stocks.cgst_rate_pct, stocks.sgst_rate_pct DECIMAL(5,2) NOT NULL DEFAULT 0 + CHECK 0..100; trip_vendors.cgst_paise, trip_vendors.sgst_paise BIGINT NOT NULL DEFAULT 0 + CHECK >= 0. Existing rows = 0 (untaxed history stays as-is). v_stocks_grid: drop/re-create to expose the rates (pattern from R-48 migration). No matview change.\n- Models Stock + TripVendor; zod validators (stock create/update, trip add-vendor/update-vendor); DTOs return rates as numbers, paise as strings (money rule).\n- Frontend: StockForm inputs 'CGST (%)' / 'SGST (%)' + hint; TripDetail add-vendor form 'CGST (₹)' / 'SGST (₹)'; trip vendor card shows GST next to Paid; Stocks grid columns for the rates (optional, cheap).\n- Tests: backend (validation + create/read round-trip), frontend (gst helper + StockForm hint + TripDetail submit payload).\n\nOUT OF SCOPE: GST on sales/receipts (output tax), input-tax credit reports, variance between line rates and bill totals.\n\nBUILT 2026-09-13 (awaiting user test): migration 20260913000004 (stocks.cgst_rate_pct/sgst_rate_pct DECIMAL(5,2) 0..100; trip_vendors.cgst_paise/sgst_paise BIGINT>=0; v_*_grid dropped/re-created; v_stocks_grid exposes cgstRatePct/sgstRatePct; tests/utils/test-setup.js view mirrored). Models, zod (gstRateSchema: 0..100, <=2 decimals; bill paise optional default 0), services + DTOs (rates as numbers, paise as strings). Frontend: platform/gst.js landedCostPerUnit/parsePercent (6 tests); StockForm CGST/SGST (%) inputs + live 'Cost per unit incl. GST' hint under Selling price (per-unit price, else whole/qty); TripDetail add-vendor CGST/SGST (₹) inputs + 'GST incl.' column; Stocks grid shows 'GST x% + y%' under per-unit price. jest 738/738, vitest 379/379, build OK. Migrated on IMPOC dev.\n\nDONE 2026-09-13: user tested (stock rates + hint, vendor bill GST, grids) — 'working great'. Closed by user.",
       "completedAt": "2026-09-13T11:00:00.000Z"
-    },
-    {
-      "id": "R-52",
-      "title": "Decide the fate of the Buying templates module (disable now, remove later?)",
-      "status": "blocked",
-      "priority": "low",
-      "assignee": null,
-      "origin": "user (2026-09-13)",
-      "deps": [],
-      "createdAt": "2026-09-13T09:30:00.000Z",
-      "humanQA": [
-        {
-          "q": "**What should happen to Buying templates?**\n\nYou said you rarely use it and may remove it. Options:\n\n1. `Hide` — remove the Templates route + the 'Apply template' picker on the stock form; keep table, API and data (reversible, ~1 hour).\n2. `Remove` — drop `stock_templates` (migration), the `template.*` backend module, `TemplateForm.jsx`, the picker, and their tests (one-way).\n3. `Keep` as is.\n\nNo work is done on this module until you pick.",
-          "askedAt": "2026-09-13T09:30:00.000Z",
-          "a": "Not now. I will run the system in production for about a month (until ~mid-October 2026) and then decide Hide / Remove / Keep.",
-          "answeredAt": "2026-09-13T11:00:00.000Z"
-        }
-      ],
-      "details": "Origin: while scoping R-51 the user said buying templates are rarely used and 'maybe we will remove it in future' — explicitly NO changes to the module in R-51 (so templates do NOT get GST fields). Footprint today: backend/src/modules/intake/template.{controller,service}.js + routes under trips, table stock_templates (has buying/whole-buying/selling/floor defaults + R-11 type/subtype), frontend TemplateForm.jsx (/trips/:tripUuid/templates) + 'Apply template' picker in StockForm.jsx + clone-stocks-for-trip helpers. Blocked on the humanQA decision above.\n\nUSER 2026-09-13: parked deliberately — decide after ~1 month of production use (revisit ~2026-10-13). Stays blocked; no work."
     },
     {
       "id": "R-53",
@@ -1218,17 +1474,6 @@
       "completedAt": "2026-09-14T11:45:00.000Z"
     },
     {
-      "id": "R-60",
-      "title": "Durable backups on the shop laptop: verified pg_dump twice daily (Task Scheduler) + manual encrypted upload to Google Drive via rclone + restore script; setup.ps1 registers it all",
-      "status": "doing",
-      "priority": "high",
-      "assignee": "claude (direct, no worker)",
-      "origin": "user (2026-09-14)",
-      "deps": [],
-      "createdAt": "2026-09-14T12:30:00.000Z",
-      "details": "USER: automatic local DB backup twice a day (times asked at setup, 24h format), a manually triggered backup that uploads the whole DB to the cloud (Google Drive, personal gmail, via rclone) into DATE-WISE folders, all registered by the initial setup script. HARD RULES: setup.ps1 has already been run on the laptop → every change must be backward compatible, idempotent, and a failing new step must never affect what is already installed and running (app, DB, .env, pm2, firewall, startup). Show the rclone encryption password ONCE at setup so the user saves it.\n\nDESIGN:\n- Backups live OUTSIDE the repo at C:\\\\IMPOC-backups\\\\{local,pre-update,cloud-staging}\\\\ so git/update.ps1 never see them. Shared helpers in deploy/windows/lib/backup-common.ps1 (Read-DotEnv, Find-PgTool, Invoke-VerifiedDump = pg_dump -Fc → pg_restore --list check → atomic rename, Write-BackupStatus JSON, Prune).\n- backup-local.ps1/.cmd: verified dump → impoc-YYYY-MM-DD_HHmm.dump, prune >14 days, log + last-status.json; exit code non-zero on failure. Registered as two Windows scheduled tasks 'IMPOC backup 1/2' (Register-ScheduledTask, run when logged on — the laptop auto-logs in; StartWhenAvailable so a missed time runs at next boot).\n- backup-cloud.ps1/.cmd (manual double-click; safe to schedule later): takes a fresh verified dump, uploads dump + backend\\\\.env with `rclone copy --checksum` to gdrive-crypt:YYYY/MM/DD/ (encrypted names+contents), prunes cloud copies >90 days, writes status; clear message if rclone/remote missing.\n- restore-db.ps1: list local (and cloud) dumps, pick one, confirm by typing the DB name, stop pm2, pg_dump a safety copy, drop+create DB, pg_restore, migrate, restart pm2.\n- setup.ps1: new final steps (each try/catch → Warn, never Fail): 10 backup folder + times prompt (24h HH:mm, validated; -BackupTimes param to skip prompt) + task registration; 11 rclone (-SkipCloud to bypass): install via winget or zip download to C:\\\\IMPOC\\\\rclone, `rclone config create gdrive drive scope drive.file` (browser sign-in), crypt remote gdrive-crypt → gdrive:IMPOC-backups with generated password+salt (rclone obscure), password shown ONCE + saved to C:\\\\IMPOC-backups\\\\CLOUD-PASSWORD-SAVE-ME.txt, connection test. Skips cleanly if already configured.\n- update.ps1: pre-migration dump via the shared helper into C:\\\\IMPOC-backups\\\\pre-update.\n- docs/WINDOWS_PRODUCTION_SETUP.md: Backups section (schedule, cloud, restore, token-reconnect chore). Hive docs updated.\n\nVERIFY: PowerShell syntax check (pwsh parser) here; logic reviewed; user runs setup.cmd again on the laptop (idempotent) and reports.\n\nBUILT 2026-09-14 (awaiting user run on the laptop): deploy/windows/lib/backup-common.ps1 (BackupRoot C:\\\\IMPOC-backups, env override; Read-DotEnv, Find-PgTool, Invoke-VerifiedDump = pg_dump -Fc → .partial → pg_restore --list must succeed + contain TABLE DATA → rename; Remove-OldDumps; Write-BackupStatus JSON (atomic tmp+move); Write-BackupLog monthly; Find-Rclone/Test-RcloneRemote), backup-local.ps1/.cmd (14-day retention, exit code), backup-cloud.ps1/.cmd (fresh dump → rclone copy --checksum to gdrive-crypt:YYYY/MM/DD + .env → config/backend.env, lsl confirms, delete --min-age 90d *.dump, rmdirs; token-expiry hint), restore-db.ps1 (local or -FromCloud pick, type-DB-name confirm, safety dump, pm2 stop, terminate connections, drop/create, pg_restore --exit-on-error, migrate, pm2 start; on failure prints the safety copy path). setup.ps1: params -BackupTimes 'HH:mm,HH:mm' + -SkipCloud; step 10 (folder, validated 24h prompt, two Register-ScheduledTask 'IMPOC database backup 1/2' daily, Interactive logon, StartWhenAvailable, first backup taken) and step 11 (rclone via winget or zip → C:\\\\IMPOC\\\\rclone; `config create gdrive drive scope drive.file` browser sign-in; crypt remote with New-Secret password+salt shown ONCE + CLOUD-BACKUP-PASSWORD-SAVE-ME.txt; mkdir+lsd test) — both try/catch → Warn, placed after pm2/firewall/startup; idempotent (skips existing remotes/tasks re-registered with -Force). update.ps1 pre-migration dump now uses the helper into pre-update/ (60-day prune). docs §8 rewritten. All 7 scripts parse clean (pwsh 7.6); helper smoke-tested on macOS against the dev DB: 181 KB verified dump, prune, corrupt-file rejection, status/log. Windows-only parts (Task Scheduler, rclone install, cmd /c) cannot run here — user to re-run setup.cmd."
-    },
-    {
       "id": "R-61",
       "title": "Barcode scanner zoom: 1x / 2x / 3x presets (default 2x), remembered per device, applied only when the camera supports zoom",
       "status": "done",
@@ -1243,243 +1488,1092 @@
       "completedAt": "2026-09-14T15:00:00.000Z"
     },
     {
-      "id": "R-62",
-      "title": "Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later): templates, engine, invoice send, birthday programme, stock alerts, campaigns",
-      "status": "todo",
+      "id": "T-00",
+      "title": "Fix auth refresh/session bug across backend + frontend",
+      "status": "done",
+      "assignee": "Pam",
       "priority": "high",
-      "assignee": null,
-      "origin": "user (2026-09-14, Communication & Campaign spec)",
-      "deps": [
-        "R-45"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "EPIC. Design doc: docs/COMMUNICATION_PLATFORM.md (read it first). Spec from user 2026-09-14: one platform for ALL customer messages (invoices, birthday offer + wish, stock-availability alerts, festival/new-collection campaigns), provider-replaceable, A/B-ready, AI-ready later.\n\nDECISIONS (user 2026-09-14): (1) epic R-62 + lettered sub-tickets; R-47 folded into R-62e; R-46 narrowed to Instagram publishing. (2) First channels = WhatsApp via wa.me click-to-chat (hand-off: system prepares text, staff taps Open WhatsApp and presses send) AND email (real send via SMTP), built together; SMS later. (3) Invoice auto-sends on every consented channel with contact info; WhatsApp shows the hand-off button on the POS close screen. (4) NO public URL: laptop stays LAN-only (internet out only) -> no links in messages, no webhooks, no hosted receipt page; status stops at SENT/HANDOFF.\n\nARCHITECTURE: business code calls ONE function enqueue(); rows go into delivery_logs (extended = the ledger AND the queue); an in-process worker polls (FOR UPDATE SKIP LOCKED) and sends through a provider chosen by env (COMM_EMAIL_PROVIDER=smtp, COMM_WHATSAPP_PROVIDER=wame|cloud, COMM_SMS_PROVIDER=none|msg91). Provider contract returns {kind:'sent'} or {kind:'handoff', url}. Daily scheduler (Asia/Kolkata, catch-up on late boot, idempotent via dedupe_key) drives birthdays + campaign steps. pg-boss considered and rejected (ledger row is the job).\n\nPHASES: 1 = R-62a..g + i (platform, templates, engine, messages screen, invoice, birthday, stock alerts, preferences). 2 = R-62h campaigns + R-62j analytics. Later = R-62k WhatsApp Cloud API, R-62l SMS, R-62m PDF attachment, R-62n public receipt page + tunnel.\n\nORDER: a -> b -> c -> d -> e (first user-visible win: invoice on email + wa.me) -> f -> g -> i -> h -> j.\n\nUSER 2026-09-15: (1) Brevo account created -> email provider = Brevo SMTP. (2) Birthday wishes ALWAYS send (not an ad) - only do_not_contact blocks them; marketing opt-out does not. (3) Build the Customer Enquiry module first as its own ticket R-63 (a new Enquiries tab + table; creating an enquiry creates/picks the customer). R-62g now = auto-match + Notify on top of R-63.",
-      "humanQA": [
-        {
-          "q": "**Which mailbox should IMPOC send email from?**\n\nNeeded before R-62c can be tested end-to-end (SMTP host, user, password go in `backend/.env`).\n\n1. Brevo free plan (300 mails/day, needs a sender address you own)\n2. Gmail with an app password (simplest; ~500/day cap)\n3. Something else",
-          "askedAt": "2026-09-14T16:30:00.000Z",
-          "a": "Brevo — account created (2026-09-15). SMTP creds to go in backend/.env when R-62c starts.",
-          "answeredAt": "2026-09-15T05:00:00.000Z"
-        }
-      ]
+      "deps": [],
+      "humanQA": [],
+      "detail": "Fixed 'logged out on refresh': backend cookie path/domain + removed debug logs; vite /api proxy + basicSsl; AuthProvider sync token getter; apiClient returns new accessToken.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
-      "id": "R-62a",
-      "title": "Comm foundation: migrations (comm_templates, delivery_logs extension, customers prefs, stock_inquiries, comm_campaigns/steps), models, permissions, settings keys",
-      "status": "todo",
-      "priority": "high",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
-      "deps": [
-        "R-45"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "Migrations (ESM export style; rollback must work with db:refresh): (1) comm_templates (key+channel unique, category, subject, body, variables JSONB, is_active, is_system, archived_at, version). (2) ALTER delivery_logs: customer_id FK, template_key, template_version, category, campaign_id, campaign_step_id, variant_key, recipient, rendered_subject, rendered_body, scheduled_for, attempts, last_error, next_attempt_at, handoff_url, dedupe_key (unique partial), handed_off_at, confirmed_by_user_id; status check widened to QUEUED/SENDING/SENT/FAILED/HANDOFF/SKIPPED/CANCELLED/DELIVERED/READ; indexes (status,scheduled_for), (customer_id,created_at), (campaign_id). (3) customers: preferred_channel, marketing_opt_out_at, do_not_contact. (4) stock_inquiries. (5) comm_campaigns + comm_campaign_steps. (6) seed permissions comm.view, comm.send, comm.templates.manage, comm.campaigns.manage, comm.settings.manage (ADMIN+MANAGER; comm.send also CASHIER-type roles) following 20260905000008 pattern. (7) seed system templates (invoice, birthday_wish, birthday_offer, stock_available) for EMAIL + WHATSAPP with the spec's sample wording. Sequelize models + associations (Customer.hasMany DeliveryLog). Settings defaults in app-settings (comm.* keys, see design doc §3.6). Tests: migration up/down, model round-trip, dedupe_key uniqueness."
-    },
-    {
-      "id": "R-62b",
-      "title": "Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}}, preview) + Templates admin screen",
-      "status": "todo",
-      "priority": "high",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
-      "deps": [
-        "R-62a"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "Backend src/modules/comm/templates.service.js: list/get/create/update/duplicate/archive/activate; render(templateKey, channel, variables) -> {subject, body}: {{var}} substitution, HTML-escape variables for EMAIL, leave template body trusted; missing variable -> render error listing the names; version++ on body/subject edit. System templates (is_system) cannot be deleted. Routes under /api/comm/templates (comm.templates.manage for writes, comm.view for reads) + POST /api/comm/templates/:uuid/preview with sample variables. Frontend: Admin -> Templates screen (DataGrid by category/channel, form dialog with subject/body, variables chips you can click to insert, live preview pane, Duplicate/Archive/Activate actions). Tests: render escaping, missing vars, duplicate naming, permissions."
-    },
-    {
-      "id": "R-62c",
-      "title": "Notification engine + provider layer: enqueue(), worker poller, retries, scheduler tick, providers email.smtp (nodemailer) + whatsapp.wame (hand-off) + none",
-      "status": "todo",
-      "priority": "high",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
-      "deps": [
-        "R-62a",
-        "R-62b"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "engine/enqueue.js: the single entry point (see design doc §4): resolve customer -> channels = requested ∩ consent ∩ has contact − opt-out (marketing categories) − do_not_contact; normalise phone to E.164 (10 digits -> +comm.whatsapp.default_country_code); write one delivery_logs row per channel (QUEUED or SKIPPED with reason); honour dedupe_key (ON CONFLICT DO NOTHING -> return existing). engine/worker.js: setInterval 20s, FOR UPDATE SKIP LOCKED LIMIT 20, render -> provider.send -> SENT | HANDOFF(handoff_url) | FAILED; retry 3x (1m/10m/1h) when ProviderError.retryable; runOnce() exported for tests; disabled when NODE_ENV=test or COMM_WORKER=off; started from server.js after DB ready. engine/scheduler.js: hourly tick, runs 'daily jobs' once per Asia/Kolkata day (marker in app_settings comm.last_daily_run); job registry so R-62f/R-62h plug in. providers/: index.js picks by env; email.smtp.js via nodemailer (add dep) with SMTP_HOST/PORT/USER/PASS, from = comm.email.from_name <SMTP_FROM>; whatsapp.wame.js builds https://wa.me/<E164>?text=<encoded> and returns {kind:'handoff', url}; *.none.js -> SKIPPED 'provider not configured'. Global kill switch comm.enabled. REST: POST /api/comm/messages/:uuid/confirm-handoff (-> SENT, handed_off_at, confirmed_by), /undo-handoff (-> HANDOFF), /retry, /resend (clones row with new dedupe suffix). Tests: enqueue consent matrix, dedupe, worker runOnce with fake providers (sent/handoff/retryable/fatal), scheduler catch-up + once-per-day, phone normalisation. HUMAN: SMTP creds (see epic humanQA)."
-    },
-    {
-      "id": "R-62d",
-      "title": "Messages screen (WhatsApp hand-off queue with Open WhatsApp, queued/sent/failed/skipped tabs, retry/resend) + Communication tab on customer profile",
-      "status": "todo",
-      "priority": "high",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
-      "deps": [
-        "R-62c"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "Frontend: new nav item Messages (comm.view). Tabs: To send on WhatsApp (rows in HANDOFF: customer, recipient, preview, Open WhatsApp button -> window.open(handoff_url) then POST confirm-handoff -> SENT; toast with Didn't send -> undo-handoff), Queued (scheduled_for), Sent, Failed (last_error, Retry), Skipped (reason). Badge count of HANDOFF rows in the nav. Customer profile (CustomersScreen): Communication tab = GET /api/comm/messages?customerUuid= newest first, filter by category/channel. Backend: GET /api/comm/messages list with filters + pagination (MAX_PAGE_SIZE), DTO excludes rendered_body in list, includes in detail. Mobile layout check (R-44 rules, min-h-0). Tests: vitest for hand-off flow + undo, backend list filters."
-    },
-    {
-      "id": "R-62e",
-      "title": "Invoice communication: auto-enqueue receipt after sale/rental commit (email = branded HTML inline; WhatsApp = short text template + hand-off on POS close screen); resend from sale screen. Supersedes R-47",
-      "status": "todo",
-      "priority": "high",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
-      "deps": [
-        "R-62c",
-        "R-62d"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "After createSale / createRental commit (NOT inside the tx; after-commit hook or right after tx resolves), call enqueue({templateKey:'invoice', entity:{SALE|RENTAL, uuid}, customerId, variables from buildReceipt payload, dedupeKey invoice:<TYPE>:<uuid>:<CHANNEL>}). Email body = buildReceiptHtml output embedded (template wraps it; subject 'Your SHREE receipt {{invoice_number}}'). WhatsApp body = invoice text template (number, date, N items, total ₹, thank you) - keep short for wa.me. POS PaymentDialog / close-transaction step: after Close transaction poll GET /api/comm/messages?entityUuid= and show chips: Email sent / WhatsApp: Open WhatsApp (hand-off inline, confirm on click) / Skipped: no consent; never block closing. Sale + rental detail screens: Send again button (channels picker). Cancel/refund: optional invoice_cancelled template (system, inactive by default). Idempotent on checkout retry via dedupe_key. Tests: backend enqueue on sale, no enqueue when comm.enabled=false, dedupe on retry; vitest for POS chips + hand-off."
-    },
-    {
-      "id": "R-62f",
-      "title": "Birthday programme: daily job (offer N days before, wish on the day), settings page (on/off, days before, validity, offer text, channels), due-soon preview",
-      "status": "todo",
-      "priority": "high",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
-      "deps": [
-        "R-62c"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "Scheduler job 'birthday' (registered in R-62c scheduler): at comm.send_hour Asia/Kolkata select customers with dob where (month,day) == today + days_before -> enqueue birthday_offer (variables customer_name, offer_text, valid_till = today+days_before+validity); (month,day)==today -> enqueue birthday_wish (mention offer only if an offer row exists this year). 29 Feb handled as 28 Feb in non-leap years. dedupe_key birthday_offer:<customer>:<year>:<CHANNEL> etc. Category RELATIONSHIP (respects marketing opt-out? NO - relationship messages are sent unless do_not_contact; document this). Admin -> Birthday programme screen (comm.settings.manage): toggle, days before, validity days, offer text, channels checkboxes, 'Due in next 14 days' list with customer + channel readiness (missing dob/consent shown as hints), 'Sent this year' counter. Manual 'Send now' per customer for the odd case. Tests: date maths incl. leap year and year boundary, idempotency, catch-up after late boot."
-    },
-    {
-      "id": "R-62g",
-      "title": "Enquiry \"available\" message through the real engine: route closeEnquiry(notify) via enqueue() + stock_available template; optional intake hint \"N open enquiries asked for this product type\"",
-      "status": "todo",
+      "id": "T-01",
+      "title": "Add .gitignore and clean dead scaffolding",
+      "status": "done",
+      "assignee": "Pam",
       "priority": "medium",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
-      "deps": [
-        "R-63",
-        "R-62c",
-        "R-62d"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "DEPENDS ON R-63 + R-62c. User decision 2026-09-15: enquiries are closed manually only — NO auto-matching / auto-notify (a customer must never get \"it is available\" months later by accident). This ticket: (1) replace the R-63 hand-off links with enqueue({templateKey:'stock_available'}) so email really sends and WhatsApp goes through the Messages queue (or Cloud API later); (2) optional, low priority: on the add-unit / intake page show a hint \"3 open enquiries mention <product type>\" linking to the Enquiries tab filtered by that type (uses idx_customer_enquiries_open_product_type). Tests: notify path enqueues one row per channel with the enquiry variables; hint count."
+      "deps": [],
+      "humanQA": [],
+      "detail": "Root .gitignore added (env/node_modules/dist/logs + hive). Dead files removed (BarcodeImage.jsx, unused assets).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
-      "id": "R-62h",
-      "title": "Campaigns: CRUD/clone/pause/resume/cancel, audience segments with live count, multi-step schedule, materialise sends at each step, variants (A/B hook)",
-      "status": "todo",
+      "id": "T-02",
+      "title": "Frontend design system: Tailwind/shadcn-style + framer-motion, light mode",
+      "status": "done",
+      "assignee": "Pam",
+      "priority": "high",
+      "deps": [
+        "T-00"
+      ],
+      "humanQA": [],
+      "detail": "INTERIM design system landed (custom-token warm-retail + framer-motion). NOTE: superseded by the human's UI/UX REVAMP (R-01) which replaces the styling layer with Tailwind + shadcn, light-only.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-03",
+      "title": "Users / Roles / Permissions management screens",
+      "status": "done",
+      "assignee": "Kelly",
+      "priority": "high",
+      "deps": [
+        "T-02"
+      ],
+      "humanQA": [],
+      "detail": "Admin screens built. Will be RESTYLED in R-03.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-04",
+      "title": "Picklist management screens",
+      "status": "done",
+      "assignee": "Kelly",
+      "priority": "high",
+      "deps": [
+        "T-02"
+      ],
+      "humanQA": [],
+      "detail": "Picklist screens built. Will be RESTYLED in R-03.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-05",
+      "title": "Vendors management screen",
+      "status": "done",
+      "assignee": "Kelly",
       "priority": "medium",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
       "deps": [
-        "R-62c",
-        "R-62d",
-        "R-62b"
+        "T-02"
       ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "Backend comm/campaigns: comm_campaigns + steps; segments (all, purchased, high_value {minPaise, months}, birthday_month, inactive {days}, new {days}) as one SQL builder with count(); status machine DRAFT->SCHEDULED->RUNNING->DONE, PAUSED/CANCELLED; scheduler job 'campaign-steps' materialises delivery_logs rows per customer x channel at step.send_at with campaign_id/step_id/variant_key (weighted pick); PAUSED -> worker skips rows whose campaign is paused; CANCELLED -> rows CANCELLED. Marketing category -> respects marketing_opt_out. Frontend: Campaigns screen (list, status chips, counts), composer (name, category, template per channel, audience picker with live count, steps list of dates e.g. 15/7/3/0 days before an event with a 'generate from event date' helper, variants section collapsed by default), actions Clone/Pause/Resume/Cancel, per-campaign message counts by status. WhatsApp campaign sends land in the hand-off queue (R-62d) until R-62k. Tests: segment SQL counts, step materialisation idempotent, pause/resume/cancel effects, variant weighting."
+      "humanQA": [],
+      "detail": "Vendors screen built. Will be RESTYLED in R-03.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
-      "id": "R-62i",
-      "title": "Customer communication preferences: preferred channel, marketing opt-out, do-not-contact on the customer form + consent hints",
-      "status": "todo",
+      "id": "T-06",
+      "title": "Backend: unit transition HTTP routes",
+      "status": "done",
+      "assignee": "Dwight",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "POST /api/units/:uuid/transition with guard tables, CAS, permission-gated.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-07",
+      "title": "Intake workflow UI (trips + lots + scan)",
+      "status": "done",
+      "assignee": "Kevin",
+      "priority": "high",
+      "deps": [
+        "T-02",
+        "T-06"
+      ],
+      "humanQA": [],
+      "detail": "Trips/Lots/Scan screens built. Will be RESTYLED + regrouped under Inventory in R-04.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-08",
+      "title": "Backend: Sales / POS module",
+      "status": "done",
+      "assignee": "Dwight",
+      "priority": "high",
+      "deps": [
+        "T-06"
+      ],
+      "humanQA": [],
+      "detail": "Sales module: orders/lines/checkout/cancel/refund, paise snapshot, reversal rows, units transition.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-09",
+      "title": "Frontend: POS / checkout screen",
+      "status": "done",
+      "assignee": "Kevin",
+      "priority": "high",
+      "deps": [
+        "T-08",
+        "T-02"
+      ],
+      "humanQA": [],
+      "detail": "POS cart/checkout/receipt built. Will be RESTYLED + given rental-mode switch in R-05.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-10",
+      "title": "Backend: Rental agreements module",
+      "status": "done",
+      "assignee": "Creed",
+      "priority": "high",
+      "deps": [
+        "T-06"
+      ],
+      "humanQA": [],
+      "detail": "Rentals module: agreements, rent/day, deposit, overdue + damage grading, reversing rows.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-11",
+      "title": "Frontend: Rental screens",
+      "status": "done",
+      "assignee": "Angela",
+      "priority": "high",
+      "deps": [
+        "T-10",
+        "T-02"
+      ],
+      "humanQA": [],
+      "detail": "Rentals create/hand-over/return screens built. Will be RESTYLED + linked from POS in R-05.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-12",
+      "title": "Backend: Expenses module",
+      "status": "done",
+      "assignee": "Creed",
       "priority": "medium",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
-      "deps": [
-        "R-62a"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "CustomerFormDialog: Preferred channel select, Marketing opt-out toggle (records marketing_opt_out_at), Do not contact toggle with confirm; show hints 'WhatsApp needs a phone' / 'Email needs an address' next to consent boxes. customers.validation + service accept the new fields. Customers grid: small icons for consented channels. Engine (R-62c recipients.js) already reads these columns - this ticket is the UI + validation. Tests: form submit shape, engine skips on opt-out/do_not_contact (backend)."
+      "deps": [],
+      "humanQA": [],
+      "detail": "Expenses module: record/update, reversal rows, never UPDATE completed expense.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
-      "id": "R-62j",
-      "title": "Communication analytics (phase 2): counts per campaign / template / channel / variant, birthday programme stats, simple dashboard cards",
-      "status": "todo",
+      "id": "T-13",
+      "title": "Frontend: Expenses screens",
+      "status": "done",
+      "assignee": "Angela",
+      "priority": "medium",
+      "deps": [
+        "T-12",
+        "T-02"
+      ],
+      "humanQA": [],
+      "detail": "Expenses screen built. Will be RESTYLED in R-06.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-14",
+      "title": "Backend: Dashboard aggregates + reports queries",
+      "status": "done",
+      "assignee": "Oscar",
+      "priority": "medium",
+      "deps": [
+        "T-08",
+        "T-10",
+        "T-12"
+      ],
+      "humanQA": [],
+      "detail": "Reports module: GET /api/reports/dashboard|sales|rentals|expenses|inventory, authorize(reports.view). Mounted + verified (suite 9/9).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-15",
+      "title": "Frontend: Dashboard/reports screens ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â DEFERRED TO VERY END",
+      "status": "done",
+      "assignee": "worker-t15-dashboard",
       "priority": "low",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
       "deps": [
-        "R-62h",
-        "R-62f"
+        "T-14",
+        "R-01"
       ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "GET /api/comm/stats?from&to&groupBy=campaign|template|channel|variant -> queued/sent/handoff/failed/skipped counts + rates; birthday: offers/wishes sent per year, customers with dob vs without. Frontend: Messages -> Stats tab or Reports section cards (reuse reports chart patterns). Open/click/conversion/revenue-attribution need links or webhooks -> later, keep columns free. Tests: SQL aggregates."
+      "humanQA": [],
+      "detail": "DONE: Dashboard.jsx (period presets + custom dates, 4 KPI money cards using money-in/out/held tokens, 3-bucket P&L never summed, inventory summary, Sales|Rentals|Expenses|Inventory tabbed sub-reports) replaces DashboardPlaceholder; services/reportsApi.js (5 endpoint wrappers, from/to params). Build PASS + vitest 190/190.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
-      "id": "R-62k",
-      "title": "LATER: WhatsApp Cloud API provider (whatsapp.cloud.js) + status webhooks; swap from wa.me by env only",
-      "status": "todo",
-      "priority": "low",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
-      "deps": [
-        "R-62c",
-        "R-62n"
-      ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "Needs: Meta Business + WABA + dedicated number + approved UTILITY (invoice, stock) and MARKETING (campaign) templates + a public webhook URL (R-62n). Provider maps our template keys to Meta template names + components; webhook updates SENT->DELIVERED->READ on delivery_logs by provider_message_id. Paid per delivered message. See R-46 research for accounts/approvals timeline."
+      "id": "R-01",
+      "title": "Revamp foundation: Tailwind v4 + shadcn-style design system, light-only, role-grouped nav",
+      "status": "done",
+      "assignee": "worker-revamp-foundation-r01b",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "Replace the custom-token CSS styling layer with Tailwind v4 + shadcn-style components (light-only). Rebuild AppShell as role-grouped nav with labelled sections + icons. Rewrite navigation.js to group routes by role/section (Inventory, POS/Counter, Rentals, Expenses, Admin; Dashboard empty-until-T-15). Map bmad money/status semantics into Tailwind theme tokens. Migrate base ui/ components. Update routing/nav tests. Land first ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the foundational design the other restyles build on. Verify vite build + vitest green.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
-      "id": "R-62l",
-      "title": "LATER: SMS provider (MSG91 or similar) + India DLT registration; sms.msg91.js",
-      "status": "todo",
-      "priority": "low",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
+      "id": "R-02",
+      "title": "Restyle auth + SignIn + AppShell polish",
+      "status": "done",
+      "assignee": "worker-revamp-r0203",
+      "priority": "medium",
       "deps": [
-        "R-62c"
+        "R-01"
       ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "Needs DLT sender ID + registered templates before any send. Text only, 160 chars: invoice = one line + amount; birthday = short wish. Provider returns providerMessageId; status webhook optional (needs R-62n)."
+      "humanQA": [],
+      "detail": "Restyle SignIn and polish the role-grouped AppShell on the new design system. Light-only, modern shadcn look. (Batched with R-03 in one worker.)",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
-      "id": "R-62m",
-      "title": "LATER: PDF receipt attachment on invoice email (pdfkit already a dependency)",
-      "status": "todo",
-      "priority": "low",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
+      "id": "R-03",
+      "title": "Restyle admin screens (users/roles/perms, picklists, vendors)",
+      "status": "done",
+      "assignee": "worker-revamp-r0203",
+      "priority": "medium",
       "deps": [
-        "R-62e"
+        "R-01"
       ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "Render the branded receipt to PDF server-side (pdfkit or html->pdf), attach to the invoice email; store nothing, regenerate on resend. Also usable as a WhatsApp document once R-62k exists."
+      "humanQA": [],
+      "detail": "Restyle existing admin screens onto Tailwind+shadcn. Preserve all functionality/RBAC. (Batched with R-02 in one worker.)",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
-      "id": "R-62n",
-      "title": "LATER: public receipt page /r/:token + Cloudflare tunnel from the shop laptop (exposes only /r/* and /webhooks/*)",
-      "status": "todo",
-      "priority": "low",
-      "assignee": null,
-      "parent": "R-62",
-      "origin": "god (2026-09-14, R-62 breakdown)",
+      "id": "R-04",
+      "title": "Restyle Inventory screens (Trips/Lots/Units/Scan) + Barcode print",
+      "status": "done",
+      "assignee": "worker-revamp-r0406",
+      "priority": "high",
       "deps": [
-        "R-62e"
+        "R-01"
       ],
-      "createdAt": "2026-09-14T16:30:00.000Z",
-      "details": "User decision 2026-09-14: not now; the system stays LAN-only. When wanted: cloudflared as a Windows service in setup.ps1 (additive step), tokenised unguessable receipt route rendered outside RouteGuard (reuse the R-35 public-route split), expiring tokens, links in WhatsApp/SMS/email, unsubscribe link for marketing email, provider webhooks."
+      "humanQA": [],
+      "detail": "Restyle the intake/inventory screens (Trips, Trip detail, Lots, Intake scan loop, Units) + Barcode print screen, regrouped under a labelled Inventory section. Keep the bmad separate-surfaces workflow. (Batched with R-06 in one worker.)",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
-      "id": "R-63",
-      "title": "Customer Enquiry module: Enquiries tab (Open / Closed), customer_enquiries table, log an enquiry = pick or create the customer + what they want; close = \"it's available — tell the customer\" (tap-to-send WhatsApp / email / SMS) or \"close quietly\"",
+      "id": "R-07",
+      "title": "Inventory workflow revamp (Trips/TripDetail/LotForm/LotIntake/VendorDetail) + Size-run",
+      "status": "done",
+      "assignee": "worker-revamp-inventory-r07b",
+      "priority": "high",
+      "deps": [
+        "R-01"
+      ],
+      "humanQA": [],
+      "detail": "REWRITE the inventory frontend to match bmad Epic 3 / Scan Primitive: split into TripsScreen + TripDetailScreen (variance strip) + LotForm (channel/rental fields) + LotIntake (arm-decode-commit cadence, N-of-M counter, per-unit colour/size pre-fill, refusal, lot-full, waking, manual fallback) + VendorDetail history + Size-run mode. Frontend-only; backend + barcode sheets untouched. Human chose full workflow revamp. Replaces collapsed IntakeScreen/CreateTripDialog/CreateLotDialog/ScanScreen. DONE: 5 new screens (inventory/) wired into nav+App.jsx, /intake->/trips + nested /trips/:uuid /trips/:uuid/lots/new /trips/:uuid/lots/:uuid/scan /vendors/:uuid. Build PASS + vitest 190/190. KNOWN GAPS (deferred): (a) no NEW tests for the new workflow screens (counter-on-save-not-decode/refusal/lot-full/size-run/prefill untested); (b) old screens/intake/* still on disk (orphaned, imported only by posIntake.test.jsx); (c) stale '/intake' map in AppShell.jsx.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-05",
+      "title": "Restyle POS + add rental-mode switch; restyle Rentals section",
+      "status": "done",
+      "assignee": "worker-revamp-r05",
+      "priority": "high",
+      "deps": [
+        "R-01"
+      ],
+      "humanQA": [],
+      "detail": "Restyle POS cart/checkout/receipt/sales. Add a way to run rentals at the register (retail checkout + switch to rental mode) and restyle the dedicated Rentals section (create/hand-over/return). DONE: POSScreen gets Sale/Rental segmented toggle (mode-gated barcode: retail units -> createSale, rental units -> createRental w/ days validation + rental fields); RentalsScreen/RentalCreateDialog/ReturnUnitsDialog restyled; pos.css + rentals.css deleted; admin.css untouched. Build PASS + vitest 190/190.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-06",
+      "title": "Restyle Expenses screen",
+      "status": "done",
+      "assignee": "worker-revamp-r0406",
+      "priority": "medium",
+      "deps": [
+        "R-01"
+      ],
+      "humanQA": [],
+      "detail": "Restyle the expenses screen (record misc non-stock spend: light bill, rent, etc.) onto the new design system. (Batched with R-04 in one worker.)",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-16",
+      "title": "Final QA, full test pass, wiring review",
+      "status": "done",
+      "assignee": "god",
+      "priority": "medium",
+      "deps": [
+        "R-01",
+        "R-02",
+        "R-03",
+        "R-04",
+        "R-05",
+        "R-06",
+        "T-15"
+      ],
+      "humanQA": [],
+      "detail": "DONE 2026-09-03. Backend 424 pass / 3 pre-existing auth.test failures (cookie Path + requireSpaHeader, documented NOT regressions). Frontend 195/195 + build PASS (89s green). Light-only confirmed; orphaned screens/intake/* removed; AppShell stale '/intake' map fixed ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ '/trips'. All nav sections grouped + role-gated, dashboard reachable, all backend routes mounted in app.js, no dead imports. R-07 gap closed: added LotIntake Scan Primitive tests (commit 8209d82) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â counter-on-save-not-decode, refusal re-arm without increment, lot-full close, colour/size prefill.; master @ 8209d82.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-17",
+      "title": "Schema V2: backend restructure ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â trip/vendor/stock/unit + per-vendor bills",
+      "status": "done",
+      "assignee": "worker-schema-v2-backend",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DONE + integrated on master (merge 3ef2e90, commit b8f83db). Trips/TripVendor(junction w/ bill_reference+total_paid)/Stock/StockTemplate models+migrations; units.stock_id linkage; intake module rewritten to trip/stock/template (routes /api/trips, /api/trips/:tripUuid/stocks, /api/templates); dropped stock-intakes + intake-records + intake-templates modules/tests. DB reset + migrations(29)/seed verified on dev DB. Backend suite in main: 446 pass / 3 pre-existing auth.test fails (documented since T-16). Live smoke: /api/trips returns 401 unauthed, 200 empty-list authed.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-18",
+      "title": "Schema V2: customers + consent + delivery_logs + receipt renderer + customer linkage + reports analytics",
+      "status": "done",
+      "assignee": "worker-schema-v2-customers-backend",
+      "priority": "high",
+      "deps": [
+        "T-17"
+      ],
+      "humanQA": [],
+      "detail": "DONE + integrated on master (merge 70741d0, commit 4cd09b3, + permission-seed/analytics fixes c2b6b32, f8fa581, 251e02d). customers table + CRUD + consent endpoint; delivery_logs + /api/delivery (polymorphic entity_type/entity_id, receipt_payload JSONB, provider ids); receipt renderer (58/80mm printer text + self-contained digital payload) at GET /api/receipts/preview|print; sales/rentals customer_id FK (name snapshot kept); reports analytics /trip-pnl, /vendor-sell-through, /stock-levels + low-stock, /margins. Verified in T-21 QA: full backend 479 pass / 3 pre-existing auth fails.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-19",
+      "title": "Schema V2: frontend rename + fold IntakeRecords into Trips + buying templates",
+      "status": "done",
+      "assignee": "worker-schema-v2-frontend",
+      "priority": "high",
+      "deps": [
+        "T-17"
+      ],
+      "humanQA": [],
+      "detail": "DONE + integrated (master 25b0b89). Frontend mirrors Schema V2: routes.js ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ TRIP_ROUTES/STOCK_ROUTES/TEMPLATE_ROUTES; tripsApi.js + templatesApi.js (+ deleted intakeApi/intakeRecordsApi/barcodeApi); LotFormÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢StockForm (per-vendor buying-template prefill), LotIntakeÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢StockIntake (scan primitive retained); TripDetail shows per-vendor bills + stocks grouped by vendor; IntakeRecords screens folded into Trips and deleted; nav/AppShell updated to /trips + nested stock routes. Build PASS + vitest 200/200 (16 files).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-20",
+      "title": "Schema V2: frontend customers + POS/rental capture + consent + receipts view",
+      "status": "done",
+      "assignee": "worker-schema-v2-customers-frontend",
+      "priority": "high",
+      "deps": [
+        "T-18",
+        "T-19"
+      ],
+      "humanQA": [],
+      "detail": "DONE + integrated (master 4088fe4, commit b85420a). customersApi.js (search/list/create/update/consent), CustomersScreen.jsx (role-gated customers.view, debounced search, purchases count), CustomerPicker.jsx + ConsentCheckboxes (inline-create with consent), receiptApi.js (preview+print), ReceiptPreview/ReceiptPrintDialog/ReceiptSection, POS + rentals send customerUuid, SaleReceipt + RentalsScreen show customer + receipts. CUSTOMER_ROUTES + RECEIPT_ROUTES, /customers nav + AppShell. Build PASS + vitest 213/213 (18 files).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "T-21",
+      "title": "Schema V2: final QA + integration + DB reset verify + full suites",
+      "status": "done",
+      "assignee": "god",
+      "priority": "high",
+      "deps": [
+        "T-17",
+        "T-18",
+        "T-19",
+        "T-20"
+      ],
+      "humanQA": [],
+      "detail": "DONE 2026-09-05, master @ bb1eb08. Integrated all worker worktrees (T-17..T-20 merged; T-18 follow-up fixes). db:refresh (undo-all ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ 35 migrations ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ seed) verified on dev DB. Backend full suite 479 pass / 3 pre-existing auth fails (documented, non-regressions). Frontend vitest 213/213 + vite build PASS. Live E2E chain verified: trip (w/ multi-vendor bills) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ stock (vendorUuid/tripVendorUuid) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ scanned units; sale S-0001 of 2 units (100000 paise) with customer + consent; receipt renderer reviewed (printer text + digital payload) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â found+fixed store name bug (was 'Munder Difflin'). Analytics spot checks: trip-pnl (cost 300000), vendor-sell-through (unitsSold 2, revenue 100000), stock-levels (low-stock flag), margins (avg 20000 / 40%) all correct. Delivery log create OK. Nav reachability via routing+AppShell tests. QA data left in dev DB (QA Vendor/Trip/Customer/sale) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â clear via db:refresh if unwanted.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-09",
+      "title": "Backend: schema V3 intake ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â StockTemplate subTypeId + whole/per-unit buying price; Stock subTypeId + wholeBuyingPricePaise; list endpoints GET /stocks + GET /units",
+      "status": "done",
+      "assignee": "worker-inventory-v2-backend",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "From human: one trip buys from multiple vendors; one vendor sells multiple stocks; one stock spawns multiple units. Stock/template build on the type+subtype picklist relation (e.g. type 'Sari' + subtype 'Paithani'). Template carries WHOLE-stock AND per-unit buying price; per-unit auto-fills each scanned unit. Backend: add subTypeId + wholeBuyingPricePaise to StockTemplate; subTypeId + wholeBuyingPricePaise to Stock; expose bare GET /stocks (all) + GET /units (all) list endpoints (currently only per-trip stocks + per-uuid units exist). Migration + service/validation/DTO updates + tests. DONE + integrated by god on master (commit 59dd31d, merge bb1eb08). Migration 20260905000009 applied/verified on dev DB (columns+FKs matched migration; worker-side self-sync had left them w/o indexes/meta ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ god completed indexes+SequelizeMeta). New regression suite tests/intake/inventory-v2.test.js (16 tests) added by god; full backend suite 495 pass / 3 pre-existing auth fails.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-10",
+      "title": "Frontend: Create-Trip flow (name + date, then add vendors under the trip)",
+      "status": "done",
+      "assignee": "worker-inventory-v2-frontend-r10",
+      "priority": "high",
+      "deps": [
+        "R-09"
+      ],
+      "humanQA": [],
+      "detail": "DONE + integrated by god on master (ff-merge, commit b19420f). TripsScreen create dialog = NAME + DATE (+optional notes) only, posts {name, purchasedOn, notes, vendors:[]}; list rows prefer trip.name. TripDetailScreen 'Add vendor' dialog: Existing (searchable, trip-excluded) OR New vendor (inline create name/address/phone via vendorsApi.createVendor), then attach w/ per-vendor bill via addTripVendor + refetch; 409 + money errors surface; DTO fix (data.vendors[] camelCase w/ legacy fallbacks). Worker added tripsFlow.test.jsx (6 tests); worktree verified 219/219 vitest + build PASS. Main-tree verification after integration: 223/223 (R-08+R-10 coexist). NOTE: R-08's local uncommitted TripDetailScreen.jsx change (rules-of-hooks fix moving stocksByVendor above early returns) was DROPPED at integration as fully subsumed by R-10's committed version (stockByVendorGroups memo, TripDetailScreen.jsx line 182). Worktree auto-reclaimed.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-11",
+      "title": "Frontend: Stock/template builder with type+subtype + whole/per-unit buying price",
+      "status": "done",
+      "assignee": "worker-inventory-v2-stock-builder-r11",
+      "priority": "high",
+      "deps": [
+        "R-10"
+      ],
+      "humanQA": [],
+      "detail": "DONE + integrated by god on master (ff-merge, commit 8e29673 from b19420f). StockForm: two-level Type/Subtype cascading selects (parents parentUuid null; subtype disabled until type; type change clears subtype), optional 'Whole stock buying price' -> wholeBuyingPricePaise (null when blank), POST sends subTypeUuid (null-safe) + wholeBuyingPricePaise, applyTemplate + clone prefill carry subtype+whole, 'Manage buying templates' link. New TemplateForm.jsx at /trips/:tripUuid/templates: per-vendor list + create/edit (PATCH) + delete (confirm dialog), same two-level selects + whole price + defaults, 400 errors inline, vendor via nav state or getVendors. StockIntake decoded card shows stock type+subtype. App.jsx route registered. stockForm.test.jsx (10 tests). Worktree verified 229/229 vitest + build PASS. Main verify: 233/233 + build PASS. StockIntake overlap with R-08 resolved via stash+pop (R-08 styling preserved, no conflict). Worktree auto-reclaimed (notice a8050d).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-12",
+      "title": "Frontend: Nav tabs Trips/Vendors/Stocks/Units + Barcode; standalone Stocks & Units surfaces",
+      "status": "done",
+      "assignee": "worker-inventory-v2-frontend-r12",
+      "priority": "medium",
+      "deps": [
+        "R-09"
+      ],
+      "humanQA": [],
+      "detail": "DONE + integrated by god on master (ff-merge, commit c6eee10). Inventory section = Trips, Vendors, Stocks, Units, Print labels. Standalone Stocks screen (listAllStocks filters tripUuid/vendorUuid/search, type/subtype names mapped from getProductTypes with uuid fallback, N-of-M scanned green when complete, whole+per-unit buying, Scan + Units actions) and standalone Units screen (listAllUnits search/status/stockUuid, mono barcode chip, --status-* token badges + legend, reads ?stockUuid=, adjust-state-during-render sync). New listAllStocks + listAllUnits wrappers, STOCK_ROUTES.LIST_ALL + UNIT_ROUTES.LIST. navigation.js sections order Trips/Vendors/Stocks/Units/Print labels, ICONS Package/Tags, flat App.jsx routes. Gates INVENTORY.VIEW kept. status tokens verified committed in index.css HEAD. Worktree verified 240/240 vitest + build PASS; main verify 244/244 (22 files, incl R-08 themeRuntime.test) + build PASS. Zero R-08 overlap. Worktree auto-reclaimed.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-13",
+      "title": "Integration + final QA for inventory V2 (god)",
+      "status": "done",
+      "assignee": "god",
+      "priority": "medium",
+      "deps": [
+        "R-09",
+        "R-10",
+        "R-11",
+        "R-12"
+      ],
+      "humanQA": [],
+      "detail": "DONE 2026-09-05, god. Dev DB: 35 migrations all UP (incl. 20260905000009-add-inventory-v2-type-price). Backend full suite 498/498 PASS (30 suites, 0 failures). Frontend vitest 244/244 PASS (22 files) + vite build PASS. Live E2E (all PASS): login -> seed picklists (product-type parent+subtype+colour+size) -> create trip (name+date) -> create vendor (name/address/phone) -> attach vendor to trip with bill (500000 paise) -> create template (subtype + per-unit 25000 + whole 500000) -> create stock (buyingPricePaise=25000 from template, whole=500000) -> scan 2 units (buying auto-filled from stock.buyingPricePaise = template per-unit) -> verify unit in standalone Units tab (status in_stock, stockName='Type Subtype', vendorName correct) -> verify stock in standalone Stocks tab (unitsScannedCount=2) -> trip variance=0 (whole 500000 - totalPaid 500000). Master = c6eee10.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-14",
+      "title": "Backend: trip-vendor bill receipt image (base64) support",
+      "status": "done",
+      "assignee": "worker-trip-bill-receipt-backend",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DONE + integrated by god on master (ff-merge, commit 3c312e7 from c6eee10). Optional bill receipt IMAGE on trip-vendor (migration 20260906000001-add-receipt-image-to-trip-vendors -> trip_vendors.receipt_image TEXT nullable, verified UP on dev DB; TripVendor model field receiptImage; trip.validation BOTH schemas get receiptImage z.string().max(10000000).nullable(); trip.service persists in createTrip loop + addTripVendor + TRIP_VENDOR_INCLUDE attributes + mapTripVendorDTO exposes; trip.controller escapeTripVendorDTO passes base64 through UNESCAPED; app.js express.json({limit:'15mb'}) (was 100kb default). Tests: new 'Receipt image (R-14)' describe in trips.test.js - createTrip persists+returns, addTripVendor persists+returns, oversize>10M -> 400, getTrip returns vendors[].receiptImage. Worker verified in worktree: intake 115/115, full backend 499 pass/3 fail (3 = pre-existing auth cookie tests, green only w/ uncommitted R-08 auth fixes - not R-14 scope, verified). God verified in MAIN: full backend suite 502/502 PASS (30 suites, 0 failures; R-08 auth fixes + R-14 both present). Worktree auto-reclaimed.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-15",
+      "title": "Frontend: searchable vendor combobox + single-mode Add-vendor dialog + receipt upload",
+      "status": "done",
+      "assignee": "worker-vendor-combobox-r15",
+      "priority": "high",
+      "deps": [
+        [
+          "R-14"
+        ]
+      ],
+      "humanQA": [],
+      "notes": "Integrated by god on master 8eb8d62 (rebase onto 3c312e7 + ff-merge; package.json stash/fold trick used because R-08 keeps frontend/package.json dirty in main ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â cmdk committed, R-08 inter line preserved as uncommitted). cmdk ^1.1.1 installed in main (npm install --legacy-peer-deps). Full commit suite 242/242 PASS (worktree) / 246 in MAIN with R-08 themeRuntime tests; tripsFlow 8/8; vite build PASS both. Worktree auto-reclaimed.",
+      "detail": "DONE, INTEGRATED, master 8eb8d62. Files (exactly contract): NEW frontend/src/components/ui/SearchableSelect.jsx (cmdk v1.1.1, shadcn-style trigger+search popover, keyboard nav, var(--...) tokens, inline '+ Create <query>' as plain button role=option inside CommandEmpty ' + label passed to <Command> to dodge cmdk's aria-label gotcha); TripDetailScreen.jsx ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Add-vendor dialog is ONE mode (no Existing/New tabs): searchable existing-vendor combobox (name+phone desc, excludes already-on-trip), selecting auto-fills read-only Address, '+ Create <query>' reveals editable Name(prefilled)/Phone/Address with a 'Change' switch-back; bill ref/notes kept; NEW bill receipt image file input (image/*, FileReaderÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢base64 dataURL, 5MB cap, preview + Remove) sent as receiptImage in addTripVendor (null when none) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â posts for both existing and new vendors (local variable vendorUuid updated after createVendor, no stale state); vendor row shows clickable 48px receipt thumbnail ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ lightbox Dialog. tripsFlow.test.jsx rewritten to 8 tests (no tab testids; combobox search; address autofill+readonly; inline-create name prefill; receipt uploadÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢previewÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢removeÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢re-uploadÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢posts dataURLÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢thumbnailÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢lightbox; 409 duplicate). ui/index.js exports SearchableSelect; package.json +cmdk; vitest.setup.js +ResizeObserver +scrollIntoView polyfills. Build verified PASS. NOTE for R-16: R-16 worker builds SearchableSelect replacements reusing this component; do NOT rework SearchableSelect itself.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-16",
+      "title": "Frontend: replace all vanilla dropdowns system-wide with SearchableSelect",
+      "status": "done",
+      "assignee": "worker-r16-finish",
+      "priority": "medium",
+      "deps": [
+        "R-15"
+      ],
+      "humanQA": [],
+      "detail": "After R-15 landed the reusable ui/SearchableSelect (master 8eb8d62), sweep every consumer of the vanilla ui/Select and swap them for the new searchable combobox. Exact consumer set (re-grep 'import { ... Select ... }' from ui during work to catch drift): admin/ProductTypesManager.jsx, admin/FlatPicklistManager.jsx, admin/UserFormDialog.jsx, admin/RolesScreen.jsx, admin/UsersScreen.jsx, expenses/ExpensesScreen.jsx, inventory/StockForm.jsx, inventory/StockIntake.jsx, inventory/StocksScreen.jsx, inventory/TemplateForm.jsx, inventory/UnitsScreen.jsx, rentals/ReturnUnitsDialog.jsx, rentals/RentalsScreen.jsx. Map each screen's <option> lists to SearchableSelect options [{value,label,description?}] ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â long lists (vendors/trips/product types/subtypes/colours/sizes/damage grades/expense category/roles/units/stock status filters) get searchable comboboxes; keep tiny fixed enums sensible (e.g. 2-3 option enums may stay as-is with a good reason). Update ALL affected tests + labels + testids. GOTCHAS from R-15: pass label to <Command> (cmdk ignores CommandInput aria-label), plain <button role=option> in CommandEmpty (CommandItem there flips filtered count ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ 'Maximum update depth exceeded'), ResizeObserver + Element.scrollIntoView polyfills already in vitest.setup.js (do not duplicate). Use ONLY var(--...) tokens. IMPORTANT integration wrinkle: frontend/src/screens/inventory/StockIntake.jsx is R-08-dirty in god's MAIN tree ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â god handles the combined merge at integration. Do NOT touch index.css/theme/authentication/navigation files. FRONTEND ONLY; leave all work UNCOMMITTED; send outbox 'done' to god with vitest/build counts.\n\nREDISPATCH 2026-09-06 (god): original worker worker-vendor-combobox-r16 was reaped during the CLOSING-TIME window (protocol cancelled by human) with 11/13 screens converted, 2 rentals screens (ReturnUnitsDialog/RentalsScreen) still vanilla, and 12 tests failing (stockForm 7, stockIntake 3, stocksUnits 2) because those tests still drive the old <select>. Work preserved UNCOMMITTED in its worktree. Re-dispatched to worker-r16-finish (spawn r16-finish.json, isolate=false, cwd=worktrees/worker-vendor-combobox-r16) to finish IN PLACE: convert the 2 rentals screens, rewrite the failing test interactions for SearchableSelect mechanics (assertions unchanged), full vitest green + build PASS, leave uncommitted.\n\nDONE 2026-09-06, INTEGRATED on master 2553a28 (ff from 8eb8d62). worker-r16-finish completed: remaining 2 rentals screens (ReturnUnitsDialog damage-grade, RentalsScreen filter) converted so ZERO vanilla ui/Select imports remain in the 13 consumer screens (grep verified); rewrote 11 failing tests (stockForm 6, stockIntake 3, stocksUnits 2) to drive SearchableSelect (click trigger -> search input -> role=option row; content assertions on trigger instead of .value; async findByLabelText before conditionally-rendered combos). Verified in its worktree: vitest 242/242 + build PASS. God independently re-verified worktree 242/242 + build PASS, committed agent/worker-vendor-combobox-r16 @ 2553a28, ff-merged to master (R-08 StockIntake overlap resolved via stash/pop clean auto-merge), MAIN re-verify 246/246 + build PASS. Worktree removed + pruned. Master = 2553a28. Consumer screens all SearchableSelect: admin x5, expenses x1, inventory x6, rentals x2 (+ TripDetailScreen had it from R-15).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-17",
+      "title": "Frontend: 3 UI fixes - overlapping combobox popover, StockForm per-trip vendor dropdown, scrollable modals",
+      "status": "done",
+      "assignee": "worker-ui-bugs-r17",
+      "priority": "high",
+      "deps": [
+        "R-16"
+      ],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-06 (god), 3 human-reported UI bugs after R-16 integration on master 2553a28. BUG 1: SearchableSelect.jsx opens its dropdown IN NORMAL FLOW (relative z-30 div after the trigger inside the flex-col root) so it pushes the labels/fields below it downward instead of overlaying them ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â make it an absolutely-positioned overlay under the trigger (relative wrapper + absolute popover, z-index above page content) with the option list capped at max-height + overflow-y-auto (scroll inside the popover, on every one of the 13 consumer screens). BUG 2: StockForm add-stock vendor dropdown is always EMPTY because it reads trip vendor links as 'trip?.trip_vendors' with nested { vendor: { uuid, name } } while the real backend DTO (trip.service.js mapTripDTO) emits them under 'vendors' as flat mapTripVendorDTO objects { uuid, vendorUuid, vendorName } ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â consume 'vendors ?? trip_vendors' defensively (value = vendorUuid || vendor?.uuid || uuid; label = vendorName || vendor?.name), keep the selected value = REAL vendor UUID (createStock uses it), update the stockForm.test.jsx mock to the real shape. BUG 3: Dialog.jsx panel is 'fixed p-6' with no max-height/overflow so tall content clips the footer ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â make it flex-col max-h-[85vh] with scrollable body and pinned header/footer. FRONTEND ONLY, uncommitted (god integrates), var(--...) tokens only, no R-08 files. Baseline 242 vitest in worktree.\n\nROOT-CAUSE NOTES (god, for the worker): (1) SearchableSelect.jsx lines ~124-193 render the popover as the second child of the root 'flex flex-col gap-1.5' div ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â in flow. (2) backend/src/modules/intake/trip.service.js mapTripDTO ~line 408 sets dto.vendors = tripVendors.map(mapTripVendorDTO) (flat {uuid, vendorUuid, vendorName,...}); StockForm.jsx ~lines 54-68 reads trip.trip_vendors and ~lines 222-225 maps tv.vendor?.uuid/.name ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ empty. TripDetailScreen.jsx already uses the defensive 'data?.vendors ?? data?.trip_vendors' fallback ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â mirror it. (3) Dialog.jsx ~lines 50-56 panel has no max-h/overflow; body div line 84 + footer line 85 inline.\n\nDONE 2026-09-06, INTEGRATED on master 32c8706 (ff from 2553a28). worker-ui-bugs-r17 completed all 3 fixes: SearchableSelect popover now 'absolute left-0 right-0 top-full z-50 mt-1' overlay inside a 'relative' wrapper around the trigger (was 'relative z-30' in flow) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â no longer pushes layout; list stays capped (max-h-60 overflow-y-auto); rootRef still spans trigger+popover so outside-mousedown + Escape close intact; props/cmdk structure unchanged. StockForm reads 'trip?.vendors ?? trip?.trip_vendors' via new mapTripVendor(tv) helper (value = vendorUuid || vendor?.uuid || uuid, label = vendorName || vendor?.name || 'Vendor'); selected value stays the real vendor UUID; single-vendor autofill uses the helper too. Dialog panel is 'flex max-h-[85vh] flex-col', header/footer shrink-0 pinned, body 'min-h-0 flex-1 overflow-y-auto' scrolls; props/framer/createPortal/body-lock/Escape untouched. Tests: TRIP mock in stockForm.test.jsx updated to real backend shape { vendors:[{uuid:'tv1',vendorUuid:'v1',vendorName:'Sharma Fabrics'}] }; NEW SearchableSelect.test.jsx (5 tests: absolute+anchored overlay, capped+scrollable list, outside-mousedown close, Escape close, selects real vendor uuid) + Dialog.test.jsx (2 tests: capped flex-col panel + pinned header/footer + scrollable body, Escape + backdrop close). Worker verified worktree 249/249 + build PASS; god re-verified worktree 249/249 + build PASS, committed agent/worker-ui-bugs-r17 @ 32c8706, ff-merged to master (files disjoint from R-08 dirty set ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â no stash needed), MAIN re-verify 253/253 (24 files) + build PASS. Worktree removed + pruned; branch deleted. Master = 32c8706. WORKER OBSERVATION (out of R-17 scope, noted): TripsScreen/VendorDetail/VendorsScreen also read trip.trip_vendors but from DIFFERENT endpoints (trips LIST DTO emits vendorSummary flat; vendor history nests stocks with tripVendorUuid) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â they likely need their own reconciliation task.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-18",
+      "title": "Fix add-stock 400: createStock must send tripUuid in request body",
       "status": "done",
       "priority": "high",
-      "assignee": "claude (direct, no worker)",
-      "origin": "user (2026-09-15)",
       "deps": [
-        "R-62"
+        "R-17"
       ],
-      "createdAt": "2026-09-15T05:00:00.000Z",
-      "details": "USER: \"we need a new tab where we note down the customer enquiries; one migration because we introduce a table; creating an enquiry is basically creating a new customer with the enquiry details.\" First building block of the stock-availability feature (R-62g adds matching + notify later).\n\nSCOPE: migration 20260915000001 creates customer_enquiries (uuid, customer_id FK, product_type_id/colour_id/size_id nullable FKs, description NOT NULL, notes, promised_date DATEONLY, status OPEN|MATCHED|NOTIFIED|CLOSED (CHECK), matched_stock_id/matched_at/notified_at reserved for R-62g, closed_at/closed_reason (FULFILLED|NOT_AVAILABLE|CUSTOMER_DROPPED|OTHER)/closed_note/closed_by_user_id, created_by_user_id, soft delete, indexes (status, created_at), (customer_id), partial (product_type_id) WHERE status='OPEN'); migration 20260915000002 seeds enquiries.view / enquiries.create / enquiries.update (ADMIN, MANAGER, CASHIER). Backend module src/modules/enquiries: POST /api/enquiries accepts customerUuid OR an inline customer {name, phone, email, dob, consent*} (created in the same transaction; duplicate phone/email -> 409 so staff picks the existing one), GET list ?status&search (customer name/phone/description) with counts per status, GET :uuid, PATCH :uuid, POST :uuid/close {reason, note}, POST :uuid/reopen. Frontend: nav item Enquiries under POS / Counter (/enquiries), EnquiriesScreen with tabs Open / Closed + search + DataGrid (customer + phone, wanted = type · colour · size + description, promised date with Overdue badge, taken by, age, Edit / Close), EnquiryFormDialog = CustomerPicker (search or inline create - reuses the existing picker) + product type / colour / size Selects + description + notes + promised date; CloseEnquiryDialog with reason + note; enquiriesApi.js + routes + permission constants. Tests: backend (create with new customer, create with existing, 409 on duplicate phone, list filters + counts, close/reopen, permissions), vitest (screen list + tabs, form submit shape, close flow), navigation test updated.\n\nNOT in scope (flagged): a separate WhatsApp number on the customer (customers has one phone + consent_whatsapp); POS 'log enquiry' shortcut; matching/notify (R-62g).\n\nBUILT 2026-09-15 (awaiting user test): migrations 20260915000001 (customer_enquiries + CHECKs + indexes) and 20260915000002 (enquiries.view/create/update -> ADMIN, MANAGER, CASHIER), model CustomerEnquiry + associations; module src/modules/enquiries (validation/service/controller/routes) mounted at /api/enquiries; customers.service createCustomer now accepts { transaction } so the inline customer is created in the enquiry's transaction (duplicate phone/email -> 409, nothing saved). Frontend: ENQUIRY_ROUTES, PERMISSIONS.ENQUIRIES, services/enquiriesApi.js, screens/enquiries/{EnquiriesScreen,EnquiryFormDialog,CloseEnquiryDialog}.jsx, nav item 'Enquiries' under POS / Counter (icon MessageSquareText). Tests: jest tests/enquiries (11) + test-setup now builds the customers phone/email partial unique indexes (they were missing, so the 409 path was never exercised) + CASHIER permission assertions in auth.test updated; vitest enquiriesScreen (8) + navigation expectation. jest 764/764 (sales suite flaked once under parallel contention, green alone), vitest 434/434, build OK. Migrations applied on impoc_dev.\n\nREWORKED 2026-09-15 after user feedback: enquiries close MANUALLY only, with exactly two outcomes — (a) \"It's available — tell the customer\": server builds the message (enquiries.notify.js, shop name from branding, first name, \"Saree Red (free text)\"), checks consent + contact per chosen channel (400 'Cannot reach the customer on WHATSAPP: No consent' otherwise), writes one delivery_logs row per channel (entity_type ENQUIRY, provider 'handoff', status SENT) and returns tap-to-send links: wa.me / mailto: / sms:; the dialog then shows one 'Open WhatsApp / Open email / Open SMS' button per link + Done. (b) \"Close quietly\": nothing sent. NO other close reasons (bought / not interested are not recorded — user: \"we will not save any other details\"). No auto-matching. Schema simplified: status OPEN|CLOSED, closed_reason NOTIFIED|NOT_NOTIFIED, notified_at + notified_channels; matched_* columns dropped (migration rewritten in place, re-applied on impoc_dev). DTO carries channelReadiness {WHATSAPP,EMAIL,SMS: {ok, reason}} so the dialog pre-ticks reachable channels and explains blocked ones; if none reachable the dialog defaults to quiet close. src/utils/phone.js toE164Digits (10-digit -> 91…) is the shared normaliser for R-62c. error.middleware allow-list gained the enquiry messages. Tests: jest enquiries 14 + phone 2 -> 769/769; vitest enquiriesScreen 10 -> 436/436; build OK.\n\nWHEN R-62c LANDS: closeEnquiry() calls enqueue() with template 'stock_available' instead of building links; the dialog's hand-off step becomes the Messages queue (R-62d). Screen contract unchanged.\n\nDONE 2026-09-15: user tested (log enquiry, close with tell-the-customer -> WhatsApp opened with the message) — \"working\".",
-      "completedAt": "2026-09-15T07:00:00.000Z"
+      "humanQA": [],
+      "detail": "DONE + INTEGRATED on master 00a7fba (ff-merge from 32c8706). Human-reported: adding stock logs POST /api/trips/:tripUuid/stocks 400 (Bad Request). god root-caused + reproduced against the live backend: backend createStockSchema (stock.validation.js:4-8) requires 'tripUuid' in the request BODY, but frontend createStock(tripUuid, payload) in tripsApi.js (~line 176) posted only 'payload' with tripUuid in the URL path - never the body - so zod.parse(req.body) always 400'd 'Invalid input: expected string, received undefined'. Broken for the React UI since Schema V2 (backend b8f83db); R-13 E2E passed only because it hit the API directly with tripUuid in body; exposed after R-17 fixed the previously-empty vendor dropdown. FIX: createStock posts { ...payload, tripUuid } (+ JSDoc updated) + NEW frontend/src/services/__tests__/tripsApi.test.js (2 tests: body includes tripUuid + all payload fields pass through; error propagation). Worker worktree verified 251/251 vitest + build PASS (249 baseline + 2 new); god re-verify MAIN 255/255 + build PASS. Live 201 confirmed by worker against :3000 (test stock row left in dev DB; no DELETE route). Worktree removed + pruned; branch deleted. R-08 dirty batch untouched.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-19",
+      "title": "Fix StockIntake 'Start scanning' 404: trip-scoped STOCK_ROUTES.GET/SCAN",
+      "status": "done",
+      "assignee": "worker-stock-scan-404-r19",
+      "priority": "high",
+      "deps": [
+        "R-18"
+      ],
+      "humanQA": [],
+      "detail": "DONE + INTEGRATED on master 87b1339 (ff-merge from 00a7fba). Human-reported: after saving a stock and clicking 'Start scanning', StockIntake mounts and fires GET /api/stocks/09c9490e-c50b-45cd-9054-477717f0114e -> 404 (Not Found). ROOT CAUSE (god-verified): backend serves single-stock GET + scan ONLY under NESTED mount app.use('/api/trips/:tripUuid/stocks', stockRoutes) (backend/src/app.js:69; getStockByUuid/scanIntoStock controllers verify trip access via verifyTripAccess(tripUuid)); the bare /api/stocks mount (app.js:70, stockListRouter) has ONLY GET / (list-all). But frontend STOCK_ROUTES.GET(uuid)='/stocks/:uuid' and STOCK_ROUTES.SCAN(uuid)='/stocks/:uuid/scan' (frontend/src/platform/routes.js ~38) are BARE, called by getStock(uuid)/scanBarcodeIntoStock(stockUuid,{}) (tripsApi.js ~156/214) -> frontend hits /api/stocks/:uuid which does not exist -> Express 404. All backend tests use the nested path; R-13 E2E passed because it used it directly; broken for the React UI since Schema V2; exposed after R-18 let add-stock finally succeed. FIX (frontend only, worker worker-stock-scan-404-r19 kevin isolate:true): STOCK_ROUTES.GET/SCAN trip-scoped (tripUuid, uuid) mirroring LIST/CREATE/UPDATE (encodeURIComponent both params, JSDoc updated); getStock(tripUuid,uuid) + scanBarcodeIntoStock(tripUuid, stockUuid, {barcode,colourUuid,sizeUuid}) signatures; StockIntake.jsx call sites (~56/~65/~147) pass tripUuid from useParams, deps arrays [tripUuid, stockUuid]; routes.test.js GET+SCAN now nested + both-param encode tests; stockIntake.test.jsx scan mock (tripUuid, stockUuid, payload) + toHaveBeenCalledWith('t1','S1',{barcode,colourUuid,sizeUuid}) (mounted at /trips/t1/stocks/S1/scan); tripsApi.test.js +2 regression tests (getStock GET /trips/T/stocks/U; scanBarcodeIntoStock POST /trips/T/stocks/U/scan exact body). Worktree verify 253/253 + build PASS (worker) == god re-verify 253/253 + build PASS. Live proof: bare /api/stocks/:uuid -> 404 (user's bug), nested /api/trips/6082e02e.../stocks/09c9490e... -> 200 with the stock DTO. MAIN re-verify **257/257** (25 files: 255 + 2 new) + build PASS. ff-merge needed R-08 stash/pop trick (StockIntake.jsx in both dirty sets, disjoint hunks 53-147 vs 327-435); R-08 batch restored intact, ThemeProvider.jsx/theme-config.js CRLF warnings benign. Worktree removed + pruned; branch agent/worker-stock-scan-404-r19 deleted.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-08",
+      "title": "Minimals dark-primary UI revamp + audit fixes (dev batch on bb1eb08)",
+      "status": "done",
+      "assignee": "god",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DOING 2026-09-05, god. Human-directed: switch M-01/T-21 minimals tokens to a DARK-FIRST palette with gold #FAAF00 primary, default colorScheme=dark, FOUC-proof pre-hydration, + audit fixes from 3 spawned review agents. DONE+verified in working tree (uncommitted on bb1eb08): index.css dark :root tokens (surface #141A21 base / #1C252E raised, gold primary/accent #FAAF00, dark-tuned ink/status/money, Inter+P.Sans); theme-config (Dark first, gold primary presets default, DEFAULT dark); FONT dunk ThemeProvider runtime data-primary/data-font re-add (H Refresh regression fix); index.html FOUC script (dark default + resolve 'system'); auth.controller cookieClearOptions (logout clears with same domain/path); RouteGuard expired banner themed (--danger); SettingsDrawer swatch background + Check uses --primary-foreground; StockIntake waking banner ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ accent/foreground; BarcodeScanner.css unscoped body #fff ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ var(--surface-base). Verified: backend auth 35/35, frontend vitest 217/217 (incl. new themeRuntime.test.jsx locking the runtime attribute sync), vite build PASS. COMMITTED 4e55c3a (2026-09-06, on master).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-20",
+      "title": "Scanner UX fix: auto-start camera, remove zoom-input/tap-to-arm ceremony (stock intake navigation kept)",
+      "status": "done",
+      "assignee": "god",
+      "priority": "high",
+      "deps": [
+        "R-19"
+      ],
+      "humanQA": [],
+      "detail": "DOING 2026-09-06, god (direct, no worker spawned). Human reported the barcode scanner 'whole page opens' with a zoom-input arm ceremony. Resolved with the human to KEEP current navigation entirely (StockIntake IDLEÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ARMEDÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢saveÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢IDLE, page drops back after save) and only remove the zoom-input / 'Start Scanner' tap-to-arm ceremony inside BarcodeScanner ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â camera now auto-starts on mount. DONE + verified in working tree (uncommitted alongside R-08): BarcodeScanner.jsx ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â mount effect auto-starts camera (setTimeout 0; eslint-disable for react-hooks/set-state-in-effect), startRequestedRef StrictMode-guards the double-start, removed zoomInput start screen + 'Start Scanner' button + zoomError state + stopCamera + internal Close button, added ZOOM_STEP 0.5 floating ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢/+ zoom pill (track.applyConstraints advanced zoom clamped to zoomRange; only rendered when zoomRange>0), kept torch/video/frame/pause/beep/vibrate + BarcodeDetector + ZXing fallback; error panel now static with 'Try again' (guard reset on failure so retry works). BarcodeScanner.css ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â .barcode-scanner position fixed/inset:0 (full viewport = the 'whole page opens' cause) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ absolute/inset:0 (fills StockIntake 3:4 camera box), removed unscoped body position:fixed rule + .scanner-close block + its media queries, added .scanner-starting + .scanner-zoom(.button/.value), .scanner-error static, .scanner-camera bottom 0, reduced-motion selector updated. Vite HTTPS (plugin-basic-ssl) and both decode paths deliberately untouched. Verified: eslint 0 errors (2 pre-existing exhaustive-deps warnings), vitest 257/257 PASS, vite build PASS. COMMITTED 4e55c3a (2026-09-06, on master).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-21",
+      "title": "UI polish batch: names-only (no ids) display, StockIntake scan-next flow, POS product names",
+      "status": "done",
+      "assignee": "god",
+      "priority": "high",
+      "deps": [
+        "R-20"
+      ],
+      "humanQA": [],
+      "detail": "DOING 2026-09-06, god (direct, human-reported, uncommitted alongside R-08/R-20). (1) NAMES-ONLY (no uuids in the UI): backend vendor.service.js history query + DTO now return stockName (new deriveStockName helper), subTypeUuid, colourName, sizeName alongside the legacy colour/size uuid keys; VendorDetail StockBlock + unit rows and VendorsScreen history Product column render names; StocksScreen filters no longer show uuid prefixes (fallbackName ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ generic 'Type'/'Subtype'/'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â'; tripLabel helper = trip.name || 'Trip <date>', used in both dropdown + row chip); UnitsScreen stock filter replaced the raw-stockUuid readonly input with a SearchableSelect of stock names (listAllStocks + getProductTypes). (2) SCAN-NEXT: StockIntake off-by-one fixed (post-refresh unitsScannedCount instead of +1, guarded by quantity>0) so 3-unit stocks no longer close early; IDLE shows 'Unit saved ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â scan the next one.' + 'Scan next unit' button when scannedCount>0, else 'Tap to arm the camera' + 'Scan barcode'. (3) POS NAMES: units.service.js mapUnitDTO + getUnitByBarcode add colourName/sizeName/stockName (stockÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢productType/subType names); POSScreen cart rows show product name first, barcode ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· colour ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· size detail below, toast names the product (fallback 'Item <barcode>'). Verified: frontend vitest 258/258 (25 files), backend vendors 53/53, intake+vendors 168/168, units+barcode 31/31; eslint only pre-existing noise. COMMITTED 4e55c3a (2026-09-06, on master).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-22",
+      "title": "POS/customer batch: picker display+search, payment-methods picklist, receipts customer+payment info",
+      "status": "done",
+      "assignee": "god",
+      "priority": "high",
+      "deps": [
+        "R-21"
+      ],
+      "humanQA": [],
+      "detail": "DOING 2026-09-06, god (direct, human-reported POS gaps, uncommitted alongside R-08/R-20/R-21). (1) CUSTOMER PICKER: backend customers search now matches name/phone/email (customers.service.js Op.or += email); frontend customersApi.js unwrap fixed (list ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ data.customers[], create/get/update/consent ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ data.customer ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â was passing the wrapper, so an inline-created customer had no name and lists weren't arrays); CustomerPicker placeholder 'Search by name, phone, or emailÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦', rows + selected chip show phone + email. (2) PAYMENT-METHODS PICKLIST: payment_methods table + Cash/UPI seed migration 20260906000002 + module at /api/picklists/payment-methods (mirrors colours flat picklist: POST/PATCH gated INVENTORY.CREATE/UPDATE, GET auth-only, partial unique idx on active names, deactivated names reusable); migration 20260906000003 adds sales.payment_method + rental_agreements.payment_method VARCHAR(50); Sale/RentalAgreement models + sales/rental validation/service/controller/DTO carry paymentMethod (name snapshot); frontend picklistsApi.getPaymentMethods + Admin 'Payment methods' tab (FlatPicklistManager); POS payment-method Select defaults 'Cash' (switches to first method if Cash absent), sent in sale + rental payloads, reset on clearCart + post-checkout. (3) RECEIPTS: receipts.service customerBlock falls back to customerName/customerMobile snapshot; SALE+RENTAL receipt payloads include paymentMethod; text receipt 'Payment' line; SaleReceipt customerPhone fallback + payment line, POS rental receipt block, ReceiptPreview Payment row. (4) POS CAMERA SCAN (added this session, human-reported: no camera button on POS): 'Add items' card += 'Scan barcode with camera' Button ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ Dialog (title 'Scan barcode', Close footer) mounting BarcodeScanner only while open; detected barcode ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ same addByBarcode handler as the text field, dialog auto-closes; test vi.mocks BarcodeScanner + new scanner flow test. (5) CUSTOM SELECT STANDARD (human: 'for the payment method don't use simple selectÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ every select element should be the custom select'): ui/Select.jsx REWRITTEN native <select> wrapper ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ cmdk combobox (was SearchableSelect); SearchableSelect.jsx now re-exports Select (ONE implementation, Select = standard for present+future selects); POS payment-method migrated to options/value/onChange API (data-testid pos-payment-method preserved). (6) CUSTOMER-SOURCE PICKLIST (human: 'POS should ask if they came via instagram / whatsapp group posts / pamphlet'): customer_sources table + seed Instagram/WhatsApp group/Pamphlet/Word of mouth/Walk-in/Other (migration 20260906000004, partial-unique idx like payment_methods), module /api/picklists/customer-sources (13 new backend tests), migration 20260906000005 adds sales.customer_source + rental_agreements.customer_source; Sale/RentalAgreement models + sales/rental validation/service/controller/DTO carry customerSource; frontend getCustomerSources + Admin 'Customer sources' tab; POS 'How did the customer hear about us?' custom Select (optional, 'Not selected / Walk-in' clear option), sent as customerSource in sale+rental payloads, reset on clearCart + post-checkout. VERIFIED: backend 529/529 full suite (customer-sources 13/13 + sales/rentals customerSource asserts), frontend 261/261 (pos customer-source checkout test, no-vanilla-combobox assert; /customer/i label queries ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ /^customer$/i since new label contains 'customer'), vite build PASS, eslint only pre-existing noise. Dev DB migrations 0002+0003 (payment) and 0004+0005 (customer_sources) APPLIED live. COMMITTED 4e55c3a (2026-09-06, on master).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-23",
+      "title": "Security & vulnerability review of existing codebase ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â first live test of md-framework security agent + skills",
+      "status": "done",
+      "assignee": "worker-security-lead-r23",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DONE 2026-09-07, god. Delivered SECURITY-FINDINGS.md at worktree root (copy at hive/SECURITY-FINDINGS.md) + CRITICAL escalation + done (BLOCK verdict). Counts: Critical 3 / High 10 / Medium 10 / Low 8 / Hardening 5. CR-1 double refund/void/expense-cancel TOCTOU (no CAS, replay inserts duplicate reversal rows -> ledger money loss; CAS pattern exists in units.service transitionUnit). CR-2 MANAGER->ADMIN privescal via seeded users.update + unguarded role-assign/remove/suspend routes (user.routes.js:32-34, user-role.service.js:36-101). CR-3 forgeable JWTs (auth.middleware.js:55-62,89-120 session never bound to payload.sub + algorithms not pinned + .env.example placeholder secret -> impersonate admin w/ own session UUID + signed token). H-2/H-4/H-5 IDOR reads (12 GET routes auth-only not authorize(INVENTORY.VIEW); verifyTripAccess stub; receipts by enumerable uuid); H-6 empty item sells first unit; H-7 int8->Number money corruption >2^53; H-8 JWT in localStorage; npm audit: backend 2 mod, frontend prod 2 mod, frontend dev 1 crit (vitest dev-only). Verified positives: Argon2id, zod everywhere, no SQLi/XSS/CSRF-leak, 5xx masked, CORS pinned. Worker read-only contract honored (worktree dirty = SECURITY-FINDINGS.md only, 0 commits). Worktree preserved for integration. REPO BRANCH untouched. AWAITING HUMAN decision on remediation scope (BLOCK verdict: 3 Critical + 10 High reachable by low-priv user today).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-CR-1",
+      "title": "MONEY-OUT RACE: coordinated fix for all TOCTOU + next-number races (SEC-CR-1 + PG-1/2 + NOD)",
+      "status": "done",
+      "assignee": "worker-money-out-r29",
+      "priority": "critical",
+      "deps": [
+        "R-23",
+        "R-28"
+      ],
+      "humanQA": [
+        {
+          "q": "Start with the money-out race critical first? (Cover SEC-CR-1 + PG-1/2 + NOD double-refund as ONE coordinated fix; UI/UX at last.)",
+          "askedAt": "2026-09-08T16:00:00Z",
+          "a": "Yes. Start with the money-out race critical first."
+        },
+        {
+          "ts": "2026-09-08T16:50:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DONE 2026-09-08 (worker-money-out-r29) + INTEGRATED by god as commit 9523749 + merge c2b5c7e. All 7 race paths fixed: refundSale/cancelSale/cancelExpense/cancelRental CAS conditional UPDATE (status='completed'/'active' WHERE id + expected + deleted_at IS NULL) -> 0 rows = 409 re-read; processRentalReturn catches 23505 -> 409 'already returned' + active->completed conditional completion flip; createSale/createRental retry-on-collision (MAX_NUMBER_RETRIES=3) for number races. DB backstops: 5 partial unique indexes (uq_sale_reversals_refund_sale, uq_sale_reversals_cancel_sale, uq_expense_reversals_cancel_expense, uq_rental_reversals_cancel_agreement, uq_rental_returns_line) in migration 20260908000001 + Sequelize model indexes[] + test-setup manual block. Tests: 7 concurrency tests added (sales +3, expenses +1, rentals +3). VERIFIED: full backend suite 555/555 green in MAIN (33 suites).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-CR-2",
+      "title": "CR-2  MANAGER -> ADMIN privilege escalation via users.update role assignment",
+      "status": "done",
+      "assignee": "worker-sec-cr2-role-escalation",
+      "priority": "critical",
+      "deps": [
+        "R-23"
+      ],
+      "humanQA": [
+        {
+          "ts": "2026-09-08T16:45:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "user.routes.js:32-34; user-role.service.js; user.service.js; user controllers. Fix implemented by worker-sec-cr2-role-escalation: new users.assign_role permission (ADMIN-only, added to PERMISSIONS + permission seeder + test-setup), role-assign/remove routes now gated by it (was users.update); guards in user-role.service.js (self-vs-other 403, privileged-role assign/remove 403 unless holder) + user.service.js (createUser privileged-role 403 closes SEC-H-3 vector; update/suspend/delete privileged user 403; last active admin protected from suspend/delete/demote 403); data-driven is_privileged on Role (migration 20260908120000) + roles.seed isPrivileged; new seeder 20260908000000 grants assign_role to ADMIN only (idempotent); controllers pass req.auth.userUuid actor. INTEGRATED by god: 7c1a365 + merge 0b585ee (--no-ff onto framework/md-impoc; disjoint from SEC-CR-3). VERIFIED: full backend suite 541/541 green (33 suites, default-parallel npm test), main-tree auth/users/roles 129/129. The templates/stocks/request-keys 'failures' reported by worker were runInBand artifacts - NOT present in authoritative run.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-CR-3",
+      "title": "CR-3  Forgeable JWTs: session not bound to sub, no algorithms pin, placeholder secret",
+      "status": "done",
+      "assignee": "worker-sec-cr3-jwt-forgery",
+      "priority": "critical",
+      "deps": [
+        "R-23"
+      ],
+      "humanQA": [
+        {
+          "ts": "2026-09-08T16:32:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DONE + verified (worker-sec-cr3-jwt-forgery, uncommitted for god). jwt.verify pins algorithms:[\"HS256\"] (auth.middleware.js, same JWT_ALGORITHM const used by token.service jwt.sign); access token HS256 pinned on sign; session fetched with joined User and MUST match payload.sub (else 401) closing cross-user session hole; boot fails fast via assertJwtSecrets() in app.js (missing/placeholder/<32 chars rejected; old example secrets blacklisted); JWT_ACCESS_SECRET/JWT_REFRESH_SECRET blanked in .env.example with generation comment. Test DB impoc_test via sync({force:true}) (no migrations run). New tests: HS384-wrong-algo token -> 401; cross-user sub mismatch -> 401; matching sub+session -> 200 (positive control); revoked-session token -> 401; validateJwtSecret/assertJwtSecrets unit tests. Backend full suite 536/536 PASS (32 suites; auth suite 42/42 incl 7 new). Refresh flow already user-bound (opaque token -> session.userId -> user.uuid; ACTIVE check kept). INTEGRATED by god as 8ef04b4 (ff-merged to framework/md-impoc); auth re-verified 42/42 in main tree.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-1",
+      "title": "H-1  No rate limiting / lockout / failed-attempt tracking on login+refresh",
+      "status": "done",
+      "assignee": "worker-sec-h1-auth-hardening",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-08 (god) to worker-sec-h1-auth-hardening. Scope = SEC-H-1 + SEC-H-9 + SEC-H-10 together (one auth-hardening worker, disjoint files). app.js:30-85 (no express-rate-limit/helmet), auth.routes.js:22 login public. Unlimited credential guessing vs seeded admin/staff. Fix: per-IP + per-account rate limit + exponential lockout on /login /refresh; optional 2FA for admin.\\nINTEGRATED 2026-09-09: committed 1924b6d, merged 13d12fc into main. Full backend suite 618/618 (35 suites) green. SEC-H-1 rate-limit/lockout (rate-limit.middleware.js, LOGIN_IP_MAX=100/window, LOGIN_ACCOUNT_MAX_FAILED=5, exp backoff 1m/15m/1h/24h, 429 locked); SEC-H-9 suspended/deleted user 401 in authenticate(); SEC-H-10 refresh cookie Secure all envs + /api/auth path + COOKIE_SECURE override. 15 auth tests incl 9 new.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-2",
+      "title": "H-2  IDOR: 12 GET routes auth-only leak entire purchasing cost book",
+      "status": "done",
+      "assignee": "worker-sec-h2-intake-authz",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-08 (god) to worker-sec-h2-intake-authz. Scope = SEC-H-2 + SEC-H-4 together (intake authz worker, disjoint files from H-1/H-6 workers). trip.routes.js:18,22,28; stock.routes.js:20,26; template.routes.js:18,22; vendors/vendor.routes.js:18,22,24; units/units.routes.js:23,27,34. buying_price/floor_price/quantity/history/bill receipts/barcode metadata for any auth user. Fix: authorize(INVENTORY.VIEW) + ownership/tenant scoping on all read routes. COMPLETED 2026-09-09 (god): integrated as 57fb56e ff. 601/601 green; 13 READ inventory routes gated authorize(PERMISSIONS.INVENTORY.VIEW).",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-3",
+      "title": "H-3  users.update/create target any user incl admin; arbitrary privileged role at create",
+      "status": "done",
+      "assignee": "worker-sec-cr2-role-escalation",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-08T17:00:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "CLOSED by SEC-CR-2 integration (worker-sec-cr2-role-escalation; god commit 7c1a365 + merge 0b585ee). All 4 H-3 vectors closed: (a) privileged-TARGET guard - update/suspend/delete of a privileged user 403 unless user holds new users.assign_role (user.service.js assertCanMutatePrivileged); (b) privileged-ROLE guard - role assign/remove of is_privileged roles 403 unless assign_role holder (user-role.service.js); (c) distinct role-assignment permission - new users.assign_role (ADMIN-only, seeded) gates assign/remove routes instead of broad users.update (user.routes.js:32-34); (d) LAST-ADMIN protection - cannot demote/suspend/delete the last active admin (isLastActiveAdmin + assertNotLastActiveAdmin). Plus createUser can no longer grant a privileged role without assign_role (closes POST any roleUuid incl ADMIN latent vector). VERIFIED: main-tree users/roles/auth suites green (541/541 full backend on 0b585ee). No separate SEC-H-3 worker needed.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-4",
+      "title": "H-4  Trip/stock ownership check is a stub; scan ignores trip boundary",
+      "status": "done",
+      "assignee": "worker-sec-h2-intake-authz",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-08 (god) to worker-sec-h2-intake-authz (bundled with SEC-H-2). trip.service.js:206-223 verifyTripAccess only checks trip exists; stock.controller.js:129-151 scanIntoStock never calls it, ignores req.params.tripUuid; stock.service.js:410-414 lookup by uuid only. Fix: real ownership in verifyTripAccess, scope scan lookup to where:{uuid, trip:{uuid:tripUuid}}, enforce on stock/template/scan controllers. COMPLETED 2026-09-09 (god): integrated as 57fb56e ff. 601/601 green; verifyTripAccess upgraded 404/401/403 in trip+stock services; scanIntoStock scoped to URL trip; trip.controller getCloneLastStock guarded.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-5",
+      "title": "H-5  Receipts expose any transaction + customer PII by enumerable UUID",
+      "status": "done",
+      "assignee": "worker-sec-h5-receipts-pii",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-09T14:30:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DISPATCHED 2026-09-09 (god) to worker-sec-h5-receipts-pii. receipts.routes.js:13,16 (REPORTS.VIEW only); receipts.service.js:82-87,138-143 lookup by uuid, :60-76 customerBlock returns name/phone/email. Fix: creator/ownership/role scoping, restrict reports.view holders, mask PII unless entitled. COMPLETED 2026-09-09 (god): customerBlock now accepts isPrivileged param; non-privileged callers get name only (no phone/email); controller calls isPrivilegedActor(req.auth.userUuid) and passes result. New receipts-authorization.test.js with 4 tests (preview+print x admin+non-admin PII masking). Existing receipts test updated to expect undefined phone/email for MANAGER. Backend suite 622/622 green.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-6",
+      "title": "H-6  Sale/rental item with neither barcode nor unitUuid sells first unit in table",
+      "status": "done",
+      "assignee": "worker-sec-h6-sellable-unit",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-08 (god) to worker-sec-h6-sellable-unit. sales.validation.js:16-21; rentals/rental-agreement.validation.js:5-8; sales.service.js:82-88 resolveSellableUnit. items:[{}] -> Sequelize drops key -> sells arbitrary first in_stock unit. Fix: zod .refine exactly one of barcode/unitUuid per item + service rejects neither-key where. COMPLETED 2026-09-09 (god): integrated as 3a98a01 + merge 5b16161 (no-ff). 609/609 green in main. sellableUnitItemSchema refine (Bool(unitUuid) !== Bool(barcode)); identical refine on rentals itemSchema; service guards in sales.service resolveSellableUnit + rental-agreement.service resolveRentableUnit (400); 8 new tests (4 sales + 4 rentals). Deliverable by worker-sec-h6-sellable-unit; its same intent superseded pre-existing partial edit in main working tree which god discarded.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-7",
+      "title": "H-7  int8 (BIGINT paise) parsed to JS Number - silent money corruption >2^53",
+      "status": "done",
+      "assignee": "worker-sec-h7-bigint-money",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-09T14:30:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DISPATCHED 2026-09-09 (god) to worker-sec-h7-bigint-money. pg-pool-config.js:51-62 setTypeParser(20, parseInt); money cols BIGINT; float recomputation in trip.service/vendor.service/receipts.service. Fix: money as string/BigInt until render, or cap at Number.MAX_SAFE_INTEGER + Decimal/BigInt sums. COMPLETED 2026-09-09 (god): 6 service files converted to BigInt arithmetic (sales, trip, vendor, receipts, reports, rental-agreement). DTOs already return String(). 7 test assertions updated (trips.test.js + inventory-v2.test.js) to expect string money values. Backend suite 622/622 green, frontend 261/261 green.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-8",
+      "title": "H-8  JWT access token persisted to localStorage (XSS-exfiltratable)",
+      "status": "done",
+      "assignee": "worker-sec-h8-jwt-localstorage",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-09T14:30:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DISPATCHED 2026-09-09 (god) to worker-sec-h8-jwt-localstorage. frontend/src/auth/AuthProvider.jsx:56 setItem (comment :47 says memory-only) + :107-113 boot fallback. Fix: memory-only token, restore via /auth/refresh cookie only, remove localStorage fallback. COMPLETED 2026-09-09 (god): removed localStorage.setItem (line 56), localStorage.getItem fallback (lines 107-110), localStorage.removeItem in signOut (line 82) and restoreSession catch (line 148). Updated comments to reflect memory-only design. Token restored solely via httpOnly refresh cookie. Frontend suite 261/261 green.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-9",
+      "title": "H-9  Suspended/deleted user keeps live access token + session",
+      "status": "done",
+      "assignee": "worker-sec-h1-auth-hardening",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-08 (god) to worker-sec-h1-auth-hardening (bundled with SEC-H-1 + SEC-H-10). auth.middleware.js:89-110 checks revocation/expiry only, never user.status; user.service.js:250-253,276-278. Fix: check user.status === ACTIVE in authenticate; optionally revoke sessions on status change.\\nINTEGRATED 2026-09-09: committed 1924b6d, merged 13d12fc into main. Full backend suite 618/618 (35 suites) green. SEC-H-1 rate-limit/lockout (rate-limit.middleware.js, LOGIN_IP_MAX=100/window, LOGIN_ACCOUNT_MAX_FAILED=5, exp backoff 1m/15m/1h/24h, 429 locked); SEC-H-9 suspended/deleted user 401 in authenticate(); SEC-H-10 refresh cookie Secure all envs + /api/auth path + COOKIE_SECURE override. 15 auth tests incl 9 new.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-H-10",
+      "title": "H-10 Refresh-cookie secure flag off outside production; LAN-HTTP deployment",
+      "status": "done",
+      "assignee": "worker-sec-h1-auth-hardening",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-08 (god) to worker-sec-h1-auth-hardening (bundled with SEC-H-1 + SEC-H-9). auth.controller.js:21-34 (secure:isProduction, sameSite lax in dev). Fix: TLS in every environment / require secure or refuse non-prod refresh cookies; scope cookie path.\\nINTEGRATED 2026-09-09: committed 1924b6d, merged 13d12fc into main. Full backend suite 618/618 (35 suites) green. SEC-H-1 rate-limit/lockout (rate-limit.middleware.js, LOGIN_IP_MAX=100/window, LOGIN_ACCOUNT_MAX_FAILED=5, exp backoff 1m/15m/1h/24h, 429 locked); SEC-H-9 suspended/deleted user 401 in authenticate(); SEC-H-10 refresh cookie Secure all envs + /api/auth path + COOKIE_SECURE override. 15 auth tests incl 9 new.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-M-1",
+      "title": "M-1  Money zod ceiling set to int8 max instead of Number.MAX_SAFE_INTEGER",
+      "status": "done",
+      "assignee": "worker-sec-m-zod-updates",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-09T15:10:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DISPATCHED 2026-09-09 (god) batched with M-2/M-9/M-10. trip.validation.js:5-9; stock.validation.js:34-80. Values > MAX_SAFE_INTEGER pass validation but round. Fix: cap at Number.MAX_SAFE_INTEGER. COMPLETED: Added MAX_SAFE_MONEY constant, replaced .max(9223372036854775807) with .max(MAX_SAFE_MONEY) in trip (1) + stock (8) schemas. Backend 622/622 green.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-M-2",
+      "title": "M-2  Template money fields accept float/string, no .int()/upper bound",
+      "status": "done",
+      "assignee": "worker-sec-m-zod-updates",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-09T15:10:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DISPATCHED 2026-09-09 (god) batched with M-1/M-9/M-10. template.validation.js:5-41. 100.5/1e21 pass then bigint rejects or rounds. Fix: .int().max(MAX_SAFE_INTEGER). COMPLETED: Added .int() + .max(Number.MAX_SAFE_INTEGER) to all template money fields via .pipe(z.number().int().max(...)). Backend 622/622 green.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "SEC-M-10",
+      "title": "M-10 Dev toolchain: vitest <3.2.6 (CVSS 9.8 UI-server) + old vite/esbuild",
+      "status": "done",
+      "assignee": "worker-sec-m-zod-updates",
+      "priority": "medium",
+      "deps": [],
+      "humanQA": [
+        {
+          "ts": "2026-09-09T15:10:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DISPATCHED 2026-09-09 (god) batched with M-1/M-2/M-9. frontend/package.json:44-45 (vitest ^1.0.4, vite ^8.1.1). Fix: drop --ui / never bind non-loopback; upgrade vitest >=3.2.6. COMPLETED: vitest ^1.0.4 -> ^3.2.6 (installed 3.2.7), vite already ^8.1.1 (installed 8.2.2). Frontend 261/261 green.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-25",
+      "title": "UI/UX implementation review - flow issues, styling misalignments, workflow improvements (md-framework agent test #2)",
+      "status": "done",
+      "assignee": "worker-uiux-review-r25",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-07 (god), human directive: spawn an agent to check current UI/UX implementation, find UI/UX misalignments, flow issues, styling issues in UI components, and suggest UI workflow improvements. Agent = uiux-designer (Erin persona per md-framework/agents/uiux/uiux-designer.md, character erin) + design-system-guardian lens (md-framework/agents/uiux/design-system-guardian.md). Worker worker-uiux-review-r25 spawned (isolate:true -> worktrees/worker-uiux-review-r25 on agent/worker-uiux-review-r25 base framework/md-impoc cf8b468). Consumes md-framework/skills/uiux/* + skills/design-system/* + loading-states + responsive-design. READ-ONLY review of frontend/src (no code changes). Deliverable: UIUX-FINDINGS.md at worktree root - findings with ID + priority, file:line, why it is wrong, suggested fix; tap-count/flow review of top frequent journeys; workflow improvement suggestions. Uncommitted; god verifies + integrates. Contract in god/outbox. DONE: 25 findings (3C/8H/10M/4L) delivered in UIUX-FINDINGS.md; copy at hive/UIUX-FINDINGS.md. Verdict DONE - human to decide on remediation.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-27",
+      "title": "Node.js backend review: security, speed, efficiency",
+      "status": "done",
+      "assignee": "worker-node-code-review-r27",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-08 (god): human directive - spawn agent to check node code and improve security, speed, efficiency. Agent = backend-engineer (jim). Worker worker-node-code-review-r27 spawned (isolate:true - worktrees/worker-node-code-review-r27, base framework/md-impoc cf8b468). Contract in spawn objective + god/outbox/r27-cleared-to-proceed.json. READ-ONLY review of backend/ only; categories SECURITY | SPEED | EFFICIENCY; findings IDs NOD-<n>; dups of prior SEC findings (CR-1..3, H-1..10, Medium/Low batch) -> DUPLICATE-SEC-<id>, not re-derived; npm audit + static checks OK, NO jest/server/runtime, NO code writes beyond the report. Deliverable: BACKEND-REVIEW-FINDINGS.md at worktree root (id + severity + file:line + why-wrong + fix + verdict). DONE 2026-09-08 03:00Z: 33 findings (1C/6H/15M/11L); SECURITY 2 new (NOD-23 MEDIUM completed-sale re-date/backdate no audit, NOD-31 LOW x-powered-by) + 19 DUPLICATE-SEC confirmed still present (all 3 Critical + 10 High); SPEED 17 (NOD-1 CRITICAL N+1 checkout chain in one wide tx, NOD-3 full-table JS reports no pushdown, NOD-6 event-loop-blocking barcode PDF with held tx/connection); EFFICIENCY 14; npm audit 0C/0H/2M (uuid via sequelize). Verdict BLOCK (SEC BLOCK / SPEED BLOCK / EFF PASS-WITH-CONDITIONS). Report preserved at hive/BACKEND-REVIEW-FINDINGS.md. Uncommitted; god verifies + integrates.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-28",
+      "title": "PostgreSQL review: security, speed, efficiency",
+      "status": "done",
+      "assignee": "worker-postgres-review-r28",
+      "priority": "high",
+      "deps": [],
+      "humanQA": [],
+      "detail": "DISPATCHED 2026-09-08 (god): human directive - spawn agent to check postgres and improve security, speed, efficiency. Agent = postgres-specialist (stanley). Worker worker-postgres-review-r28 spawned (isolate:true - worktrees/worker-postgres-review-r28, base framework/md-impoc cf8b468). First spawn attempt FAILED (bad escaped character in JSON - single-backslash Windows paths); rewritten with forward-slash paths (C:/projects/IMPOC-main/...) and accepted 02:40:51Z. Contract in spawn objective + god/outbox/r28-cleared-to-proceed.json. READ-ONLY: migrations/ + models/ + Sequelize query sites + LIVE dev DB impoc_dev (localhost:5432, creds in backend/.env - copy from main tree if needed, gitignored); read-only SELECT/EXPLAIN (ANALYZE, BUFFERS)/catalog queries ONLY, NO DDL/DML/migrations; may create throwaway backend/pgprobe.mjs (delete before finish). Categories SECURITY | QUERY-PERFORMANCE | SCHEMA-DATA-INTEGRITY | CONCURRENCY-TX | MIGRATIONS. Deliverable: POSTGRES-REVIEW-FINDINGS.md at worktree root (id PG-<n> + severity + file:line/table/query + why-wrong + fix + verdict per category). DONE 2026-09-08 03:06Z: 24 findings PG-1..24. Verdict by category: SECURITY PASS-WITH-CONDITIONS (superuser login role, no pool timeouts/TLS, no injection/PUBLIC grants), QUERY-PERFORMANCE FAIL (full-table JS reports, no date indexes, ~25 unindexed FKs, unpaginated lists, ILIKE), SCHEMA-DATA-INTEGRITY PASS-WITH-CONDITIONS (money=paise BIGINT CHECK>=0, append-only financials), CONCURRENCY-TX FAIL (PG-1 refundSale double-refund CRITICAL, PG-2 cancelExpense double-cancel CRITICAL, cancelSale/cancelRental indirect-only guards, nextSaleNumber/nextAgreementNumber MAX-race 500s, rental completion lost-update), MIGRATIONS PASS-WITH-CONDITIONS (lock_timeout/CONCURRENTLY/NOT VALID absent - unsafe at scale). OVERALL BLOCK until PG-1/PG-2 fixed (FOR UPDATE + partial-unique backstop indexes). Report preserved at hive/POSTGRES-REVIEW-FINDINGS.md. Uncommitted; god verifies + integrates.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
+    },
+    {
+      "id": "R-29",
+      "title": "Money-out race fix: coordinated TOCTOU + next-number races (SEC-CR-1 + PG-1/2 + NOD)",
+      "status": "done",
+      "assignee": "worker-money-out-r29",
+      "priority": "critical",
+      "deps": [
+        "R-23",
+        "R-28"
+      ],
+      "humanQA": [
+        {
+          "q": "Start with the money-out race critical first? (Cover SEC-CR-1 + PG-1/2 + NOD double-refund as ONE coordinated fix; UI/UX at last.)",
+          "askedAt": "2026-09-08T16:00:00Z",
+          "a": "Yes. Start with the money-out race critical first."
+        },
+        {
+          "ts": "2026-09-08T16:50:00Z",
+          "verifier": "god",
+          "result": "pass"
+        }
+      ],
+      "detail": "DONE 2026-09-08 (worker-money-out-r29) + INTEGRATED by god as 9523749 (merge c2b5c7e). Worker verified on dedicated temp DB impoc_test_r29 (shared impoc_test contended). God verified in main: full backend 555/555 (33 suites). All 7 race paths + 5 partial-unique DB backstops + 7 concurrency tests. See SEC-CR-1 detail for full breakdown.",
+      "doneAt": "2026-09-09T16:24:49.820Z",
+      "archivedAt": "2026-09-11T16:29:25.949Z",
+      "archiveReason": "done",
+      "archiveNote": "Done for 2 days, archived by the hourly sweep."
     },
     {
       "id": "R-64",
