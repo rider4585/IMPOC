@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
-
 import {
     BARCODE_CONFIG,
     BARCODE_FORMAT,
@@ -10,12 +8,9 @@ import { getLayout } from '../barcode-layouts/barcode-layout.service.js';
 import { generateBarcodeTestPdf } from './barcode.test-generator.js';
 
 import {
-    RequestKey,
     User,
     sequelize,
 } from '../../../database/models/index.js';
-
-import { GESTURE_TYPES } from '../../constants/gesture-type.js';
 
 
 /**
@@ -62,7 +57,7 @@ export const formatBarcodeValue = (seqValue, nowMs = Date.now()) => {
  * No in-process caching — fresh read on every call.
  *
  * @param {number} pages - Number of pages
- * @param {Transaction} transaction - Sequelize transaction to ensure atomicity with request_keys row
+ * @param {Transaction} transaction - Sequelize transaction to keep the sequence draw atomic
  * @returns {Promise<string[]>} Array of barcode values
  * @throws {Error} If the grid dimensions are invalid
  */
@@ -150,8 +145,8 @@ export const generateBarcodes = async (pages, requestUuid, userUuid) => {
         }
 
         // Generate barcode values (async, reads from app_settings, draws from barcode_seq)
-        // IMPORTANT: Sequence counter draw happens inside transaction to ensure atomicity
-        // with RequestKey logging and prevent counter value loss on rollback
+        // IMPORTANT: Sequence counter draw happens inside transaction to keep it atomic
+        // and prevent counter value loss on rollback
         const barcodeValues = await generateBarcodeValues(pages, transaction);
 
         // Generate PDF (inside transaction for consistency with sequence counter)
@@ -159,24 +154,10 @@ export const generateBarcodes = async (pages, requestUuid, userUuid) => {
         // from causing misalignment between generated barcodes and rendered grid dimensions
         const pdfBuffer = await generateBarcodePdf(barcodeValues, transaction);
 
-        // Generate a unique result UUID as a marker
-        const resultUuid = uuidv4();
-
-        // Insert request_keys row last, inside transaction
-        await RequestKey.create(
-            {
-                gesture_type: GESTURE_TYPES.BARCODE_GENERATE,
-                request_uuid: requestUuid,
-                result_kind: 'PDF',
-                result_uuid: resultUuid,
-                actor_user_id: user.id,
-            },
-            { transaction }
-        );
-
         await transaction.commit();
 
-        return { pdfBuffer, resultUuid, resultKind: 'PDF' };
+        // Always stream a fresh PDF — no idempotency replay (R-64).
+        return { pdfBuffer };
     } catch (error) {
         await transaction.rollback();
         throw error;
@@ -216,24 +197,10 @@ export const generateBarcodeTestSheet = async (requestUuid, userUuid) => {
         // Generate test sheet PDF
         const pdfBuffer = await generateBarcodeTestPdf();
 
-        // Generate a unique result UUID as a marker
-        const resultUuid = uuidv4();
-
-        // Insert request_keys row last, inside transaction
-        await RequestKey.create(
-            {
-                gesture_type: GESTURE_TYPES.BARCODE_GENERATE_TEST,
-                request_uuid: requestUuid,
-                result_kind: 'PDF_TEST_SHEET',
-                result_uuid: resultUuid,
-                actor_user_id: user.id,
-            },
-            { transaction }
-        );
-
         await transaction.commit();
 
-        return { pdfBuffer, resultUuid, resultKind: 'PDF_TEST_SHEET' };
+        // Always stream a fresh PDF — no idempotency replay (R-64).
+        return { pdfBuffer };
     } catch (error) {
         await transaction.rollback();
         throw error;
