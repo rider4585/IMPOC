@@ -106,6 +106,18 @@ export async function initializeTestDatabase() {
         `ALTER TABLE request_keys ADD CONSTRAINT request_keys_gesture_type_check CHECK (gesture_type IN ('SALE_CHECKOUT', 'SALE_EXCHANGE', 'SALE_CANCEL', 'SALE_REFUND', 'RENTAL_BOOK', 'RENTAL_HANDOVER', 'RENTAL_AMEND', 'RENTAL_CANCEL', 'RENTAL_SETTLE', 'RENTAL_WRITE_OFF', 'UNIT_RECOVER', 'UNIT_TRANSITION', 'EXPENSE_CREATE', 'EXPENSE_REVERSE', 'INTAKE_SCAN', 'BARCODE_GENERATE', 'BARCODE_GENERATE_TEST'))`
       );
 
+      // delivery_logs CHECKs (from migration 20260905000004 + 20260917000001):
+      // sync() does not build these, so mirror them to keep test fidelity.
+      await db.sequelize.query(
+        `ALTER TABLE delivery_logs ADD CONSTRAINT delivery_logs_entity_type_check CHECK (entity_type IN ('SALE', 'RENTAL', 'QUOTE', 'GENERAL', 'ENQUIRY'))`
+      );
+      await db.sequelize.query(
+        `ALTER TABLE delivery_logs ADD CONSTRAINT delivery_logs_channel_check CHECK (channel IN ('WHATSAPP', 'EMAIL', 'SMS', 'WHATSAPP_GROUP'))`
+      );
+      await db.sequelize.query(
+        `ALTER TABLE delivery_logs ADD CONSTRAINT delivery_logs_status_check CHECK (status IN ('PENDING', 'SENT', 'DELIVERED', 'FAILED', 'OPTED_OUT'))`
+      );
+
       // Create barcode_seq sequence (from migration 20260824000002)
       try {
         await db.sequelize.query(

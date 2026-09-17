@@ -1,23 +1,44 @@
 import React, { useState } from 'react';
 import { Dialog, Button, Input } from '../../components/ui';
 
-export const CHANNELS = [
-  { key: 'WHATSAPP', label: 'WhatsApp', action: 'Open WhatsApp' },
-  { key: 'EMAIL', label: 'Email', action: 'Open email' },
-  { key: 'SMS', label: 'SMS', action: 'Open SMS' },
-];
+/**
+ * TEMP FEATURE (2026-09-17, interim until R-62 lands): WhatsApp is the only
+ * channel offered when closing an enquiry as available. SMTP/SMS providers
+ * do not exist yet, so Email and SMS are hidden here FE-side only — the
+ * backend still supports them for when R-62 enables them.
+ */
+export const CHANNELS = [{ key: 'WHATSAPP', label: 'WhatsApp', action: 'Open WhatsApp' }];
 
-export const CHANNEL_LABELS = Object.fromEntries(CHANNELS.map((c) => [c.key, c.label]));
+/** Display labels for all channels — old closed rows may list Email/SMS. */
+export const CHANNEL_LABELS = { WHATSAPP: 'WhatsApp', EMAIL: 'Email', SMS: 'SMS' };
 
 const radioCls =
   'flex cursor-pointer items-start gap-3 rounded-md border border-[var(--border)] p-3 text-sm ' +
   'has-[:checked]:border-[var(--primary)] has-[:checked]:bg-[var(--primary)]/5';
 
+const textareaCls =
+  'w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 py-2 text-sm ' +
+  'text-[var(--ink)] shadow-sm transition-colors placeholder:text-[var(--ink-faint)] ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ' +
+  'focus-visible:border-transparent min-h-[140px] resize-y';
+
+function messageFromHandoffs(handoffs) {
+  const wa = handoffs?.find((h) => h.channel === 'WHATSAPP');
+  if (!wa) return '';
+  try {
+    return decodeURIComponent(new URL(wa.url).searchParams.get('text') || '');
+  } catch {
+    return '';
+  }
+}
+
 /**
- * CloseEnquiryDialog — two outcomes only (R-63):
- *   "It's available — tell the customer" (pick channels; the message is
- *   prepared by the server and opened tap-to-send) or "Close quietly".
- * After a notify-close the dialog shows one button per channel link.
+ * CloseEnquiryDialog — two outcomes only (R-63, WhatsApp-only since 2026-09-17):
+ *   "It's available — tell the customer" (compose the WhatsApp message, then
+ *   send via wa.me) or "Close quietly".
+ * After a notify-close the dialog opens a composer: the message is pre-filled
+ * from the server-prepared body but fully editable, and "Send" + opens
+ * WhatsApp with whatever was typed.
  */
 export function CloseEnquiryDialog({ open, onClose, onConfirm, saving, enquiry }) {
   const readiness = enquiry?.channelReadiness || {};
@@ -29,7 +50,8 @@ export function CloseEnquiryDialog({ open, onClose, onConfirm, saving, enquiry }
   const [error, setError] = useState('');
   // Set once the server has closed the enquiry with links to open.
   const [handoffs, setHandoffs] = useState(null);
-  const [opened, setOpened] = useState({});
+  const [message, setMessage] = useState('');
+  const [sent, setSent] = useState(false);
 
   const toggleChannel = (key) =>
     setChannels((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -37,53 +59,81 @@ export function CloseEnquiryDialog({ open, onClose, onConfirm, saving, enquiry }
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (notify && channels.length === 0) {
-      setError('Pick at least one way to tell the customer, or close quietly.');
+      setError('Pick a way to tell the customer, or close quietly.');
       return;
     }
     setError('');
     const result = await onConfirm({ notify, channels: notify ? channels : [], note: note.trim() || null });
     if (result && Array.isArray(result.handoffs) && result.handoffs.length > 0) {
+      setMessage(messageFromHandoffs(result.handoffs));
       setHandoffs(result.handoffs);
     }
   };
 
-  const openLink = (h) => {
-    window.open(h.url, '_blank', 'noopener');
-    setOpened((prev) => ({ ...prev, [h.channel]: true }));
+  const sendWhatsApp = () => {
+    const wa = handoffs?.find((h) => h.channel === 'WHATSAPP');
+    if (!wa) return;
+    try {
+      const url = new URL(wa.url);
+      url.searchParams.set('text', message);
+      window.open(url.toString(), '_blank', 'noopener');
+      setSent(true);
+    } catch {
+      window.open(wa.url, '_blank', 'noopener');
+      setSent(true);
+    }
   };
 
   if (handoffs) {
+    const wa = handoffs.find((h) => h.channel === 'WHATSAPP');
+    const waPhone = wa ? (() => {
+      try {
+        return new URL(wa.url).pathname.replace(/^\/+/, '');
+      } catch {
+        return '';
+      }
+    })() : '';
     return (
       <Dialog
         open={open}
         onClose={onClose}
-        title="Now send the message"
+        title="Write the message"
         footer={
-          <Button onClick={onClose} data-testid="enquiry-handoff-done">
-            Done
-          </Button>
+          <>
+            <Button variant="outline" onClick={onClose} data-testid="enquiry-handoff-done">
+              Done
+            </Button>
+            <Button onClick={sendWhatsApp} data-testid="enquiry-handoff-send">
+              {sent ? 'Send again' : 'Send WhatsApp message'}
+            </Button>
+          </>
         }
       >
         <div className="flex flex-col gap-3">
           <p className="text-sm text-[var(--ink-muted)]">
-            The message is ready. Tap each button, press send in the app that opens, then come back.
+            WhatsApp opens with your message pre-filled — send it there to tell{' '}
+            <span className="font-medium text-[var(--ink)]">{enquiry?.customer?.name}</span>.
           </p>
-          {handoffs.map((h) => {
-            const meta = CHANNELS.find((c) => c.key === h.channel) || { label: h.channel, action: 'Open' };
-            return (
-              <div key={h.channel} className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-3">
-                <span className="text-sm font-medium">{meta.label}</span>
-                <Button
-                  variant={opened[h.channel] ? 'outline' : 'default'}
-                  size="sm"
-                  onClick={() => openLink(h)}
-                  data-testid={`enquiry-handoff-${h.channel}`}
-                >
-                  {opened[h.channel] ? 'Open again' : meta.action}
-                </Button>
-              </div>
-            );
-          })}
+          {waPhone && (
+            <p className="text-sm font-medium">
+              To <span className="font-normal text-[var(--ink-muted)]">+{waPhone}</span>
+            </p>
+          )}
+          <label htmlFor="enquiry-handoff-message" className="block pb-0.5 text-sm font-medium text-[var(--ink)]">
+            Message
+          </label>
+          <textarea
+            id="enquiry-handoff-message"
+            data-testid="enquiry-handoff-message"
+            className={textareaCls}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            maxLength={5000}
+            placeholder="Type the message to send…"
+          />
+          <p className="text-xs text-[var(--ink-faint)]">
+            Sent {sent ? 'again — ' : ''}via WhatsApp ({wa ? 'wa.me' : ''}). The enquiry is already closed.
+          </p>
         </div>
       </Dialog>
     );
@@ -125,7 +175,7 @@ export function CloseEnquiryDialog({ open, onClose, onConfirm, saving, enquiry }
             <span>
               <span className="block font-medium">It&apos;s available — tell the customer</span>
               <span className="block text-xs text-[var(--ink-muted)]">
-                We prepare the message; you tap send.
+                Compose the WhatsApp message, then tap send.
               </span>
             </span>
           </label>
@@ -150,7 +200,7 @@ export function CloseEnquiryDialog({ open, onClose, onConfirm, saving, enquiry }
               })}
               {reachable.length === 0 && (
                 <p className="text-xs text-[var(--danger)]">
-                  No way to reach this customer — add a phone/email and consent on their profile, or close quietly.
+                  WhatsApp needs the customer&apos;s phone and WhatsApp consent on their profile — or close quietly.
                 </p>
               )}
             </div>
