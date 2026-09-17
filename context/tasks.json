@@ -2585,6 +2585,19 @@
       "humanQA": [],
       "details": "USER: GET /api/barcodes/generate?pages=5&requestUuid=... returned JSON 'cached result' marker instead of a PDF download + 'Waking the system up' banner then no file. Root cause: request_keys idempotency replay in barcode.controller.js returns {resultUuid} and never streams the PDF, and no route fetches a previous PDF by resultUuid. DECISION (user): option 2 — download any number of PDFs with the same template; never the cached/frozen PDF. FIX (backend, worker-barcode-fresh-pdf): dropped RequestKey.create + request_keys replay for BARCODE_GENERATE + BARCODE_GENERATE_TEST (service returns only {pdfBuffer}; controller always sets application/pdf headers and streams). FIX (frontend, same ticket): wakingRequest.js no longer resolves with a synthetic {status:'waking'} at 1200ms (which dropped the slow-but-successful cold-start PDF); waking/failure now go through onStatus(), the promise resolves with the real result. Callers: BarcodePrintScreen.jsx, StockIntake.jsx + tests. VERIFIED: backend jest 806/806 (barcode 48/48 incl. rewritten replay tests -> fresh PDF + no request_keys row), frontend vitest 436/436, build clean. Shipped context bcb1740 + main 172e0b6 as fix/feat commit; docs commit 6a29464. No migrations/models touched.",
       "doneAt": "2026-09-17T07:45:00Z"
+    },
+    {
+      "id": "R-65",
+      "title": "Enquiry close: WhatsApp-only composer (temp, pre-R-62) + fix the close 500 from delivery_logs entity_type CHECK missing ENQUIRY",
+      "status": "done",
+      "priority": "high",
+      "deps": [],
+      "assignee": "god (interim FE + backend fix)",
+      "origin": "user (2026-09-17)",
+      "createdAt": "2026-09-17T08:40:00Z",
+      "humanQA": [],
+      "details": "USER (mid-session, interim until R-62): closing an Enquiries item as available must offer ONLY WhatsApp (Email/SMS hidden FE-side), open a window to WRITE the message, then send it via wa.me. DONE (FE-only): frontend/src/screens/enquiries/CloseEnquiryDialog.jsx drops Email/SMS from the channel list (CHANNEL_LABELS kept full so old CLOSED rows still label them); the post-close step is now a composer - textarea pre-filled from the server wa.me body, editable, Send rebuilds the wa.me URL with the typed text. Tests updated in enquiriesScreen.test.jsx. THEN the user hit POST /api/enquiries/:uuid/close -> 500: root cause = migration 20260905000004's delivery_logs_entity_type_check allowed only (SALE,RENTAL,QUOTE,GENERAL) while close-as-available writes ENQUIRY; jest never caught it because tests/utils/test-setup.js did not mirror those CHECKs. FIX: new migration 20260917000001 drops + re-adds the CHECK with ENQUIRY; test-setup.js now mirrors all three delivery_logs CHECKs (entity_type/channel/status). VERIFIED: dev DB migrate applied (constraint includes ENQUIRY, live 500 gone), fresh undo-all->migrate->seed on a throwaway scratch DB clean, backend jest 806/806, frontend vitest 436/436, build clean. Shipped main + context. Interim caveat: the close API logs the default body while the edited text is what wa.me sends; R-62 routes this through the real engine.",
+      "doneAt": "2026-09-17T09:10:00Z"
     }
   ]
 }

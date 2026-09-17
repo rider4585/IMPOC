@@ -733,3 +733,22 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - Cosmetic: pre-existing mojibake (U+FFFD) only in old 2026-09-10 base lines (board ~L679-700) + one 2026-09-16 memory line — NOT introduced this session; left as-is.
 - VERIFY-FIRST rule reinforced: bot-me's first instinct was to blind-copy hive -> context (would have DELETED the laptop's kanban summary + R-64 notes). Always diff/sample BOTH directions before overwriting a tracked snapshot.
 
+## [2026-09-17] Interim WhatsApp-only enquiry close (god, user request)
+- Temp FE-only change to R-63 Enquiries, pending R-62. On close-as-available: only WhatsApp is offered (Email/SMS hidden client-side; backend still supports them), and a composer window lets staff edit the message before Send.
+- Files: `frontend/src/screens/enquiries/CloseEnquiryDialog.jsx` (CHANNELS = WhatsApp only; `CHANNEL_LABELS` kept full so old CLOSED rows still label Email/SMS; composer prefills from the server `wa.me` `text` param via `messageFromHandoffs`, Send rebuilds the URL with `url.searchParams.set('text', message)`) and `frontend/src/screens/__tests__/enquiriesScreen.test.jsx`.
+- GOTCHA: prefill must be set SYNCHRONOUSLY in `handleSubmit` when handoffs arrive — a `useEffect([handoffs])` raced the test/`findBy` and left the textarea empty.
+- GOTCHA: `URLSearchParams` encodes space as `+` and `!` as `%21` (both valid for `wa.me`); test expectations must match that, not `%20`.
+- Verified: enquiries 10/10, frontend 436/436, `vite build` clean. Backend untouched. Lint errors on the file (unused React import, constant exports) are PRE-EXISTING repo-wide patterns, not introduced.
+- Open: code UNCOMMITTED — awaiting user OK to commit. The close API writes the handoff row with the default body, not the edited text (acceptable interim; R-62 fixes).
+
+
+## [2026-09-17] BUGFIX: enquiry close 500 (delivery_logs entity_type CHECK)
+- User hit 500 on POST /enquiries/:uuid/close (notify). Root cause: migration 20260905000004 created delivery_logs with CHECK entity_type IN (SALE,RENTAL,QUOTE,GENERAL) — ENQUIRY missing, so close-as-available DeliveryLog.create threw a constraint violation. Jest never caught it: tests/utils/test-setup.js only mirrored app_settings + request_keys checks (delivery_logs checks absent from sync-created test DB).
+- Fix: new migration backend/database/migrations/20260917000001-add-enquiry-to-delivery-logs-entity-type-check.js (drop + re-add CHECK with ENQUIRY). Applied to dev DB directly (npm run db:migrate) so the live 500 is fixed without reseeding.
+- Test fidelity: mirrored all three delivery_logs CHECKs (entity_type incl. ENQUIRY, channel, status) into tests/utils/test-setup.js — the existing "closes as available" test now really exercises the constraint.
+- Verified: dev constraint includes ENQUIRY; full fresh lifecycle (undo-all->migrate->seed) on a throwaway impoc_scratch DB clean, then dropped; backend jest 806/806. Root cause lesson: any column-level CHECK in a migration should be mirrored in test-setup.js or a migration-only bug like this slips through.
+
+## [2026-09-17] R-65 closed + shipped (god, user OK)
+- User confirmed enquiry close works; asked to ticket it (done, R-65), push code, and push updated docs on context.
+- tasks.json: +R-65 (done, assignee god) -> 166 cards / 149 done. CONTEXT.md "Current state (2026-09-16)" -> (2026-09-17), 148 -> 149, R-65 bullet prepended before R-64.
+- board.md + god-memory.md appended (SHIFT CLOSE #13), context and hive copies kept byte-identical. CONVENTION REUSED FROM R-64: app code ships to BOTH main and context (cherry-pick), docs live only on context.

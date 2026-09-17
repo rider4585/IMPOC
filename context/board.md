@@ -1228,3 +1228,15 @@ User committed directly to main (not through hive task system). Pulled from orig
 # SHIFT CLOSE #12 (2026-09-17)
 Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated to ONE 165-card file (148 done / R-60 doing / R-52 blocked / 15 todo R-62 family), archive removed. Context snapshots board/god-memory/memory-index re-synced (append-only union of laptop + hive session records, no deletions). CONTEXT.md + CONTEXT-RESUME.md updated (148 done, R-64 bullet, tasks single file). Local main fast-forwarded to origin/main. All context/memory/tasks files pushed to origin/context; no app-code changes pending. Untracked leave-alone: colors.zip, colors/, frontend/doc/, tunnels.json.
 
+# SHIFT NOTE (2026-09-17, god) — interim WhatsApp-only enquiry close
+- User asked mid-session for a temp FE-only tweak to R-63 (Enquiries): on "Close & prepare message" offer ONLY WhatsApp (Email/SMS hidden FE-side until R-62), open a composer window to write the message, then send via `wa.me`.
+- Done FE-only: `frontend/src/screens/enquiries/CloseEnquiryDialog.jsx` (CHANNELS = WhatsApp only; composer prefilled from the server `wa.me` body, editable; Send rebuilds `wa.me` with the typed text) + `frontend/src/screens/__tests__/enquiriesScreen.test.jsx` updated. Backend untouched.
+- Verified: enquiries 10/10, frontend 436/436, `vite build` clean. Code left UNCOMMITTED pending user OK. Not a numbered ticket — interim work folded toward R-62.
+- Caveat: the enquiry still closes server-side before send, so `delivery_logs` records the default body while the edited text is what goes out via `wa.me`; R-62 routes this through the real engine.
+- Fleet: god only; nothing blocked, unowned, or stale. Board accurate.
+
+# SHIFT CLOSE #13 (2026-09-17, god)
+- **R-65 shipped** (main + context): temp WhatsApp-only enquiry close composer (FE-side, Email/SMS hidden until R-62) + backend fix for the close 500 (`delivery_logs_entity_type_check` lacked ENQUIRY — new migration `20260917000001`, and `tests/utils/test-setup.js` now mirrors the delivery-log CHECKs so migration-only schema bugs can't slip past again). Verified: dev migrate applied, fresh scratch-DB lifecycle clean, backend 806/806, frontend 436/436, build clean.
+- tasks.json: 166 cards, **149 done** (R-65 added+done this shift; R-60 doing / R-52 blocked / 15 todo R-62 family unchanged). CONTEXT.md refreshed to 149 + R-65 bullet.
+- Everything pushed: main (code), origin/context (code + tasks + board + god-memory + CONTEXT.md). Hive copies in lockstep. Board accurate, safe to close.
+
