@@ -1,10 +1,14 @@
 <#
-    Shared backup helpers (R-60). Dot-source from the other scripts:
+    Shared backup helpers (R-60 v2). Dot-source from the other scripts:
 
         . (Join-Path $PSScriptRoot 'lib\backup-common.ps1')
 
     Everything here is deliberately conservative: a failed backup must never
     touch an existing good backup, the live database, or the running app.
+
+    R-60 v2 adds: the slot times (single source of truth), a skip-if-current
+    check driven by last-status.json, and a per-kind lock so a scheduled run
+    and the every-logon catch-up can never dump twice at the same instant.
 #>
 
 # Backups live OUTSIDE the repo so git / update.ps1 never see them and a
@@ -17,6 +21,86 @@ $script:RcloneRemote       = 'gdrive-crypt'     # encrypted remote (wraps gdrive
 $script:RcloneBaseRemote   = 'gdrive'
 $script:RcloneFolder       = 'IMPOC-backups'
 $script:RcloneInstallDir   = 'C:\IMPOC\rclone'
+
+# Single source of truth for the daily backup slots (24h HH:mm). Both the
+# scheduled tasks and the every-logon catch-up are driven from this list.
+$script:BackupSlotTimes = @('14:00', '21:00')
+
+# Today at the given 24h 'HH:mm' time. Throws when the string is malformed.
+function Get-SlotDateTime([string]$hhmm) {
+    $parsed = [datetime]::ParseExact($hhmm, 'HH:mm', [Globalization.CultureInfo]::InvariantCulture)
+    $today  = (Get-Date).Date
+    return $today.AddHours($parsed.Hour).AddMinutes($parsed.Minute)
+}
+
+<#
+    True when last-status.json says kind ('local'|'cloud') last succeeded at or
+    after the given slot. For the 14:00 slot, a 14:00:05 backup counts, a
+    13:59 one does not. No status file / no entry -> false (not current).
+#>
+function Test-BackupCurrent([string]$kind, [datetime]$slot) {
+    $dirs = Get-BackupDirs
+    if (-not (Test-Path $dirs.status)) { return $false }
+    $status = $null
+    try { $status = Get-Content $dirs.status -Raw | ConvertFrom-Json } catch { return $false }
+    if (-not $status -or -not $status.$kind) { return $false }
+    $entry = $status.$kind
+    if (-not $entry.ok -or -not $entry.at) { return $false }
+    try { $at = [datetime]::Parse([string]$entry.at) } catch { return $false }
+    return ($at -ge $slot)
+}
+
+<#
+    The latest slot today that has already passed AND was not backed up yet,
+    or $null when nothing is missed (now before the first slot, or every
+    passed slot is current). Drives backup-catchup at the next power-on.
+#>
+function Get-MissedSlot([string]$kind) {
+    $now   = Get-Date
+    $slots = @()
+    foreach ($t in $script:BackupSlotTimes) {
+        $dt = Get-SlotDateTime $t
+        if ($dt -le $now) { $slots += $dt }
+    }
+    if ($slots.Count -eq 0) { return $null }
+    foreach ($s in @($slots | Sort-Object -Descending)) {
+        if (-not (Test-BackupCurrent $kind $s)) { return $s }
+    }
+    return $null
+}
+
+<#
+    Per-kind lock so two overlapping runs - e.g. a StartWhenAvailable scheduled
+    task and the every-logon catch-up - cannot dump twice at once. Lock file
+    C:\IMPOC-backups\<kind>.lock holds our pid + timestamp. Returns $true when
+    WE now hold the lock; $false when a lock younger than 10 minutes exists
+    (another run is in flight). A stale lock older than 10 minutes is taken
+    over silently.
+#>
+function Enter-BackupLock([string]$kind) {
+    # The lock lives in the backup root, which may not exist on a first run
+    # (e.g. a scheduled task firing before any setup); create it first so the
+    # lock write below can never be the reason a backup is skipped.
+    New-Item -ItemType Directory -Force -Path $script:BackupRoot | Out-Null
+    $lockFile = Join-Path $script:BackupRoot "$kind.lock"
+    if (Test-Path $lockFile) {
+        $item = Get-Item $lockFile -ErrorAction SilentlyContinue
+        $age = if ($item) { (Get-Date) - $item.LastWriteTime } else { (New-TimeSpan) }
+        if ($age -lt (New-TimeSpan -Minutes 10)) { return $false }
+    }
+    try {
+        "pid=$PID ts=$((Get-Date).ToString('o'))" | Set-Content -Path $lockFile -Encoding UTF8
+    } catch { return $false }
+    return $true
+}
+
+# Remove OUR lock only - never the lock of another backup still running.
+function Exit-BackupLock([string]$kind) {
+    $lockFile = Join-Path $script:BackupRoot "$kind.lock"
+    if (-not (Test-Path $lockFile)) { return }
+    $content = Get-Content $lockFile -Raw -ErrorAction SilentlyContinue
+    if ("$content" -match "pid=$PID") { Remove-Item -Force $lockFile -ErrorAction SilentlyContinue }
+}
 
 function Get-BackupRoot { return $script:BackupRoot }
 
@@ -72,12 +156,23 @@ function Write-BackupLog([string]$kind, [string]$msg) {
     last-status.json keeps the outcome of the most recent local and cloud
     runs so a person (or the app) can see at a glance whether backups are
     healthy. Updated atomically; one bad write never loses the other entry.
+    Windows PowerShell 5.1-safe (ConvertFrom-Json -AsHashtable is pwsh-only).
 #>
 function Write-BackupStatus([string]$kind, [bool]$ok, [string]$file, [string]$message) {
     $dirs = Get-BackupDirs
     $status = @{}
     if (Test-Path $dirs.status) {
-        try { $status = Get-Content $dirs.status -Raw | ConvertFrom-Json -AsHashtable } catch { $status = @{} }
+        try {
+            $existing = Get-Content $dirs.status -Raw | ConvertFrom-Json
+            foreach ($k in @($existing.PSObject.Properties.Name)) {
+                $status[$k] = @{
+                    ok      = [bool]$existing.$k.ok
+                    at      = [string]$existing.$k.at
+                    file    = [string]$existing.$k.file
+                    message = [string]$existing.$k.message
+                }
+            }
+        } catch { $status = @{} }
     }
     $status[$kind] = @{
         ok      = $ok

@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
-    Upload an encrypted copy of the IMPOC database to Google Drive (R-60).
-    Double-click backup-cloud.cmd whenever you want an off-site copy.
+    Upload an encrypted copy of the IMPOC database to Google Drive (R-60 v2).
+    Runs twice a day at 14:00 and 21:00 via Task Scheduler (tasks
+    "IMPOC cloud backup 1/2"); double-click backup-cloud.cmd any time.
 
 .DESCRIPTION
     1. Takes a fresh, verified local backup first (so the cloud copy is current).
@@ -14,12 +15,29 @@
        than 90 days.
     4. Records the outcome in C:\IMPOC-backups\last-status.json.
 
-    Needs the one-time rclone setup done by setup.ps1 (Google sign-in). If the
+    A per-kind lock (C:\IMPOC-backups\cloud.lock, 10 min) stops a scheduled
+    run and the every-logon catch-up from uploading twice at the same moment.
+    With -SlotTime and the slot already current, it logs "skipped" and exits
+    0 instead of uploading again; -Force overrides that.
+
+    Needs the one-time rclone setup done by setup.cmd (Google sign-in). If the
     Google login token has expired, run:  rclone config reconnect gdrive:
+
+.PARAMETER SkipLocalDump
+    Upload the newest existing local dump instead of taking a new one.
+
+.PARAMETER SlotTime
+    The 'HH:mm' slot this run represents (set by the scheduled task). When the
+    slot is already backed up and -Force is not given, the run is skipped.
+
+.PARAMETER Force
+    Run the upload even if the -SlotTime slot is already backed up.
 #>
 [CmdletBinding()]
 param(
-    [switch]$SkipLocalDump      # upload the newest existing local dump instead of taking a new one
+    [switch]$SkipLocalDump,     # upload the newest existing local dump instead of taking a new one
+    [string]$SlotTime,          # 24h 'HH:mm' slot this run represents
+    [switch]$Force              # ignore the already-backed-up skip
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,7 +52,19 @@ function Invoke-Rclone([string]$rclone, [string]$args) {
     return @{ code = $LASTEXITCODE; out = "$out" }
 }
 
+$acquired = $false
 try {
+    $acquired = Enter-BackupLock 'cloud'
+    if (-not $acquired) {
+        Write-BackupLog 'cloud' 'skipped: another backup is already running'
+        exit 0
+    }
+
+    if ($SlotTime -and -not $Force -and (Test-BackupCurrent 'cloud' (Get-SlotDateTime $SlotTime))) {
+        Write-BackupLog 'cloud' "skipped: already backed up for slot $SlotTime"
+        exit 0
+    }
+
     $dirs = Initialize-BackupDirs
     $rclone = Find-Rclone
     if (-not $rclone) { throw 'rclone is not installed. Re-run setup.cmd (it installs rclone and signs in to Google).' }
@@ -91,4 +121,6 @@ try {
         Write-Host 'The Google sign-in has probably expired. Run:  rclone config reconnect gdrive:' -ForegroundColor Yellow
     }
     exit 1
+} finally {
+    if ($acquired) { Exit-BackupLock 'cloud' }
 }

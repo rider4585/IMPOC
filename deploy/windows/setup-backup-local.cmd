@@ -1,0 +1,4 @@
+@echo off
+REM Set up or update the LOCAL IMPOC backups (no full setup needed). Safe to re-run.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup-backup-local.ps1" %*
+if errorlevel 1 pause
