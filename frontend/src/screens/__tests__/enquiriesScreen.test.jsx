@@ -34,8 +34,8 @@ const OPEN = [
     customer: { uuid: 'c1', name: 'Priya Sharma', phone: '9876543210', email: null },
     channelReadiness: {
       WHATSAPP: { ok: true, reason: null },
-      EMAIL: { ok: false, reason: 'No email' },
-      SMS: { ok: false, reason: 'No consent' },
+      EMAIL: { ok: true, reason: null },
+      SMS: { ok: true, reason: null },
     },
     productType: { uuid: 'pt1', name: 'Saree' },
     colour: { uuid: 'col1', name: 'Red' },
@@ -158,7 +158,7 @@ describe('EnquiriesScreen (R-63)', () => {
     expect(enquiriesApi.createEnquiry).not.toHaveBeenCalled();
   });
 
-  it('closes as available: channels pre-ticked from readiness, then shows tap-to-send buttons', async () => {
+  it('closes as available (WhatsApp only, interim until R-62): compose, then send via wa.me', async () => {
     enquiriesApi.closeEnquiry.mockResolvedValue({
       enquiry: { ...OPEN[0], status: 'CLOSED' },
       handoffs: [{ channel: 'WHATSAPP', url: 'https://wa.me/919876543210?text=Hello' }],
@@ -171,9 +171,9 @@ describe('EnquiriesScreen (R-63)', () => {
     // "Tell the customer" is the default because WhatsApp is reachable.
     expect(screen.getByTestId('enquiry-close-notify')).toBeChecked();
     expect(screen.getByLabelText('WhatsApp')).toBeChecked();
-    expect(screen.getByLabelText('Email')).toBeDisabled();
-    expect(screen.getByText('(No email)')).toBeInTheDocument();
-    expect(screen.getByLabelText('SMS')).toBeDisabled();
+    // Email/SMS are hidden on the FE for now even when reachable (Temp/R-62).
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('SMS')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'came in today' } });
     fireEvent.click(screen.getByTestId('enquiry-close-confirm'));
@@ -185,10 +185,16 @@ describe('EnquiriesScreen (R-63)', () => {
       })
     );
 
-    // Hand-off step: one button per link.
-    const send = await screen.findByTestId('enquiry-handoff-WHATSAPP');
-    fireEvent.click(send);
-    expect(openSpy).toHaveBeenCalledWith('https://wa.me/919876543210?text=Hello', '_blank', 'noopener');
+    // Composer: pre-filled with the server message, editable, send opens wa.me.
+    const compose = await screen.findByTestId('enquiry-handoff-message');
+    expect(compose.value).toBe('Hello');
+    fireEvent.change(compose, { target: { value: 'Hi Priya, your saree is ready today!' } });
+    fireEvent.click(screen.getByTestId('enquiry-handoff-send'));
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://wa.me/919876543210?text=Hi+Priya%2C+your+saree+is+ready+today%21',
+      '_blank',
+      'noopener'
+    );
     fireEvent.click(screen.getByTestId('enquiry-handoff-done'));
     await waitFor(() => expect(screen.queryByTestId('enquiry-handoff-done')).not.toBeInTheDocument());
     openSpy.mockRestore();
@@ -218,9 +224,9 @@ describe('EnquiriesScreen (R-63)', () => {
     fireEvent.click(screen.getByTestId('enquiry-close-e1'));
     expect(screen.getByTestId('enquiry-close-quiet')).toBeChecked();
     fireEvent.click(screen.getByTestId('enquiry-close-notify'));
-    expect(screen.getByText(/No way to reach this customer/)).toBeInTheDocument();
+    expect(screen.getByText(/WhatsApp needs the customer's phone and WhatsApp consent/)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('enquiry-close-confirm'));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/at least one way/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Pick a way/i);
     expect(enquiriesApi.closeEnquiry).not.toHaveBeenCalled();
   });
 
