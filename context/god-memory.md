@@ -506,3 +506,223 @@ User hits GET /api/barcodes/generate?pages=5&requestUuid=... → gets JSON "cach
 - Standup note: this morning's automation sweep had marked R-52 + R-60 "done" (doneAt 2026-09-17T02:05:42Z) - both wrong (R-52 parked, R-60 awaiting laptop). Restored in hive/tasks.json. Also: scheduler standup messages are replied to LOCALLY (review floor + board, fix stale, file to .done) - writing an outbox reply to scheduler bounces back to god; never do it.
 - Cleanup: pruned dead worker's worktree + branch agent/worker-worker-barcode-fresh-pdf (its changes are integrated).
 - IMPORTANT: context/tasks.json (tracked, 99 cards, authoritative) is NOT a copy of hive/tasks.json (gitignored, 20 cards, earlier PowerShell truncation - rebuild pending). NEVER cp hive/tasks.json -> context/tasks.json: it would wipe 79 cards of detail. Patch context/tasks.json IN PLACE (json edit via python) and keep hive/tasks.json as the local scratch kanban only. board.md + god-memory.md ARE 1:1 syncable. Corrected a near-miss in commit e8242c8 (restored the 99-card file, applied status patches + R-64 card there).
+- Security remediations: SEC-CR-1..3 (money TOCTOU/role privesc/JWT forgery), SEC-H-1..10 (rate-limit/PII/IDOR/localStorage/money>2^53), SEC-M-1..10 (idempotency/scoping/validation/delivery), SEC-L-1..8 (timing/creds/error-masking). All integrated (796ea5b..648318c). Backend reviews (R-27/28, hive/BACKEND-REVIEW-FINDINGS.md, hive/POSTGRES-REVIEW-FINDINGS.md) confirmed + fixed. Backend 669/669 jest (38 suites, 3 pre-existing auth failures eliminated after SEC fixes).
+
+## [2026-09-15 ~14:50Z] Hourly ops standup (scheduler)
+
+- Floor: only god live (healthy), all workers archived, no pending spawn-requests. Inbox drained (standup request filed to .done).
+
+- Board: 132 done / 0 doing / 2 todo (R-46 Campaigns, R-47 Receipt delivery). Both plan-only, awaiting human decisions. Nothing blocked/unowned.
+
+- Repo: framework/md-impoc, HEAD a0b06f3, working tree clean (untracked: colors.zip, colors/, frontend/doc/, tunnels.json, worktrees/).
+
+- No stale/idle workers; no phantom assignees. Board accurate. Safe to close.
+
+## Git/remote branch layout (2026-09-11)
+
+Remote: origin = https://github.com/rider4585/IMPOC.git (has main, dev, framework/md-impoc). Local built two clean branches for the user to push (they push with their own token; I do NOT handle the raw token):
+
+- main (9f9c7cb): CLEAN APP ONLY = backend, frontend, README.md, .gitignore. Built by FF main (was 4e55c3a, an ancestor) up to the work (121afca) then a forward commit `git rm -r --cached md-framework postman`. Non-destructive, no history rewrite. FF push over origin/main.
+
+- context (d467467): FULL HANDOFF = app + md-framework + postman + NEW root CONTEXT.md + curated context/ dir (board.md, tasks.json+archive, god-memory.md, memory-index.md, PROTOCOL/COMMANDS, findings/*). NEW remote branch. Curated because hive/ is gitignored + ~1.7GB (node_modules/logs/backups) — only the useful docs copied, noise excluded.
+
+- framework/md-impoc (121afca): the working branch (optional to push; 69 ahead of remote cf8b468).
+
+Push cmds handed to user: `git push origin main`, `git push -u origin context`, optional `git push origin framework/md-impoc`. After this the local checkout was left on `main`; future work should checkout framework/md-impoc or a new branch. CONTEXT.md documents run/state/open-tickets for a new harness.
+
+## Latest remote changes pulled (2026-09-15)
+
+Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertions, 883 deletions. Fast-forward merge successful.
+
+### New features (R-48 through R-63):
+
+- **R-48/R-49/R-50 (barcode system)**: Unique SHREE barcode values, print-labels flow, sheet configurator with templates and page sizes (A3/A4/A5/Letter/custom). New backend modules: barcode-layouts, barcode.geometry.js. Frontend: BarcodePrintScreen revamp, LabelLayoutScreen, labelLayout.js platform util.
+
+- **R-51 (GST on purchases)**: CGST/SGST rates on stocks, amounts on vendor bills. New migration 20260913000004, Stock model + TripVendor model updated. Backend tests: gst.test.js.
+
+- **R-53 (digital pet)**: Customer display idle screen shows an animated digital pet. New frontend: DigitalPet.jsx, petEngine.js, pet-sheet.png asset.
+
+- **R-54 (Google review QR)**: After payment on customer display, show a Google review QR code. New backend: review-links module (ReviewLink model, routes, service). Frontend: PosDisplayScreen updated.
+
+- **R-55 (vendor bill photo)**: Take photo/gallery with review & retake, client-side downscale before upload. New frontend: PhotoCapture.jsx, imageResize.js. Backend: TripVendor model gains receipt_image column.
+
+- **R-56 (barcode sheet configurator)**: Templates + page sizes for label printing. New backend: BarcodeLayoutTemplate model, barcode-layouts module. Frontend: barcodeLayoutApi.js, LabelLayoutScreen.
+
+- **R-57 (inline colour/size)**: Add new colour/size inline from the add-unit dropdowns in StockIntake.
+
+- **R-58 (branding/theme)**: Editable shop name + logo and custom accent colour picker in the theme drawer. New backend: branding module. Frontend: BrandingProvider.jsx, SettingsDrawer updated, color-utils.js.
+
+- **R-59 (unit search)**: Scan a barcode on the Units page to find a unit.
+
+- **R-60 (durable backups)**: Verified pg_dump twice daily, encrypted Google Drive upload, restore script. New deploy/windows/ scripts.
+
+- **R-61 (scanner zoom)**: Zoom presets 1x/2x/3x remembered per device. New platform/scannerZoom.js.
+
+- **R-63 (customer enquiries)**: Enquiries tab, customer_enquiries table, close = tell the customer (tap-to-send WhatsApp/email/SMS) or close quietly. New backend: enquiries module. Frontend: EnquiriesScreen, EnquiryFormDialog, CloseEnquiryDialog.
+
+### Deployment (Windows production):
+
+- New deploy/windows/ directory: setup.ps1, start.ps1, update.ps1, backup scripts (local + cloud), restore-db.ps1, ecosystem.config.cjs for pm2.
+
+- Backend ecosystem.config.cjs for pm2 process management.
+
+- docs/WINDOWS_PRODUCTION_SETUP.md, docs/COMMUNICATION_PLATFORM.md.
+
+### Current state:
+
+- Branch: main, HEAD = 8fa271a (fast-forwarded from 9f9c7cb).
+
+- Working tree: clean except untracked: colors.zip, colors/, frontend/doc/, md-framework/, postman/, tunnels.json.
+
+- Backend: new migrations 20260913000001..20260915000002 (10 total new).
+
+- Frontend: new components (DigitalPet, PhotoCapture, BarcodeScanner zoom), new screens (EnquiriesScreen, LabelLayoutScreen), new platform utils (petEngine, imageResize, labelLayout, scannerZoom, gst, camera).
+
+- Tests: new test files for barcode-layout, branding, enquiries, gst, review-links, phone utils, zoom, digital-pet, photo-capture, label-layout, friendly-server-message.
+
+- Board: 132 done (from earlier) + new features R-48..R-63 (need to check tasks.json for exact counts).
+
+- R-46 (Campaigns) and R-47 (Receipt delivery) remain todo/plan-only.
+
+## [2026-09-15 ~15:00Z] Floor check (god)
+
+- Inbox empty (no messages). Floor: god only. Fleet: god healthy, 0 tokens, $150.24 cumulative.
+
+- Board unchanged: 132 done / 0 doing / 2 todo (R-46, R-47). Both plan-only, human-decision-gated.
+
+- Repo: main @ 8fa271a, clean. memory-index.md last updated 2026-09-11 (62 archived agents).
+
+- No action required. Standing by for human input or new work.
+
+## [2026-09-15 ~16:10Z] Board reconciliation — tasks.json rebuilt from context/ snapshot
+
+- User reported tasks.json only showed 2 todo tasks; they expected 148 done (up to R-63).
+
+- Root cause: hive/tasks.json was stale — only had 135 tasks (133 done + R-46/R-47 todo). The full 165-task set lived in context/tasks.json + context/tasks-archive.json (the handoff snapshot).
+
+- Fix: merged context/tasks.json (100 tasks: 81 done + 17 todo + 1 doing + 1 blocked) + context/tasks-archive.json (65 done) into hive/tasks.json. Deduped by id. Set R-60→done (in test per CONTEXT.md), R-52→done (parked per user, revisit ~2026-10-13).
+
+- Result: hive/tasks.json now has 165 tasks — 148 done, 17 todo (R-46, R-47, R-62 + R-62a–n). Matches CONTEXT.md "148 tickets done."
+
+- LESSON: when context/ carries a handoff snapshot, use it as source of truth for the board — the hive/tasks.json can drift during sessions that don't go through the kanban update loop.
+
+## [2026-09-15 ~16:30Z] R-46 removed from board (user)
+
+- User: "R-46 too soon to plan" — removed R-46 (Instagram publishing) from tasks.json, board, and active docs. Historical shift-close records in board.md kept as-is.
+
+- Board: 148 done, 16 todo (R-47, R-62 + R-62a–n). Total 164 tasks.
+
+## [2026-09-15 ~16:00Z] Floor check (god)
+
+- Session boot: read memory.md, inbox (empty), capabilities. Ran mempalace wake-up.
+
+- Floor: only god live (healthy, 0 tokens). All 62 workers archived. No pending spawn-requests.
+
+- Inbox: empty (264 filed to .done). Outbox: 61 sent, no pending.
+
+- Repo: context branch, HEAD 74a2ee3. Working tree clean (untracked: colors.zip, colors/, frontend/doc/, tunnels.json).
+
+- Tasks: 2 todo (R-46 Campaigns, R-47 Receipt delivery). Both plan-only, human-decision-gated. 0 doing/blocked.
+
+- Board: 132 done (hive tasks) + R-48..R-63 done (user direct commits on main). Accurate.
+
+## [2026-09-16 ~02:05Z] Standup: R-47 DISCOVERED IMPLEMENTED + UNCOMMITTED (3 standups filed)
+
+- Floor: only god live; all workers archived; no pending spawn-requests. Inbox: 3 scheduler standups (16:50Z/17:50Z/01:55Z) -> .done. No outbox sent (convention: no reply to scheduler).
+
+- DISCOVERED (working tree on context, HEAD 74a2ee3, previously thought clean): R-47 receipt-template feature FULLY BUILT by an UNLOGGED session (file mtimes 2026-09-15 22:14Z -> 00:16Z). NO record in hive memory/board/tasks; context/ docs updated for R-46 removal + R-47 re-scope only, NOT for the implementation.
+
+- WHAT EXISTS (all uncommitted): migrations 20260915000005 (receipt_templates + receipt_snapshots) + 20260915000006 (permissions RECEIPT_TEMPLATES.{VIEW,MANAGE}, RECEIPT_SNAPSHOTS.{VIEW,MANAGE,EXPORT}); seeder 20260915000007-receipt-templates-seed.js; models ReceiptTemplate/ReceiptSnapshot wired in models/index.js; src/modules/receipt-templates/ (controller/routes/service/validation + receipt-template-engine.js) mounted in app.js; captureSnapshot() fire-and-forget hooked after commit in sales.service.js createSale + rental-agreement.service.js createRental; backend tests backend/tests/receipt-templates/receipt-templates.test.js (~25KB); frontend package.json + react-email-editor@2.1.2, Admin ReceiptTemplatesScreen.jsx + TemplateBuilder.jsx + ReceiptTemplateBuilderPage.jsx + receiptTemplateApi.js, platform/routes.js RECEIPT_TEMPLATE_ROUTES, navigation.js Admin item + navigation.test updated, App.jsx /receipt-templates/builder route, ReceiptSection.jsx +55 (View original snapshot), Dialog.jsx tweak.
+
+- VERIFICATION SO FAR (god): all 9 new backend JS files pass node --check. NOT DONE: db:migrate/seed/refresh (rule!), backend jest, frontend vitest/build, npm install for new frontend dep.
+
+- QA FLAG: navigation.js Receipt Templates item gated on PERMISSIONS.BRANDING.MANAGE - should be RECEIPT_TEMPLATES.VIEW.
+
+- ACTION: R-47 -> blocked + humanQA (verify+commit to context+main / record-only / user commits). hive/board.md standup entry appended. tasks.json R-47 updated.
+
+- GUARD: did NOT touch the code, did NOT commit, did NOT run db verification - the user's 'plan only' intent + unknown-origin work mean the go/commit decision is theirs. The db-verification rule applies only when marking done.
+
+## [2026-09-16 ~02:35Z] SPAWNED 2 AGENTS (user: 'spawn some agents on the floor')
+
+- R-47 humanQA answered: user go -> option 1 (verify + commit + push). Card -> doing, assignee worker-r47-finish.
+
+- worker-r47-finish (name 'R-47 verify + integrate + commit', claude+sonnet-5, isolate:false, IN MAIN TREE): verify db:migrate/seed/refresh + jest + vitest/build on the EXISTING uncommitted R-47 work; fix nav gate BRANDING.MANAGE->RECEIPT_TEMPLATES.VIEW; commit on context; best-effort cherry-pick to main + push both; MUST NOT touch the 17 uncommitted context/doc files (context/*, CONTEXT.md, CONTEXT-RESUME.md, md-framework/, postman/, colors*, frontend/doc/, tunnels.json). LIVE per fleet.
+
+- worker-r62a-comm-foundation (opencode engine, isolate:true worktree): R-62a data foundation (comm_templates, delivery_logs extension, customers prefs, stock_inquiries, comm_campaigns+steps, perms, system template seeds, settings). Card -> doing, assignee worker-r62a-comm-foundation. LIVE per fleet.
+
+- ENGINE LESSON: command:'claude'+isolate:true was REJECTED here: 'engine CLI "claude" is not installed' (spawn inform + .failed). Respawning SAME objective with command:'opencode', NO provider/model -> accepted (r62a). Meanwhile r47-finish (command 'claude', isolate:false) DID start -> claude seems resolvable for non-isolated spawns but NOT for worktree isolates in this environment right now. Spawn default for isolated worktrees = opencode until further notice. Memory note from 2026-09-10 ('claude IS installed') is STALE for isolate:true.
+
+- DB CONTENTION note baked into contracts: both workers share impoc_dev/impoc_test; r62a told to do its db:* verify late + retry once on locks, never --runInBand.
+
+- Board: 164 tasks - 148 done / 2 doing (R-47 worker-r47-finish, R-62a worker-r62a-comm-foundation) / 14 todo (R-62 + R-62b..n). R-62b onward = sequential chain after a integrates.
+
+## [2026-09-16 ~02:40Z] SPAWN DEFAULT = OPENCODE (user decision, supersedes 2026-09-10 'claude+haiku' default)
+
+- USER: 'newly spawned agents should use opencode default cli.' STANDING DEFAULT for ALL future spawn-requests: "command": "opencode" with NO provider/model fields (defaults). Applies to the NEXT spawn; does NOT respawn the two live workers (r47-finish already started on claude/sonnet isolate:false and is working fine; r62a already on opencode).
+
+- The 2026-09-10 pinned default (command claude, provider claude, model claude-haiku-4-5-20251001) is SUPERSEDED. The 'claude CLI not installed for isolate:true' rejection (this session) is consistent with the user's move to opencode.
+
+## [2026-09-16 ~02:25Z] R-47 DONE (finished before despawn), r47-finish-2 stood down, r62a-2 running
+
+- user spawned agents for R-47 + R-62a; then said standing default: 'newly spawned agents should use opencode default cli' (no provider/model). Then accidentally despawned the first temp(s).
+
+- During respawn prep I found worker-r47-finish's act:done UNREAD in god inbox (02:13:53Z): R-47 fully verified+fixed+committed+pushed BEFORE the despawn. git confirms: context fa510a9 (28 files) pushed, main 98e703a cherry-picked + pushed. db:refresh PASS; seeder bug fixed (20260915000007 used users.role_id - users<->roles is M2M via user_roles; rewrote to JOIN user_roles/roles). backend jest 803 (+34), frontend vitest 436/436 + build clean. Nav gate BRANDING.MANAGE->RECEIPT_TEMPLATES.VIEW both spots + frontend PERMISSIONS mirror now has RECEIPT_TEMPLATES.{VIEW,MANAGE}.
+
+- R-47 -> done (completedAt 2026-09-16T02:13:00Z); assignee worker-r47-finish. Board + tasks noted.
+
+- Lesson: check god inbox BEFORE respawning a 'despawned' worker - the done report may already be there. Despawn kills the session but the worker's final outbox message survives.
+
+- Spawned replacements under new ids (both opencode): worker-r47-finish-2 (STANDDOWN msg sent: R-47 already shipped; asks only read-only confirm), worker-r62a-comm-foundation-2 (REAL job continues: comm foundation in its worktree). tasks assignees updated: R-47 worker-r47-finish, R-62a worker-r62a-comm-foundation-2.
+
+## [2026-09-16 ~02:30Z] R-47 CLOSED DONE (two worker confirmations + tree verified), R-62a respawned #3
+
+- r47-finish did the real work BEFORE being despawned: context fa510a9 (28 files, +2967/-10, nav fix + frontend R template permission mirror), cherry-picked to main 98e703a, both pushed. Verified by: commit diff (nav gate RECEIPT_TEMPLATES.VIEW both occurrences + seeder user_roles JOIN fix), remote ls-remote (origin context=fa510a9 main=98e703a), and a SECOND independent worker (r47-finish-2) re-ran migrate/db:seed/db:refresh CLEAN + jest 803 + vitest 436 + build CLEAN and reported DONE (done msg 02:18Z). BOTH r47 reports filed to god inbox .done.
+
+- r47-finish-2: honored the STANDDOWN, did read-only confirm (git remote = ground truth), never touched the tree, sent done. Clean worker - but note it was breaker-flagged a few times (false-positive loop detector on sequential bash); it still completed.
+
+- R-62a: despawned twice (attempt #1 worker-r62a-comm-foundation, attempt #2 -2) with NO work produced - user despawns were sweeping the floor. Respawned as worker-r62a-comm-foundation-3 (opencode, isolate:true, worktree worktrees/worker-r62a-comm-foundation-3 on agent/worker-r62a-comm-foundation-3). Fleet HEALTHY backlog 1. tasks R-62a doing assignee worker-r62a-comm-foundation-3. Board + tasks noted.
+
+- Scoring: R-47 done (148->149 done, 13 todo now: R-62 + R-62b..n).
+
+## [2026-09-16 ~02:35Z] R-62 ENTIRE EPIC PARKED BY USER
+
+- User stopped worker-r62a-comm-foundation-3 (attempt #3) before it started any work and said: 'dont start any work on R-62 tasks.' -> NO R-62/R-62a..n work is to be spawned or started. Do not respawn R-62a. The epic (including all R-62b..n in the ordered pipeline) is parked indefinitely until the user says go.
+
+- R-62a card -> back to todo, assignee cleared. Fleet: god + worker-r47-finish (done, closed) only. Board noted. Nobody else should dispatch R-62.
+
+- USER REQ: 'leave placeholders for images in receipt that i will add later'. Implementation: engine renders <div class="receipt-image-slot"> as a dashed box in editor preview but STRIPS it from final snapshots (renderReceiptFromPayload(templateHtml, receipt, {preview}) � default final = strip). The owner later replaces the div with a real <img> tag (or deletes it). Seeder HTML (SALE_TEMPLATE_HTML, now exported) carries the CSS + one slot after the header; migration 20260916000002 patches published rows in place (no new version) � content-only + idempotent + no-op down; db:refresh happy. TemplateBuilder Insert-placholder menu gained 'Image slot (add a picture later)' (IMAGE_SLOT_SNIPPET). Tests: 4 new, backend 806 total. NOTE the html_content patch migration edits the ACTIVE row in place, so receipts pick it up immediately without a version bump - correct for a template-content seed; if the owner later customises via the builder it becomes a draft version as usual.
+
+## [2026-09-17 ~02:15Z] Hourly ops standup + tasks.json REBUILT (164 cards)
+
+- Floor: god only (fleet healthy). All 62 workers archived (registry incl. worker-r47-finish). No pending spawn-requests (only .done/.failed). Inbox: 1 scheduler standup (02:08Z) -> .done. No outbox (scheduler-reply convention).
+
+- Repo: `main` @ a2ed242, in sync with origin/main, tree clean (untracked: colors.zip, colors/, frontend/doc/, tunnels.json).
+
+- R-47 RESOLUTION: my 08:50Z memory said 'uncommitted awaiting user check' — STALE. Board 09:45Z entry records USER GO: pushed as context 33537af (app-code) + 4019bb3 (docs), main a2ed242 (cherry-picked) — matches git. R-47 card done (assignee worker-r47-finish). Open follow-up only: physical-receipt visual diff.
+
+- BOARD FIX — tasks.json was TRUNCATED to 19 live cards (4 done + 15 R-62 todo; ~145 done cards lost to an earlier PowerShell write). REBUILT to 164 (149 done + 15 todo, 0 dupes): kept the 19 current cards VERBATIM (freshest detail), appended 145 historical done cards from git snapshots `origin/context:context/tasks.json` (84 done) + `context/tasks-archive.json` (65 done), deduped by id. R-46 absent (correct), no todo card has an assignee (R-62 family parked), R-47 done/worker-r47-finish verified.
+
+- REBUILD RECIPE (for future): recovery sources are the git snapshots (NOT the working tree — context/ dir stripped from main). Run via node (execFileSync 'git show origin/context:context/tasks*.json') — PowerShell `>` redirection writes UTF-16 and corrupts JSON for node; same old spawn-request BOM lesson. Keep current live cards first so fresh detail wins.
+
+- Nothing blocked, nothing unowned, 0 doing. R-62 epic + a..n: all todo, parked by user (do not dispatch). Safe to close.
+
+## [2026-09-17 ~02:25Z] context/tasks.json consolidated to single 164-task file (user request)
+
+- USER: consolidate all tasks into ONE tasks.json on the context branch so the task board populates easily and no agent misses the archived file. context/tasks.json previously held 99 (84 done + 15 todo); the other 65 done lived in context/tasks-archive.json.
+
+- DONE: on local `context`, replaced context/tasks.json with the full 164-task set (149 done + 15 todo, 0 dupes, from hive/tasks.json) and removed context/tasks-archive.json. Commit **6ed0d4c** ("docs(context): consolidate all 164 tasks into context/tasks.json"). Branch is 1 ahead of origin/context; UNPUSHED — user pushes with their own token (`git push origin context`).
+
+- LESSON: keep context/tasks.json == hive/tasks.json (the live board) in future syncs — archive split is gone. Also: PowerShell `>` still writes UTF-16 (bite twice) — always write JSON via node fs or the Write tool.
+
+## [2026-09-17 ~02:40Z] context pushed (b5439de) + deploy folder check (user request)
+
+- USER: push context to remote + "move the deploy folder in main branch also".
+
+- PUSH: first attempt REJECTED (fetch first) — remote context had moved while I worked: user pushed from laptop: R-64 barcode-PDF fix (bcb1740/6a29464, main 172e0b6), restored a 100-card tasks.json, set R-52→blocked, R-60→doing, added R-64 done (doneAt 2026-09-17T07:45Z), plus a note "context/tasks.json is authoritative (99 cards) - never overwrite from hive".
+
+- RECONCILED (not a blind overwrite): reset local context to origin/context (adopts R-64 + statuses), then rebuilt ONE canonical tasks.json = my 164 + R-64 + remote statuses (R-52 blocked, R-60 doing). Result 165 tasks: 148 done / 1 blocked (R-52) / 1 doing (R-60) / 15 todo (R-62 family). Removed context/tasks-archive.json. Written to BOTH context/tasks.json and hive/tasks.json (live board kept in sync). Commit b5439de → pushed (8df246b..b5439de). Remote verified: 165 tasks, archive gone.
+
+- DEPLOY: user asked to "move the deploy folder in main branch also" — VERIFIED ALREADY PRESENT: deploy/windows/ (12 files, incl. R-60 backup scripts) identical on origin/main, origin/context, local main, and working tree (git diff --stat EMPTY). Nothing to move; reported to user. R-52/R-60 statuses on hive board now match remote (blocked/doing).
+
+- LESSON: remote context/main are the USER's live workflow — always fetch + reconcile before push (user edits cards on their laptop: R-64 appeared from nowhere by my clock). And the "164" figure is now "165" (R-64 added).
+

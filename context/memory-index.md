@@ -189,3 +189,29 @@ worker-vendor-combobox-r15  Vendor combobox + receipt upload (R-15) (worker)  em
 
 worker-r35-pos-upi-display  worker-r35-pos-upi-display (temp)  empty  0 B  never written
   C:\projects\IMPOC-main\hive\agents\worker-r35-pos-upi-display\memory.md
+Written 2026-09-16T02:20:15.783Z by the harness when a temp was spawned. 67 agents have been on this floor, 25 with notes worth reading.
+
+god  Michael (orchestrator (god))  active  67 KB  updated 2026-09-16 02:17 UTC
+
+worker-r47-finish  R-47 verify + integrate + commit (temp)  active  3 KB  updated 2026-09-16 02:15 UTC
+
+C:\projects\IMPOC-main\hive\agents\worker-r47-finish\memory.md
+
+worker-r47-finish-2  R-47 verify + integrate + commit (temp)  archived  3 KB  updated 2026-09-16 02:18 UTC
+
+C:\projects\IMPOC-main\hive\agents\worker-r47-finish-2\memory.md
+
+worker-receipt-redesign  worker-receipt-redesign (temp)  archived  12 KB  updated 2026-09-11 15:23 UTC
+
+worker-r62a-comm-foundation-3  R-62a comm foundation (temp)  empty  122 B  updated 2026-09-16 02:20 UTC
+
+C:\projects\IMPOC-main\hive\agents\worker-r62a-comm-foundation-3\memory.md
+
+worker-r62a-comm-foundation  R-62a comm foundation (temp)  empty  0 B  never written
+
+C:\projects\IMPOC-main\hive\agents\worker-r62a-comm-foundation\memory.md
+
+worker-r62a-comm-foundation-2  R-62a comm foundation (temp)  empty  0 B  never written
+
+C:\projects\IMPOC-main\hive\agents\worker-r62a-comm-foundation-2\memory.md
+

@@ -1133,3 +1133,93 @@ User: "R-46 too soon to plan." Instagram publishing module removed from the boar
 
 # IMPORT from other Munder Difflin instance (2026-09-16)
 The user uploaded this board + kanban + god-memory (originally Windows hive `C:\projects\IMPOC-main\`) onto branch `context` @ 4019bb3. Imported into the live hive: `hive/board.md`, `hive/tasks.json` (99 cards: 84 done, 15 todo = R-62 epic + a–n, all parked by user), `hive/tasks-archive.json` (65), memory.md = `context/god-memory.md` content + boot note. R-47 shipped both branches; R-60 awaiting laptop run; R-52 parked to ~2026-10-13; R-62 awaits user go.
+Human reported: adding stock fails with \POST /api/trips/:tripUuid/stocks 400 (Bad Request)\ in the console (fired from tripsApi.js:176). The \eportAllChanges startTime\ TypeError in the same console is unrelated web-vitals noise.
+
+- **R-18** frontend: add-stock 400 fix (createStock sends tripUuid in body). &rarr; **DONE, INTEGRATED on master 00a7fba** (2026-09-06, ff from 32c8706). Worker **worker-stock-create-400-r18** (kevin, isolate:true) delivered: 	ripsApi.js createStock now posts { ...payload, tripUuid } (+ JSDoc) and NEW rontend/src/services/__tests__/tripsApi.test.js (2 tests per BarcodePrintScreen apiClient-mock convention). Worktree verify: 251/251 vitest (249 baseline + 2 new) + build PASS; god re-verify MAIN: **255/255** + build PASS. Live 201 confirmed against :3000 (left a stock row in dev DB; no DELETE route). Clean ff-merge (only tripsApi.js + new test; R-08 dirty set untouched); worktree removed + pruned, branch deleted. Frontend only, uncommitted (god integrated). The \eportAllChanges startTime\ TypeError in the console is unrelated web-vitals plugin noise.
+
+# NEW FEATURES R-48–R-63 (2026-09-11→15, user-direct commits on main)
+
+User committed directly to main (not through hive task system). Pulled from origin/main (9f9c7cb→8fa271a) on 2026-09-15. 164 files, +10677/−883 lines.
+
+## Features delivered
+
+- **R-48/R-49/R-50 (barcode system)**: Unique SHREE barcode values, print-labels flow, sheet configurator with templates + page sizes (A3/A4/A5/Letter/custom). New backend modules: barcode-layouts, barcode.geometry.js. Frontend: BarcodePrintScreen revamp, LabelLayoutScreen, labelLayout.js.
+
+- **R-51 (GST on purchases)**: CGST/SGST rates on stocks, amounts on vendor bills. Migration 20260913000004, Stock + TripVendor models updated.
+
+- **R-53 (digital pet)**: Customer display idle screen animated pet. DigitalPet.jsx, petEngine.js, pet-sheet.png.
+
+- **R-54 (Google review QR)**: Post-payment Google review QR on customer display. review-links backend module.
+
+- **R-55 (vendor bill photo)**: Take photo/gallery with review & retake, client-side downscale. PhotoCapture.jsx, imageResize.js.
+
+- **R-56 (barcode sheet configurator)**: Templates + page sizes for label printing. BarcodeLayoutTemplate model, barcode-layouts module.
+
+- **R-57 (inline colour/size)**: Add new colour/size inline from add-unit dropdowns in StockIntake.
+
+- **R-58 (branding/theme)**: Editable shop name + logo + custom accent colour picker in theme drawer. BrandingProvider.jsx, color-utils.js, branding backend module.
+
+- **R-59 (unit search)**: Scan barcode on Units page to find a unit.
+
+- **R-60 (durable backups)**: pg_dump twice daily, encrypted Google Drive upload, restore script. deploy/windows/ scripts.
+
+- **R-61 (scanner zoom)**: Zoom presets 1x/2x/3x remembered per device. scannerZoom.js.
+
+- **R-63 (customer enquiries)**: Enquiries tab, customer_enquiries table, close = tell customer (tap-to-send WhatsApp/email/SMS) or close quietly. enquiries backend module.
+
+## Deployment
+
+- Windows production setup: deploy/windows/ (setup/start/update/backup/restore scripts, ecosystem.config.cjs for pm2).
+
+- docs/WINDOWS_PRODUCTION_SETUP.md, docs/COMMUNICATION_PLATFORM.md.
+
+## Current state (2026-09-15)
+
+- Branch: context, HEAD = 74a2ee3. Main: 8fa271a.
+
+- Working tree: clean except untracked: colors.zip, colors/, frontend/doc/, tunnels.json.
+
+- Board: 164 tasks — 148 done, 16 todo (R-47, R-62 + R-62a–n). 0 doing, 0 blocked.
+
+- memory-index.md outdated (last updated 2026-09-11); 62 agents listed, all archived except god.
+
+- All offline work (R-48–R-63) is now reflected in tasks.json and this board.
+
+# STANDUP 2026-09-16 ~02:05Z (god)
+
+- Floor: only god live (healthy). All 62 workers archived. No pending spawn-requests (all .done/.failed, none waiting).
+
+- Standup inbox: 3 scheduler requests (16:50Z, 17:50Z, 01:55Z) filed to .done.
+
+- DISCOVERED: uncommitted R-47 implementation in the working tree on context (HEAD 74a2ee3), NOT in memory/board/tasks. Built 2026-09-15 ~22:14Z-00:16Z by an unlogged session. Full formula: receipt_templates + receipt_snapshots tables (migration 20260915000005), permissions seed (0006), seeder (0007), backend module receipt-templates/ + engine + tests, snapshot capture on sale/rental create, frontend Admin screens + react-email-editor@2.1.2 + nav/route wiring, ReceiptSection 'View original'. 17 modified tracked + ~15 untracked files; all PARSE OK (node --check on backend new files).
+
+- R-47 card -> blocked + humanQA (verify+commit vs record-only vs user commits it). QA flag: nav item gated on branding.manage (should be receipt_templates.view).
+
+- Board: 164 tasks - 148 done / 1 blocked (R-47, humanQA) / 15 todo (R-62 + a-n). 0 doing. R-52 parked done (revisit ~2026-10-13).
+
+- BOARD 2026-09-16 ~02:22Z (god): humanQA answered -> option 1. Spawned worker-r47-finish (claude, isolate:false, main tree) + worker-r62a-comm-foundation (claude 1st spawn rejected 'not installed'; respawned opencode, isolate:true, worktree). User then said 'newly spawned agents should use opencode default cli' -> standing spawn default = command:opencode, no provider/model. User accidentally despawned BOTH temp agents while they ran.
+
+- DISCOVERY during respawn: worker-r47-finish had ACTUALLY FINISHED R-47 before the despawn - its act:done sat unread in god's inbox (02:13:53Z). Verified: db:migrate/seed/refresh PASS (+ seeder bug fix users.role_id -> user_roles/roles JOIN in 20260915000007), backend jest 803 (+34), frontend vitest 436/436 + build clean, nav gate BRANDING.MANAGE -> RECEIPT_TEMPLATES.VIEW (both spots) + frontend PERMISSIONS mirror, context fa510a9 (28 files) pushed, cherry-picked to main 98e703a pushed, docs leftovers stashed/popped. R-47 card -> done (completedAt 02:13Z). Spawned r47-finish-2 + r62a-comm-foundation-2 (both opencode); r47-finish-2 stood down as STANDDOWN (R-47 already shipped, read-only confirm only); r62a-2 continues in its worktree (real work needed).
+
+- BOARD 2026-09-16 ~02:30Z: R-47 CLOSED DONE. The despawned worker-r47-finish had ACTUALLY finished (done msg was unread): context fa510a9 + main 98e703a pushed, nav fix + seeder bugfix verified in diff, confirmed by second independent re-verify (r47-finish-2: db:refresh clean, jest 803, vitest 436, build clean). R-62a workers were swept twice by despawning before producing work -> respawned attempt #3: worker-r62a-comm-foundation-3 (opencode, isolate:true, worktree created, healthy). Board: 149 done / 1 doing (R-62a) / 13 todo (R-62 + R-62b..n).
+
+- BOARD 2026-09-16 ~02:35Z: USER PARKED THE ENTIRE R-62 EPIC - 'dont start any work on R-62 tasks' - stopped the R-62a worker (attempt #3) before it did anything. R-62a back to todo, no assignee, no spawns. Do NOT respawn or dispatch any R-62/R-62a..n work until the user says go. Board: 149 done / 0 doing / 14 todo (R-62 + R-62a..n, all parked).
+
+- BOARD 2026-09-16 ~08:35Z: R-47 REOPENED BY USER (new requirements, NOT done until user checks). User attached physical receipt photo (C:\Users\Rushikesh Naik\Downloads\WhatsApp Image 2026-09-15 at 11.57.59 PM.jpeg - god cannot read images; R-45 branded design used as proxy). Spec: only 2 receipts (Sale + Rental); NO creating new templates; every change = new version; Publish button marks latest saved version active; see all previous versions; only active version generates POS invoices; template must replicate physical receipt. Also reported bug: editing a template showed EMPTY (cause: TemplateBuilder used react-email-editor drag-drop which only loads editor JSON; seeded templates have editorState NULL). IMPLEMENTED (uncommitted, working tree on context): removed POST /receipt-templates + frontend create buttons/API; updateTemplate now saves max+1 DRAFT and does NOT deactivate the published version; activate = Publish; migration 20260916000001 normalizes 1 published version per entity_type + renames Sale/Rental Receipt; seeder RENTAL now active; previewTemplate + captureSnapshot now render ACTIVE template through the engine (previously silently used buildBrandedReceiptHtml); engine store.wordmark added; TemplateBuilder rewritten as HTML code editor + placeholder insert + server preview; ReceiptTemplatesScreen = 2 grouped templates, version history, Publish button; POS BrandedReceiptDialog prefers snapshot.renderedHtml (active template output). VERIFIED: db:migrate/seed/refresh clean, seeded both active, backend jest 802 (51 suites), frontend vitest 436, build clean. R-47 card -> doing (not done). Uncommitted pending user check.
+
+- BOARD 2026-09-16 ~09:45Z: USER GO - update docs/memory + push. context: app-code commit 33537af (R-47 rework, 14 files) + docs commit 4019bb3, pushed origin/context (fa510a9..4019bb3). main: app-code cherry-picked as a2ed242, pushed origin/main (98e703a..a2ed242). Leave-alone untracked (colors.zip, colors/, frontend/doc/, tunnels.json) untouched. context snapshots synced (board/god-memory/tasks.json); R-47 card -> done both (note: physical-receipt visual diff still open follow-up).
+
+# STANDUP 2026-09-17 ~02:08Z (god)
+
+- Floor: god only live (healthy). All workers archived (incl. worker-r47-finish). No pending spawn-requests. Inbox: 1 scheduler standup (02:08Z) filed to .done; no outbox (scheduler-reply convention).
+
+- Repo: `main` @ a2ed242 == origin/main (R-47 rework shipped). Tree clean except leave-alone untracked (colors.zip, colors/, frontend/doc/, tunnels.json).
+
+- BOARD FIX: hive/tasks.json had been truncated to 19 live cards (~145 done cards lost to an earlier PowerShell write). REBUILT to **164 tasks (149 done / 15 todo / 0 doing / 0 blocked)**: current 19 cards kept verbatim, then 145 historical done cards appended from git snapshots `origin/context:context/tasks.json` + `context/tasks-archive.json`, deduped by id. No R-46 (correctly removed), no todo-with-assignee, R-47 done/worker-r47-finish confirmed.
+
+- R-47: DONE both branches (context 33537af + 4019bb3; main a2ed242) — publish-first versioning + HTML-source builder + image-slot placeholders. Open follow-up only: physical-receipt visual diff.
+
+- R-62 epic + R-62a..n: all todo, unassigned, PARKED by user (2026-09-16 ~02:35Z) — do not dispatch until human go.
+
+- Nothing blocked, nothing unowned, no stale agents. Board accurate. Safe to close.
+
