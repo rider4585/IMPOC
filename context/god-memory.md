@@ -2,6 +2,19 @@
 
 _Append durable facts, decisions, and context below._
 
+> **IMPORT (2026-09-16):** This memory was imported from the other Munder Difflin instance's hive
+> (`context/god-memory.md`, originally at `C:\projects\IMPOC-main\hive\agents\god\memory.md`).
+> Board + kanban (`hive/board.md`, `hive/tasks.json`, `hive/tasks-archive.json`) imported from
+> `context/` on branch `context` @ 4019bb3. Local env now macOS MAMP: repo root
+> `/Applications/MAMP/htdocs/Personal Projects/IMPOC` (Windows laptop paths in old entries are historical).
+> Live floor: god only (no temps running). Closed items remain done; `main` = clean app, `context` = this handoff.
+
+---
+
+# Memory — Michael (god)
+
+_Append durable facts, decisions, and context below._
+
 ---
 
 ## 📌 Durable facts (pinned — never condensed)
@@ -480,3 +493,15 @@ User chose not to plan the Campaigns (R-46) or receipt-delivery (R-47) tickets i
 ## [2026-09-16 ~09:45Z] R-47 SHIPPED - user go: docs updated + pushed to context and main
 - User: 'update the context docs, memory and push the changes to remote, context related changes to context branch only and only clean code to main'. Did: CONTEXT.md (149 done, R-47 rework bullet, receipt-template conventions) + CONTEXT-RESUME.md fully refreshed; context/{board.md,god-memory.md,tasks.json} synced from hive (08:50Z image-slots + 09:00Z bounce entries now also in snapshots; R-47 card -> done both files). Committed app code (backend + frontend + 2 migrations) as its own commit on context, docs as a second commit; pushed context; cherry-picked the app-code commit onto main (context and main had diverged - 38/21 - because both carry their own earlier R-47 commit; the delta applied cleanly) and pushed main. colors.zip/colors/, frontend/doc/, tunnels.json left untracked on purpose.
 - OPEN FOLLOW-UP (non-blocking, logged): the physical-receipt photo is unreadable by god; template replicates the R-45 branded A5 design. Any structural difference the user notices on the printed receipt = a small tweak to the seeded SALE/RENTAL v1 HTML (seeder 20260915000007) + a migration patch like 20260916000002.
+
+## [2026-09-16] R-64 — Barcode PDF caching bug (user-reported)
+User hits GET /api/barcodes/generate?pages=5&requestUuid=... → gets JSON "cached result" instead of PDF download + "Waking the system up" banner (cold start + idempotency replay). Root cause: barcode.controller.js has a request_keys idempotency replay path (SequelizeUniqueConstraintError catch → re-lookup → JSON marker with resultUuid, no PDF stream). On cold start the frontend wakingRequest retries with same key; first attempt succeeded server-side but response lost; retry hits replay → locked out. User decision: option 2 — always stream a fresh PDF, never return the cached/frozen one. Ticket: R-64 (worker-barcode-fresh-pdf). Dispatched temp to fix barcode.service.js (remove RequestKey.create), barcode.controller.js (remove lookup pre-check + unique-constraint replay catch), integration tests (rewrite replay assertions to expect fresh PDF). No migration/model changes needed. IMPOC-folder-only constraint.
+
+## [2026-09-17 ~07:40Z] R-64 SHIPPED - barcode PDF always fresh (standup integration)
+- Worker worker-barcode-fresh-pdf had done the backend half in its isolated worktree but got breaker-constrained 3x (loop: identical edit/bash), never ran tests, never reported done, and was archived with uncommitted changes. It had missed the unit tests: barcode.service.test.js still asserted RequestKey.create was called - R-64 removes it entirely. I (god) integrated as the only safe owner: applied its worktree diff to context, rewrote the 2 stale tx-wiring unit tests to pin NO request_keys write + fresh {pdfBuffer} (no resultUuid), and fixed 2 broken tests in the updated wakingRequest.test.js.
+- frontend R-64 half (wakingRequest.js: never resolve with synthetic 'waking' - onStatus() callback signals banner/failure, the real slow-cold-start PDF result is still delivered; BarcodePrintScreen.jsx + StockIntake.jsx + tests) was already modified uncommitted in the main repo - committed together as one fix.
+- TEST ENV GOTCHAS: (1) hive runtime node is a wrapper that re-execs Munder Difflin (ELECTRON_RUN_AS_NODE) - invoking it as a script fails; use the real nvm node. (2) node v25 runs vitest but breaks jsdom/tests (localStorage.clear not a function, canvas, navigation) - 33 false failures; the canonical runner is node v20.19.6 (nvm) = 436/436. (3) jest barcode needs node v25.2.1 (jest requires node >=24.9 to require ESM natively under NODE_OPTIONS=--experimental-vm-modules); backend full suite 806/806 green on v25. (4) npx/npm are NOT on the hive runtime PATH - prepend /Users/ravirajbugge/.nvm/versions/node/v<ver>/bin. (5) FAILED pod's worktree node_modules can be incomplete/broken - don't validate there, apply its diff and test in the clean main repo.
+- sleeping/worker test fixes: wakingRequest fake-timer tests need vi.advanceTimersByTimeAsync (executeAttempt awaits fn(), so the retry timer is only scheduled on a microtask flush, which sync advanceTimersByTime never does); and the 90s test advanced 1200+88000=89200 < 90000 (never fired) - fixed to 100000.
+- DELIVERABLE: context bcb1740 + main 172e0b6 (cherry-picked onto origin/main's tip after reset --hard; local main was 2 commits behind - always fetch/reset before cherry-picking to main). DevOps: none - no migrations. Board now 150 done / R-60 doing / R-52 blocked / R-62 epic+subs todo.
+- Standup note: this morning's automation sweep had marked R-52 + R-60 "done" (doneAt 2026-09-17T02:05:42Z) - both wrong (R-52 parked, R-60 awaiting laptop). Restored in hive/tasks.json. Also: scheduler standup messages are replied to LOCALLY (review floor + board, fix stale, file to .done) - writing an outbox reply to scheduler bounces back to god; never do it.
+- Cleanup: pruned dead worker's worktree + branch agent/worker-worker-barcode-fresh-pdf (its changes are integrated).

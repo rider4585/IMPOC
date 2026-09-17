@@ -14,7 +14,7 @@
 
 ---
 
-## KANBAN BOARD (as of 2026-09-15)
+## KANBAN BOARD (as of 2026-09-17)
 
 ### DOING (1)
 - **R-60** — Durable backups on the shop laptop: pg_dump twice daily, manual encrypted Google Drive upload, restore script. Code complete; awaiting user to run `setup.cmd` on the laptop.
@@ -22,9 +22,8 @@
 ### BLOCKED (1)
 - **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use.
 
-### TODO (17)
+### TODO (16)
 - **R-46** — ~~Instagram publishing module~~ — REMOVED (too soon to plan, user 2026-09-15).
-- **R-47** — Receipt template versioning + webpage builder (plan finalized 2026-09-15). Two active templates (retail + rental), npm module for builder, both JSON+HTML snapshots, admin folder export by invoice#.
 - **R-62** — Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later). 15 sub-cards below.
   - **R-62a** — Comm foundation: migrations (comm_templates, delivery_logs extension, customers preferences)
   - **R-62b** — Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}})
@@ -41,7 +40,7 @@
   - **R-62m** — LATER: PDF receipt attachment on invoice email (pdfkit already a dependency)
   - **R-62n** — LATER: public receipt page /r/:token + Cloudflare tunnel from the shop laptop
 
-### DONE (129)
+### DONE (150)
 **Foundation (T-series, 16):** T-00 Auth fix, T-01 Gitignore, T-02 Seed, T-03 Admin UI, T-05 Ops UI, T-06 Units backend, T-07 Service UI, T-08 Sales backend, T-09 Dashboard UI, T-10 Rentals backend, T-11 Receipt UI, T-12 Expenses backend, T-13 Reports backend, T-15 Dashboard frontend, T-16 Final QA.
 
 **Security (SEC-*, 28):** SEC-CR-1..3 (money TOCTOU/role privesc/JWT forgery), SEC-H-1..10 (rate-limit/PII/IDOR/localStorage), SEC-M-3..9 (idempotency/scoping/validation/delivery), SEC-L-1..8 (timing/creds/error-masking).
@@ -50,8 +49,8 @@
 
 **UI/UX (R-26, 25 cards):** UX-CR-1..3, UX-H-1..8, UX-M-1..10, UX-L-1..4.
 
-**Feature cards (R-24, R-30..R-45, R-48..R-51, R-53..R-61, R-63, 53):**
-R-24 Security umbrella, R-30 POS price edit, R-32 DB views/matviews, R-31 requestUuid frontend, R-33 Expense picklist, R-34 Collapsible nav, R-35 UPI QR + R-35a..f, R-36 Modal polish, R-37 DataGrid, R-38 Scrollbar, R-39 Sidebar rail, R-40 Nav rail toggle, R-41 Barcode scanner, R-42 Display polish + R-42a..d, R-43 Intake scan, R-44 Mobile responsiveness, R-45 Receipt redesign, R-48 Barcode SHREE prefix, R-49 Print labels toast, R-50 Label configurator, R-51 GST on purchases, R-53 Digital pet, R-54 Review QR, R-55 Vendor bill photo, R-56 Sheet configurator, R-57 Inline colour/size, R-58 Theme drawer, R-59 Units scan, R-61 Scanner zoom, R-63 Customer enquiries.
+**Feature cards (R-24, R-30..R-48, R-51, R-53..R-64, 74):**
+R-24 Security umbrella, R-30 POS price edit, R-32 DB views/matviews, R-31 requestUuid frontend, R-33 Expense picklist, R-34 Collapsible nav, R-35 UPI QR + R-35a..f, R-36 Modal polish, R-37 DataGrid, R-38 Scrollbar, R-39 Sidebar rail, R-40 Nav rail toggle, R-41 Barcode scanner, R-42 Display polish + R-42a..d, R-43 Intake scan, R-44 Mobile responsiveness, R-45 Receipt redesign, R-47 Receipt template versioning + builder (R-47 rework, 2026-09-16), R-48 Barcode SHREE prefix, R-49 Print labels toast, R-50 Label configurator, R-51 GST on purchases, R-53 Digital pet, R-54 Review QR, R-55 Vendor bill photo, R-56 Sheet configurator, R-57 Inline colour/size, R-58 Theme drawer, R-59 Units scan, R-61 Scanner zoom, R-63 Customer enquiries, R-64 Barcode PDF always fresh (2026-09-16/17).
 
 ---
 
@@ -1129,3 +1128,8 @@ User: "R-46 too soon to plan." Instagram publishing module removed from the boar
 - BOARD 2026-09-16 ~09:00Z: Scheduler standup (02:55Z) handled + filed to .done. My 02:56Z outbox reply to `scheduler` bounced as undeliverable (scheduler is not a floor agent - known, memory line 292). Bounce filed to .done; no reply sent (convention). Inbox now empty.
 
 - BOARD 2026-09-16 ~09:45Z: USER GO - update docs/memory + push. Committed in two steps: (1) app code commit (backend receipt-templates module + engine + seeder + migrations 20260916000001/2 + frontend TemplateBuilder/ReceiptTemplatesScreen/BrandedReceiptDialog/ReceiptSection/receiptTemplateApi) on context; (2) docs commit (CONTEXT.md, CONTEXT-RESUME.md, context/{board.md,god-memory.md,tasks.json}). Pushed context; cherry-picked the app-code commit onto main + pushed main. Leave-alone untracked files (colors.zip, colors/, frontend/doc/, tunnels.json) NOT committed. R-47 card -> done (shipped on both branches). Reminder logged: physical-receipt photo unreadable - visual diff vs printed receipt remains an open follow-up (seed HTML tweak only).
+
+---
+
+# IMPORT from other Munder Difflin instance (2026-09-16)
+The user uploaded this board + kanban + god-memory (originally Windows hive `C:\projects\IMPOC-main\`) onto branch `context` @ 4019bb3. Imported into the live hive: `hive/board.md`, `hive/tasks.json` (99 cards: 84 done, 15 todo = R-62 epic + a–n, all parked by user), `hive/tasks-archive.json` (65), memory.md = `context/god-memory.md` content + boot note. R-47 shipped both branches; R-60 awaiting laptop run; R-52 parked to ~2026-10-13; R-62 awaits user go.
