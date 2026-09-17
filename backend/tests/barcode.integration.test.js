@@ -232,26 +232,14 @@ describe('Barcode Generation Integration Tests', () => {
         expect(pdfHeader).toBe('%PDF');
     });
 
-    it('should generate barcode with valid requestUuid and create request_keys row', async () => {
+    it('should generate barcode with valid requestUuid and not create a request_keys row', async () => {
         // This test validates that a first barcode generation request:
         // 1. Accepts valid requestUuid
-        // 2. Calls idempotency lookup (returns not found)
-        // 3. Generates PDF
-        // 4. Inserts request_keys row inside transaction
-        // 5. Returns 200 with PDF
+        // 2. Generates PDF
+        // 3. Writes NO request_keys row (idempotency removed, R-64)
+        // 4. Returns 200 with PDF
 
         const requestUuid = uuidv4();
-
-        // Verify initial lookup returns not found
-        const initialLookup = await RequestKey.findOne({
-            where: {
-                gesture_type: GESTURE_TYPES.BARCODE_GENERATE,
-                request_uuid: requestUuid,
-                deleted_at: null,
-            },
-        });
-
-        expect(initialLookup).toBeNull();
 
         // Call the barcode generation endpoint
         const response = await request(app)
@@ -271,7 +259,7 @@ describe('Barcode Generation Integration Tests', () => {
         const pdfHeader = pdfBuffer.toString('ascii', 0, 4);
         expect(pdfHeader).toBe('%PDF');
 
-        // Verify request_keys row was created
+        // Verify NO request_keys row was created (R-64)
         const createdKey = await RequestKey.findOne({
             where: {
                 gesture_type: GESTURE_TYPES.BARCODE_GENERATE,
@@ -280,17 +268,12 @@ describe('Barcode Generation Integration Tests', () => {
             },
         });
 
-        expect(createdKey).toBeDefined();
-        expect(createdKey.result_kind).toBe('PDF');
-        expect(createdKey.result_uuid).toBeDefined();
-        expect(createdKey.actor_user_id).toBe(testUser.id);
+        expect(createdKey).toBeNull();
     });
 
-    it('should return cached result on replay with same requestUuid', async () => {
-        // This test validates that a replayed request:
-        // 1. Calls idempotency lookup
-        // 2. Returns 200 with original result_uuid (no PDF duplication)
-        // 3. Does not call nextval or render a new PDF
+    it('should stream a fresh PDF on replay with same requestUuid', async () => {
+        // R-64: a pre-existing request_keys row must NOT cause a cached JSON
+        // replay — every request streams a fresh PDF.
 
         const requestUuid = uuidv4();
         const resultUuid = uuidv4();
@@ -311,13 +294,14 @@ describe('Barcode Generation Integration Tests', () => {
             .set('Authorization', `Bearer ${accessToken}`);
 
         expect(response.status).toBe(200);
-        expect(response.headers['content-type']).toMatch(/application\/json/);
-        expect(response.body.success).toBe(true);
-        expect(response.body.data.resultUuid).toBe(resultUuid);
-        expect(response.body.message).toContain('cached');
+        expect(response.headers['content-type']).toMatch(/application\/pdf/);
+
+        const pdfBuffer = response.body;
+        expect(pdfBuffer).toBeInstanceOf(Buffer);
+        expect(pdfBuffer.toString('ascii', 0, 4)).toBe('%PDF');
     });
 
-    it('should return cached result on /test-sheet replay with same requestUuid', async () => {
+    it('should stream a fresh PDF on /test-sheet replay with same requestUuid', async () => {
         const requestUuid = uuidv4();
         const resultUuid = uuidv4();
 
@@ -337,10 +321,11 @@ describe('Barcode Generation Integration Tests', () => {
             .set('Authorization', `Bearer ${accessToken}`);
 
         expect(response.status).toBe(200);
-        expect(response.headers['content-type']).toMatch(/application\/json/);
-        expect(response.body.success).toBe(true);
-        expect(response.body.data.resultUuid).toBe(resultUuid);
-        expect(response.body.message).toContain('cached');
+        expect(response.headers['content-type']).toMatch(/application\/pdf/);
+
+        const pdfBuffer = response.body;
+        expect(pdfBuffer).toBeInstanceOf(Buffer);
+        expect(pdfBuffer.toString('ascii', 0, 4)).toBe('%PDF');
     });
 
     it('should generate test sheet PDF with geometry from app_settings', async () => {
@@ -365,7 +350,7 @@ describe('Barcode Generation Integration Tests', () => {
         const pdfHeader = pdfBuffer.toString('ascii', 0, 4);
         expect(pdfHeader).toBe('%PDF');
 
-        // Verify request_keys row was created for test sheet
+        // Verify NO request_keys row was created for the test sheet (R-64)
         const createdKey = await RequestKey.findOne({
             where: {
                 gesture_type: GESTURE_TYPES.BARCODE_GENERATE_TEST,
@@ -374,14 +359,12 @@ describe('Barcode Generation Integration Tests', () => {
             },
         });
 
-        expect(createdKey).toBeDefined();
-        expect(createdKey.result_kind).toBe('PDF_TEST_SHEET');
+        expect(createdKey).toBeNull();
     });
 
     it('should handle concurrent barcode requests with same requestUuid', async () => {
-        // This test validates that when two concurrent requests arrive with the same requestUuid:
-        // 1. At least one succeeds (returns 200 PDF or JSON)
-        // 2. Only one request_keys row exists
+        // R-64: both concurrent requests with the same requestUuid stream a
+        // fresh PDF and write NO request_keys row (no idempotency).
 
         const requestUuid = uuidv4();
 
@@ -397,11 +380,16 @@ describe('Barcode Generation Integration Tests', () => {
                 .set('Authorization', `Bearer ${accessToken}`),
         ]);
 
-        // At least one should succeed (200)
-        const successCount = [response1, response2].filter(r => r.status === 200).length;
-        expect(successCount).toBeGreaterThanOrEqual(1);
+        // Both should succeed (200) with a fresh PDF
+        for (const response of [response1, response2]) {
+            expect(response.status).toBe(200);
+            expect(response.headers['content-type']).toMatch(/application\/pdf/);
+            const pdfBuffer = response.body;
+            expect(pdfBuffer).toBeInstanceOf(Buffer);
+            expect(pdfBuffer.toString('ascii', 0, 4)).toBe('%PDF');
+        }
 
-        // Only one request_keys row should exist
+        // No request_keys row should exist (R-64)
         const rowCount = await RequestKey.count({
             where: {
                 gesture_type: GESTURE_TYPES.BARCODE_GENERATE,
@@ -410,7 +398,7 @@ describe('Barcode Generation Integration Tests', () => {
             },
         });
 
-        expect(rowCount).toBe(1);
+        expect(rowCount).toBe(0);
     });
     it('should format barcode values as SHREE + timestamp + counter (R-48)', () => {
         const nowMs = Date.UTC(2026, 8, 13, 5, 0, 0);

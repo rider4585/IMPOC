@@ -215,11 +215,16 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
   });
 
   describe('Cold-start waking and retry behavior', () => {
-    it('displays waking banner when wakingRequest returns waking status', async () => {
-      wakingRequestModule.wakingRequest.mockResolvedValueOnce({
-        status: 'waking',
-        requestKey: 'test-key',
+    // Waking is signalled via the onStatus callback (the promise itself stays
+    // pending until the real response arrives or it times out).
+    const wakeAtAnyDelay = () =>
+      wakingRequestModule.wakingRequest.mockImplementationOnce((fn, options) => {
+        options?.onStatus?.('waking', options?.requestKey);
+        return new Promise(() => {});
       });
+
+    it('displays waking banner when wakingRequest signals waking', async () => {
+      wakeAtAnyDelay();
 
       renderScreen();
       const input = screen.getByLabelText(/number of pages/i);
@@ -234,10 +239,7 @@ describe('BarcodePrintScreen (Story 1.17)', () => {
     });
 
     it('keeps form interactive during waking state', async () => {
-      wakingRequestModule.wakingRequest.mockResolvedValueOnce({
-        status: 'waking',
-        requestKey: 'test-key',
-      });
+      wakeAtAnyDelay();
 
       renderScreen();
       const input = screen.getByLabelText(/number of pages/i);

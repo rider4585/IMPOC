@@ -3,14 +3,21 @@ import { createRequestKey } from './requestKey.js';
 /**
  * Wraps a promise function to handle cold-start retry with exponential backoff.
  *
+ * The returned promise NEVER resolves with a synthetic "waking" status. Waking and
+ * failure are signalled through the optional `onStatus` callback; the promise itself
+ * resolves with the real result once `fn` succeeds, or with { status: 'failed' }
+ * after the 90s cap. This is why a slow-but-successful cold-start response (e.g. a
+ * generated PDF) is delivered instead of being dropped at the waking threshold.
+ *
  * **Timing Thresholds (currently fixed constants):**
  * - **1200ms waking threshold**: If the wrapped function hasn't resolved by 1200ms,
- *   the wrapper returns { status: 'waking', requestKey } to signal to the caller
- *   that the server is warming up. Internally, retries continue with exponential backoff.
+ *   `onStatus('waking', requestKey)` fires (so the UI can show a banner). The promise
+ *   keeps waiting — the eventual success is still delivered.
  * - **90s failure timeout**: If the wrapped function hasn't resolved by 90 seconds,
- *   the wrapper returns { status: 'failed', requestKey } and stops retrying.
+ *   `onStatus('failed', requestKey)` fires and the promise resolves with
+ *   `{ status: 'failed', requestKey }`.
  *
- * **Exponential Backoff Strategy:**
+ * **Exponential Backoff Strategy (only on rejected attempts):**
  * - First retry: 1.2 seconds after initial failure
  * - Second retry: 2.4 seconds after previous attempt (1.2 × 2)
  * - Third retry: 4.8 seconds after previous attempt (2.4 × 2)
@@ -20,10 +27,9 @@ import { createRequestKey } from './requestKey.js';
  * @param {Function} fn - An async function to wrap (e.g., async () => fetch(...))
  * @param {Object} options - Configuration options
  * @param {string} options.requestKey - The idempotency key for this request
- * @returns {Promise} Promise that resolves with result or status object:
- *   - result (raw return value) if fn succeeds
- *   - { status: 'waking', requestKey } if unresolved at 1200ms
- *   - { status: 'failed', requestKey } if unresolved at 90s
+ * @param {Function} [options.onStatus] - Called with 'waking'|'failed' + requestKey
+ * @returns {Promise} Promise that resolves with the real result, or
+ *   { status: 'failed', requestKey } after 90s.
  * @throws {TypeError} If fn is not a function
  */
 export function wakingRequest(fn, options = {}) {
@@ -33,9 +39,11 @@ export function wakingRequest(fn, options = {}) {
   }
 
   const requestKey = options.requestKey || createRequestKey();
-  let resolved = false;
+  const onStatus = typeof options.onStatus === 'function' ? options.onStatus : () => {};
+  let settled = false;
   let attempt = 1;
   const timers = [];
+  let wakingSignalled = false;
 
   return new Promise((resolve) => {
     const startTime = Date.now();
@@ -45,29 +53,27 @@ export function wakingRequest(fn, options = {}) {
      * On error, schedules the next attempt with increasing delays.
      */
     async function executeAttempt() {
-      if (resolved) return;
+      if (settled) return;
 
       try {
         const result = await fn();
-        if (!resolved) {
-          resolved = true;
+        if (!settled) {
+          settled = true;
           // Clear all pending timers
           timers.forEach(clearTimeout);
           resolve(result);
         }
       } catch (error) {
-        if (resolved) return;
+        if (settled) return;
 
         const elapsedMs = Date.now() - startTime;
 
         // If 90 seconds have passed, surface failure
         if (elapsedMs >= 90000) {
-          resolved = true;
+          settled = true;
           timers.forEach(clearTimeout);
-          resolve({
-            status: 'failed',
-            requestKey,
-          });
+          onStatus('failed', requestKey);
+          resolve({ status: 'failed', requestKey });
           return;
         }
 
@@ -89,28 +95,22 @@ export function wakingRequest(fn, options = {}) {
     // Start first attempt immediately
     executeAttempt();
 
-    // At 1200ms, if not resolved, resolve with waking status
+    // At 1200ms, signal waking but keep waiting — the real result is still delivered.
     const wakingTimeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        timers.forEach(clearTimeout);
-        resolve({
-          status: 'waking',
-          requestKey,
-        });
+      if (!settled && !wakingSignalled) {
+        wakingSignalled = true;
+        onStatus('waking', requestKey);
       }
     }, 1200);
     timers.push(wakingTimeout);
 
-    // At 90s, if not resolved, resolve with failed status
+    // At 90s, if not settled, surface failure
     const failedTimeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
+      if (!settled) {
+        settled = true;
         timers.forEach(clearTimeout);
-        resolve({
-          status: 'failed',
-          requestKey,
-        });
+        onStatus('failed', requestKey);
+        resolve({ status: 'failed', requestKey });
       }
     }, 90000);
     timers.push(failedTimeout);

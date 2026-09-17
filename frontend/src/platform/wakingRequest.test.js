@@ -19,63 +19,57 @@ describe('wakingRequest', () => {
     expect(result.status).toBeUndefined();
   });
 
-  it('surfaces waking status at 1200ms if still unresolved', async () => {
+  it('signals waking via onStatus at 1200ms but keeps the promise pending', async () => {
     vi.useFakeTimers();
 
-    let resolveAfterMs;
+    let resolveResult;
     const fn = vi.fn(
       () =>
         new Promise((resolve) => {
-          resolveAfterMs = resolve;
+          resolveResult = resolve;
         })
     );
 
+    const onStatus = vi.fn();
     const requestKey = 'test-key-2';
-    const promise = wakingRequest(fn, { requestKey });
+    const promise = wakingRequest(fn, { requestKey, onStatus });
 
-    // At 1200ms, should get waking status
+    // At 1200ms, onStatus('waking') fires but the promise is NOT settled
     vi.advanceTimersByTime(1200);
-    const statusResult = await promise;
+    expect(onStatus).toHaveBeenCalledWith('waking', requestKey);
 
-    expect(statusResult).toEqual({
-      status: 'waking',
-      requestKey,
-    });
+    // Still pending — the eventual real result must still be delivered
+    resolveResult({ success: true });
+    const result = await promise;
+    expect(result).toEqual({ success: true });
+    expect(result.status).toBeUndefined();
   });
 
-  it('retries with exponential backoff after waking', async () => {
+  it('delivers the real result after waking (not dropped)', async () => {
     vi.useFakeTimers();
 
-    let callCount = 0;
-    const fn = vi.fn(() => {
-      callCount += 1;
-      if (callCount === 1) {
-        // First call never resolves (simulate cold start)
-        return new Promise(() => {});
-      }
-      // Second call resolves after waking surfaces
-      return Promise.resolve({ success: true });
-    });
+    let resolveResult;
+    const fn = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveResult = resolve;
+        })
+    );
 
-    const requestKey = 'test-key-3';
-    const promise = wakingRequest(fn, { requestKey });
+    const onStatus = vi.fn();
+    const promise = wakingRequest(fn, { requestKey: 'test-key-3', onStatus });
 
-    // At 1200ms, should surface waking and continue retrying
     vi.advanceTimersByTime(1200);
-    const wakingResult = await promise;
-    expect(wakingResult.status).toBe('waking');
+    expect(onStatus).toHaveBeenCalledWith('waking', 'test-key-3');
 
-    // Advance to allow retry (exponential backoff starts at 1.2s)
-    // Total elapsed: 1200ms + ~1200ms = ~2400ms
-    vi.advanceTimersByTime(2000);
-
-    // If second attempt resolved, we should now have the result
-    // But since promise already resolved with waking, we get that
-    // This test shows the retry happens but waking already resolved the promise
-    expect(fn).toHaveBeenCalled();
+    // A slow cold-start response arrives after the waking banner
+    resolveResult({ data: new ArrayBuffer(8), headers: { 'content-type': 'application/pdf' } });
+    const result = await promise;
+    expect(result.data).toBeInstanceOf(ArrayBuffer);
+    expect(result.headers['content-type']).toBe('application/pdf');
   });
 
-  it('surfaces waking status first, then could surface failed later if retrying', async () => {
+  it('signals failed via onStatus and resolves {status:failed} at 90s', async () => {
     vi.useFakeTimers();
 
     const fn = vi.fn(
@@ -85,32 +79,34 @@ describe('wakingRequest', () => {
         })
     );
 
+    const onStatus = vi.fn();
     const requestKey = 'test-key-4';
-    const promise = wakingRequest(fn, { requestKey });
+    const promise = wakingRequest(fn, { requestKey, onStatus });
 
-    // Advance to 1200ms - should get waking status
     vi.advanceTimersByTime(1200);
-    const wakingResult = await promise;
-    expect(wakingResult).toEqual({
-      status: 'waking',
-      requestKey,
-    });
+    expect(onStatus).toHaveBeenCalledWith('waking', requestKey);
 
-    // The promise is now settled, so it won't emit failed
-    // This matches promise semantics: one resolution only
+    vi.advanceTimersByTime(100000);
+    const result = await promise;
+    expect(onStatus).toHaveBeenCalledWith('failed', requestKey);
+    expect(result).toEqual({ status: 'failed', requestKey });
   });
 
-  it('uses provided requestKey if given', async () => {
+  it('uses provided requestKey when reporting status', async () => {
     vi.useFakeTimers();
 
     const fn = vi.fn(() => new Promise(() => {}));
     const customKey = 'custom-request-key-5';
+    const onStatus = vi.fn();
 
-    const promise = wakingRequest(fn, { requestKey: customKey });
+    const promise = wakingRequest(fn, { requestKey: customKey, onStatus });
 
     vi.advanceTimersByTime(1200);
-    const result = await promise;
+    expect(onStatus).toHaveBeenCalledWith('waking', customKey);
 
+    vi.advanceTimersByTime(88800);
+    const result = await promise;
+    expect(result.status).toBe('failed');
     expect(result.requestKey).toBe(customKey);
   });
 
@@ -120,16 +116,17 @@ describe('wakingRequest', () => {
     const fn = vi.fn(() => new Promise(() => {}));
     const promise = wakingRequest(fn);
 
-    vi.advanceTimersByTime(1200);
+    vi.advanceTimersByTime(90000);
     const result = await promise;
 
+    expect(result.status).toBe('failed');
     // Should have a requestKey (generated UUID)
     expect(result.requestKey).toBeDefined();
     expect(typeof result.requestKey).toBe('string');
     expect(result.requestKey.length).toBe(36); // UUID v4 length
   });
 
-  it('resolves between 1200ms and 90s with the wrapped result', async () => {
+  it('resolves with the wrapped result between 1200ms and 90s (not a status)', async () => {
     vi.useFakeTimers();
 
     let resolveResult;
@@ -144,65 +141,61 @@ describe('wakingRequest', () => {
 
     // Move past waking threshold
     vi.advanceTimersByTime(1200);
-    // Should surface waking
-    let result = await Promise.race([promise, new Promise(() => {})]);
-    expect(result.status).toBe('waking');
+
+    resolveResult({ items: [1, 2, 3] });
+    const result = await promise;
+    expect(result).toEqual({ items: [1, 2, 3] });
   });
 
-  it('retries but surfaces waking at 1200ms', async () => {
+  it('retries with exponential backoff then resolves on success', async () => {
     vi.useFakeTimers();
 
     let callCount = 0;
     const fn = vi.fn(() => {
-      callCount++;
-      return Promise.reject(new Error('Cold start'));
+      callCount += 1;
+      if (callCount < 3) {
+        return Promise.reject(new Error('Cold start'));
+      }
+      return Promise.resolve({ recovered: true });
     });
 
     const promise = wakingRequest(fn, { requestKey: 'test-key-7' });
 
-    vi.advanceTimersByTime(1200);
+    // First attempt fails immediately → retry scheduled (~1.2s ±10%)
+    await vi.advanceTimersByTimeAsync(2000);
+    // Second attempt fails (retry scheduled ~2.4s ±10%)
+    await vi.advanceTimersByTimeAsync(3000);
+    // Third attempt succeeds
+    const result = await promise;
+    expect(fn).toHaveBeenCalledTimes(3);
+    expect(result).toEqual({ recovered: true });
+  });
+
+  it('resolves failed after 90s even while retrying a rejecting fn', async () => {
+    vi.useFakeTimers();
+
+    const fn = vi.fn(() => Promise.reject(new Error('Cold start')));
+
+    const onStatus = vi.fn();
+    const promise = wakingRequest(fn, { requestKey: 'test-key-8', onStatus });
+
+    vi.advanceTimersByTime(90000);
     const result = await promise;
 
-    expect(result.status).toBe('waking');
-    // Should have called fn at least once at the start
-    expect(fn).toHaveBeenCalled();
+    expect(onStatus).toHaveBeenCalledWith('failed', 'test-key-8');
+    expect(result.status).toBe('failed');
   });
 
   it('handles synchronous function that returns a promise', async () => {
     vi.useFakeTimers();
 
     const fn = () => Promise.resolve({ data: 'test' });
-    const promise = wakingRequest(fn, { requestKey: 'test-key-8' });
+    const promise = wakingRequest(fn, { requestKey: 'test-key-9' });
 
     vi.advanceTimersByTime(100);
 
     const result = await promise;
     expect(result.data).toBe('test');
-  });
-
-  it('succeeds before waking threshold if retry succeeds quickly', async () => {
-    vi.useFakeTimers();
-
-    let attemptCount = 0;
-    const fn = vi.fn(() => {
-      attemptCount += 1;
-      if (attemptCount < 2) {
-        return Promise.reject(new Error('Cold start'));
-      }
-      return Promise.resolve({ recovered: true });
-    });
-
-    const promise = wakingRequest(fn, { requestKey: 'test-key-9' });
-
-    // Retry happens quickly, within first 1200ms before waking
-    // With exponential backoff, first retry at 1200ms, so this is still in the "before waking" window
-    // Actually, with default 1200ms backoff, retry happens right at 1200ms
-    // Let's advance slightly less to show it could resolve before waking
-    vi.advanceTimersByTime(600);
-
-    // Manually trigger retry (in real scenario with actual promises/timers)
-    // For this test, just verify the function is called and can recover
-    expect(fn).toHaveBeenCalled();
   });
 
   it('throws TypeError if fn is not a function', () => {

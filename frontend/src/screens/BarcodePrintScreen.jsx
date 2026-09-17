@@ -53,7 +53,9 @@ export function BarcodePrintScreen() {
     }
 
     try {
-      // Wrap the API call with wakingRequest for cold-start retry logic
+      // Wrap the API call with wakingRequest for cold-start retry logic.
+      // Waking is signalled via onStatus; the promise resolves with the real
+      // response (the generated PDF) once the backend is up, so nothing is lost.
       const result = await wakingRequest(
         async () => {
           const response = await apiClient.get(BARCODE_ROUTES.GENERATE, {
@@ -65,16 +67,19 @@ export function BarcodePrintScreen() {
           });
           return response;
         },
-        { requestKey }
+        {
+          requestKey,
+          onStatus: (s) => {
+            if (s === 'waking') {
+              setStatus('waking');
+            } else if (s === 'failed') {
+              setStatus('failed');
+            }
+          },
+        }
       );
 
-      // Check if wakingRequest returned a status (waking or failed)
-      if (result.status === 'waking') {
-        setStatus('waking');
-        // Keep isLoading true to prevent double-submit during waking state
-        return;
-      }
-
+      // A timed-out request resolves as a failed status
       if (result.status === 'failed') {
         setStatus('failed');
         // Keep isLoading true to prevent re-submission; clear on retry

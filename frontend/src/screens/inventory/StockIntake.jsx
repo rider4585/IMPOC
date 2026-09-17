@@ -260,9 +260,23 @@ export function StockIntake() {
       });
 
     try {
-      const result = await wakingRequest(doSave, { requestKey });
-      if (result?.status === 'waking') {
-        setWaking(true);
+      const result = await wakingRequest(doSave, {
+        requestKey,
+        // Waking stays pending; the promise resolves only with the save result
+        // (or a timed-out failed status), never as "waking".
+        onStatus: (s) => {
+          if (s === 'waking') setWaking(true);
+        },
+      });
+
+      // 90s timeout — we can't tell whether the unit was saved, so keep the
+      // decoded barcode + picks and let the operator verify/retry.
+      if (result?.status === 'failed') {
+        setSaveError('The request timed out. The unit may have been saved — check the count and retry if needed.');
+        setState(STATES.DECODED);
+        setWaking(false);
+        try { navigator.vibrate?.([100, 50, 100]); } catch {}
+        return;
       }
       // Refresh stock data to get updated count
       const updated = await refreshStock();

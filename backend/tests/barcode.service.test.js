@@ -58,14 +58,14 @@ const seedBarcodeGeometry = async () => {
 /**
  * Regression coverage for the transaction-wiring fix in barcode.service.js:
  * User.findOne(...) must receive `transaction` inside its single options
- * object — the same way RequestKey.create(...) and the raw nextval() query
- * do — rather than as a second, silently-ignored positional argument.
+ * object — the same way the raw nextval() query does — rather than as a
+ * second, silently-ignored positional argument.
  *
  * Sequelize's Model.findOne(options) only ever reads one argument. Passing
  * `User.findOne({ where, attributes }, { transaction })` compiles and runs
  * without error, but the lookup executes on a connection outside the
  * gesture's transaction, breaking the "all gesture work commits or rolls
- * back together" guarantee from the request_keys design (see
+ * back together" guarantee (see
  * spec-1-4-create-request-keys-table-and-idempotency-helper.md, Design
  * Notes: "Transaction ordering (critical)"). No prior test caught this: the
  * concurrency test in barcode.idempotency.test.js never calls the real
@@ -74,9 +74,11 @@ const seedBarcodeGeometry = async () => {
  *
  * These tests spy on the real Sequelize calls (letting them run against the
  * test database) and assert the transaction instance is identical across
- * User.findOne, RequestKey.create, and — for generateBarcodes — the nextval
- * draw. If the fix is reverted, findOneOptions.transaction is undefined and
- * the `.toBe(transaction)` assertions fail.
+ * User.findOne and — for generateBarcodes — the nextval draw. They also pin
+ * R-64: barcode generation no longer writes a request_keys row at all, so
+ * RequestKey.create must never be called. If the fix is reverted,
+ * findOneOptions.transaction is undefined and the `.toBe(transaction)`
+ * assertions fail.
  */
 describe('barcode.service — gesture transaction wiring', () => {
     let testUser;
@@ -103,15 +105,15 @@ describe('barcode.service — gesture transaction wiring', () => {
         await sequelize.close();
     });
 
-    it('generateBarcodes: User.findOne, the nextval draw, and RequestKey.create all run inside the same transaction', async () => {
+    it('generateBarcodes: User.findOne and the nextval draw run in the same transaction; no request_keys write (R-64)', async () => {
         const findOneSpy = jest.spyOn(User, 'findOne');
         const createSpy = jest.spyOn(RequestKey, 'create');
         const querySpy = jest.spyOn(sequelize, 'query');
 
-        await generateBarcodes(1, uuidv4(), testUser.uuid);
+        const result = await generateBarcodes(1, uuidv4(), testUser.uuid);
 
         expect(findOneSpy).toHaveBeenCalledTimes(1);
-        expect(createSpy).toHaveBeenCalledTimes(1);
+        expect(createSpy).not.toHaveBeenCalled();
 
         // User.findOne must be called with a single options object carrying
         // `transaction` — not a second positional argument (which Sequelize
@@ -119,9 +121,7 @@ describe('barcode.service — gesture transaction wiring', () => {
         const findOneCall = findOneSpy.mock.calls[0];
         expect(findOneCall).toHaveLength(1);
         const findOneOptions = findOneCall[0];
-
-        const createOptions = createSpy.mock.calls[0][1];
-        const transaction = createOptions.transaction;
+        const transaction = findOneOptions.transaction;
 
         const nextvalCall = querySpy.mock.calls.find(
             (call) => typeof call[0] === 'string' && call[0].includes('nextval')
@@ -132,26 +132,29 @@ describe('barcode.service — gesture transaction wiring', () => {
         expect(transaction).toBeDefined();
         expect(findOneOptions.transaction).toBe(transaction);
         expect(nextvalOptions.transaction).toBe(transaction);
+
+        // Always a fresh PDF — no resultUuid marker (R-64).
+        expect(result).toHaveProperty('pdfBuffer');
+        expect(result).not.toHaveProperty('resultUuid');
     });
 
-    it('generateBarcodeTestSheet: User.findOne and RequestKey.create run inside the same transaction', async () => {
+    it('generateBarcodeTestSheet: User.findOne runs inside the transaction; no request_keys write (R-64)', async () => {
         const findOneSpy = jest.spyOn(User, 'findOne');
         const createSpy = jest.spyOn(RequestKey, 'create');
 
-        await generateBarcodeTestSheet(uuidv4(), testUser.uuid);
+        const result = await generateBarcodeTestSheet(uuidv4(), testUser.uuid);
 
         expect(findOneSpy).toHaveBeenCalledTimes(1);
-        expect(createSpy).toHaveBeenCalledTimes(1);
+        expect(createSpy).not.toHaveBeenCalled();
 
         const findOneCall = findOneSpy.mock.calls[0];
         expect(findOneCall).toHaveLength(1);
         const findOneOptions = findOneCall[0];
 
-        const createOptions = createSpy.mock.calls[0][1];
-        const transaction = createOptions.transaction;
+        expect(findOneOptions.transaction).toBeDefined();
 
-        expect(transaction).toBeDefined();
-        expect(findOneOptions.transaction).toBe(transaction);
+        expect(result).toHaveProperty('pdfBuffer');
+        expect(result).not.toHaveProperty('resultUuid');
     });
 
     it('pg pool config: money column (INT app_setting) reads from database as JavaScript number, not string', async () => {

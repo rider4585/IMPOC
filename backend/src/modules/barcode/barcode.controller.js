@@ -9,9 +9,6 @@ import {
     generateBarcodeTestSheetSchema,
 } from './barcode.validation.js';
 
-import { lookup } from '../idempotency/idempotency.service.js';
-import { GESTURE_TYPES } from '../../constants/gesture-type.js';
-
 export const generateBarcodePdf = async (req, res, next) => {
     try {
         // Validate request including requestUuid
@@ -20,63 +17,13 @@ export const generateBarcodePdf = async (req, res, next) => {
             requestUuid: req.query.requestUuid,
         });
 
-        // Check if this request was already processed (replay scenario)
-        const replay = await lookup(
-            GESTURE_TYPES.BARCODE_GENERATE,
-            validatedData.requestUuid
+        // Always stream a fresh PDF — a repeated requestUuid must never
+        // replay a cached result (R-64).
+        const { pdfBuffer } = await generateBarcodes(
+            validatedData.pages,
+            validatedData.requestUuid,
+            req.auth.userUuid
         );
-
-        if (replay.found) {
-            // Guard: result_uuid must be present
-            if (!replay.result_uuid) {
-                const error = new Error('Cached result UUID is missing');
-                error.statusCode = 500;
-                throw error;
-            }
-            // Return cached result
-            return res.status(200).json({
-                success: true,
-                message: 'Barcode PDF generated (cached result)',
-                data: {
-                    resultUuid: replay.result_uuid,
-                },
-            });
-        }
-
-        // First attempt: generate barcodes with idempotency tracking
-        let result;
-        try {
-            result = await generateBarcodes(
-                validatedData.pages,
-                validatedData.requestUuid,
-                req.auth.userUuid
-            );
-        } catch (error) {
-            if (error.name === 'SequelizeUniqueConstraintError') {
-                const replay = await lookup(
-                    GESTURE_TYPES.BARCODE_GENERATE,
-                    validatedData.requestUuid
-                );
-                if (replay.found) {
-                    // Guard: result_uuid must be present
-                    if (!replay.result_uuid) {
-                        const guardError = new Error('Cached result UUID is missing');
-                        guardError.statusCode = 500;
-                        throw guardError;
-                    }
-                    return res.status(200).json({
-                        success: true,
-                        message: 'Barcode PDF generated (cached result)',
-                        data: {
-                            resultUuid: replay.result_uuid,
-                        },
-                    });
-                }
-            }
-            throw error;
-        }
-
-        const { pdfBuffer, resultUuid } = result;
 
         // Guard: pdfBuffer must be present
         if (!pdfBuffer) {
@@ -109,62 +56,12 @@ export const generateBarcodeTestSheetPdf = async (
             requestUuid: req.query.requestUuid,
         });
 
-        // Check if this request was already processed (replay scenario)
-        const replay = await lookup(
-            GESTURE_TYPES.BARCODE_GENERATE_TEST,
-            validatedData.requestUuid
+        // Always stream a fresh PDF — a repeated requestUuid must never
+        // replay a cached result (R-64).
+        const { pdfBuffer } = await generateBarcodeTestSheet(
+            validatedData.requestUuid,
+            req.auth.userUuid
         );
-
-        if (replay.found) {
-            // Guard: result_uuid must be present
-            if (!replay.result_uuid) {
-                const error = new Error('Cached result UUID is missing');
-                error.statusCode = 500;
-                throw error;
-            }
-            // Return cached result
-            return res.status(200).json({
-                success: true,
-                message: 'Barcode test sheet PDF generated (cached result)',
-                data: {
-                    resultUuid: replay.result_uuid,
-                },
-            });
-        }
-
-        // First attempt: generate test sheet with idempotency tracking
-        let result;
-        try {
-            result = await generateBarcodeTestSheet(
-                validatedData.requestUuid,
-                req.auth.userUuid
-            );
-        } catch (error) {
-            if (error.name === 'SequelizeUniqueConstraintError') {
-                const replay = await lookup(
-                    GESTURE_TYPES.BARCODE_GENERATE_TEST,
-                    validatedData.requestUuid
-                );
-                if (replay.found) {
-                    // Guard: result_uuid must be present
-                    if (!replay.result_uuid) {
-                        const guardError = new Error('Cached result UUID is missing');
-                        guardError.statusCode = 500;
-                        throw guardError;
-                    }
-                    return res.status(200).json({
-                        success: true,
-                        message: 'Barcode test sheet PDF generated (cached result)',
-                        data: {
-                            resultUuid: replay.result_uuid,
-                        },
-                    });
-                }
-            }
-            throw error;
-        }
-
-        const { pdfBuffer } = result;
 
         // Guard: pdfBuffer must be present
         if (!pdfBuffer) {
