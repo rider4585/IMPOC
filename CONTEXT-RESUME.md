@@ -1,6 +1,6 @@
 # CONTEXT-RESUME.md — Handoff for Other AI Tools
 
-**Last updated:** 2026-09-16
+**Last updated:** 2026-09-17
 **Branch:** `context` (all planning docs live here; clean code goes to `main`)
 
 ---
@@ -15,9 +15,13 @@
 
 ---
 
-## What Happened in the Last Sessions (2026-09-16)
+## What Happened in the Last Sessions (2026-09-17)
 
 ### Completed
+- **R-64 barcode PDF always fresh** — removed the `request_keys` idempotency replay so `GET /api/barcodes/generate` never returns a cached JSON marker on cold start (the "Waking the system up" lockout). Backend `barcode.service.js`/`barcode.controller.js` + frontend `wakingRequest.js` + unit/integration tests. Shipped both branches (`context` bcb1740, `main` 172e0b6). No migrations.
+- **Single canonical `context/tasks.json`** — consolidated the split (99 cards + `context/tasks-archive.json`) into ONE file: **165 tasks (150 done / 1 doing R-60 / 1 blocked R-52 / 15 todo R-62 family)**; archive removed. Commit b5439de. `hive/tasks.json` kept in sync. Never overwrite `context/tasks.json` from a stale/truncated copy — patch it in place.
+
+### Completed (2026-09-16)
 - **R-47 receipt-template rework** (user re-scope) — shipped to `context` and cherry-picked to `main` (clean code only). Recaps:
   - Only **2 templates** (Sale/Rental), creation removed from backend + frontend.
   - Each save = **new version** row (draft, `max+1`); the published version stays live; **Publish** (`POST /:uuid/activate`) marks a version active.
@@ -37,9 +41,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Done (tasks) | 149 |
-| Doing | 0 |
-| Blocked | 0 |
+| Done (tasks) | 150 |
+| Doing | 1 (R-60, awaiting laptop run) |
+| Blocked | 1 (R-52, parked to ~2026-10-13) |
 | Todo | 15 (R-62 + a–n, all parked by user) |
 | Tests | jest 806/806, vitest 436/436 |
 
