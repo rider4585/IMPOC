@@ -11,6 +11,8 @@ Scripts live in [`deploy/windows/`](../deploy/windows/):
 | `setup.cmd` / `setup.ps1` | One-time install. Right-click → *Run as administrator*. Safe to re-run. |
 | `update.cmd` / `update.ps1` | Pull from GitHub, install, migrate, rebuild, restart. Double-click whenever there is a new version. |
 | `start.cmd` / `start.ps1` | Brings everything up: PostgreSQL → pm2 → opens the app in a browser window. Runs at every login (setup puts a shortcut in the Startup folder). Double-click it if the app ever looks down. `start.cmd --no-browser` starts the services only. |
+| `setup-backup-local.cmd` | Set up / update the **local** backups only (no full setup). Ask for two times, default 14:00, 21:00. Safe to re-run. |
+| `setup-backup-cloud.cmd` | Set up / update the **cloud** backups only (rclone → Google Drive, encrypted). Needs a one-time Google sign-in. Safe to re-run. |
 
 ---
 
@@ -64,6 +66,8 @@ Then it does all of this on its own:
 6. Installs **pm2**, starts the `impoc` process from `backend/ecosystem.config.cjs`, `pm2 save`.
 7. Opens Windows Firewall TCP 3000 (Private networks).
 8. Puts an **IMPOC** shortcut to `start.cmd` in the Startup folder.
+9. Creates `C:\IMPOC-backups`, registers the two daily **local** backup tasks and the every-logon **catch-up** task, and takes the first verified backup.
+10. Installs rclone, signs in to Google Drive once, registers the two daily **cloud** backup tasks, and uploads the first encrypted copy (skip with `setup.ps1 -SkipCloud`).
 
 When it finishes it prints the URLs and the login (`admin` / the password you typed).
 **Change the admin password inside the app after first login.**
@@ -114,22 +118,43 @@ Every run is logged to `backend\logs\update.log`. Options: `update.ps1 -Branch m
 
 Set up automatically by `setup.cmd` (steps 9–10). Everything lives in **`C:\IMPOC-backups\`** — outside the code folder, so updates never touch it.
 
-### Local — twice a day, automatic
-Two Windows scheduled tasks, **IMPOC database backup 1 / 2**, run at the times you gave during setup (24h, e.g. `13:00,18:00`). Each run:
-1. `pg_dump` the database (compressed) → `local\impoc-YYYY-MM-DD_HHmm.dump`
-2. checks the file with `pg_restore --list` — a bad dump is thrown away, never kept
-3. deletes local dumps older than 14 days
-4. writes `last-status.json` + `logs\backup-YYYY-MM.log`
+Two kinds, both automatic and scheduled:
 
-The app keeps running; sales are not interrupted. If the laptop was off at the scheduled time, the backup runs at the next boot. Take one by hand any time: double-click `deploy\windows\backup-local.cmd`. To change the times, re-run `setup.cmd` (or `setup.ps1 -BackupTimes 12:30,19:00`).
+| | Local | Cloud |
+|---|---|---|
+| What | a `pg_dump` of the database on this laptop | an encrypted copy on the shop's Google Drive (via rclone) |
+| When | 14:00 and 21:00 daily | 14:00 and 21:00 daily |
+| Tasks | **IMPOC local backup 1 / 2** | **IMPOC cloud backup 1 / 2** |
+| Retention | 14 days | 90 days |
 
-### Cloud — Google Drive, manual, encrypted
-Double-click **`deploy\windows\backup-cloud.cmd`** whenever you want an off-site copy (once a day at closing is a good habit). It takes a fresh verified backup and uploads it with **rclone** to Google Drive as
-`IMPOC-backups / 2026 / 09 / 14 / impoc-2026-09-14_1830.dump` (date-wise folders), plus `backend\.env` under `config/`. Cloud copies older than 90 days are removed.
+### How a run works
+Each scheduled task calls `backup-local.ps1` / `backup-cloud.ps1` with its slot time (`-SlotTime HH:mm`). A backup counts for a slot only when it finished **after** that slot (checked against `last-status.json`); if the slot is already covered, the run logs "skipped" and stops instead of making a duplicate. Every run appends to `logs\backup-YYYY-MM.log` and updates `C:\IMPOC-backups\last-status.json`.
 
-Files are **encrypted on the laptop before upload** — Google only sees scrambled names and contents. The encryption password + salt were shown once during setup and written to `C:\IMPOC-backups\CLOUD-BACKUP-PASSWORD-SAVE-ME.txt`: **save them in your password manager and delete that file.** Without them the cloud backups cannot be read on another computer.
+- **Local:** `pg_dump` (compressed) → `local\impoc-YYYY-MM-DD_HHmm.dump`, verified with `pg_restore --list` (a bad dump is thrown away), old local dumps deleted after 14 days.
+- **Cloud:** takes a fresh verified backup, uploads it with rclone to the **encrypted** remote `gdrive-crypt` as `IMPOC-backups / 2026 / 09 / 14 / impoc-2026-09-14_1830.dump` (date-wise folders, plus `backend\.env` under `config/`), confirms the file on the remote (`--checksum`), removes cloud copies older than 90 days.
 
-Health at a glance: `C:\IMPOC-backups\last-status.json` shows the last local and cloud result and time.
+### Missed a run (laptop was off)?
+A 10‑minute per-kind lock (`local.lock` / `cloud.lock` in `C:\IMPOC-backups`) stops two runs from dumping at the same moment, and the **IMPOC backup catch-up** task runs **at every login**: it reads `last-status.json` and immediately re-runs any slot that has already passed without a backup. So if the laptop was off at 14:00 and 21:00, the first person to sign in triggers both backups right away. (If only the cloud part is not configured yet, it logs a warning and skips just the cloud; the local backup still runs.)
+
+### Take a backup by hand
+Double-click `deploy\windows\backup-local.cmd` (local) or `deploy\windows\backup-cloud.cmd` (cloud) any time — they ignore the slot logic and just run.
+
+### Set up backups *without* re-running the full setup
+Already ran `setup.cmd` once? To (re)configure the backups alone:
+
+1. `deploy\windows\setup-backup-local.cmd` — asks the two times, registers the local tasks + the catch-up task, and takes the first verified backup.
+2. `deploy\windows\setup-backup-cloud.cmd` — configures rclone + Google Drive (one-time sign-in), registers the cloud tasks, and uploads the first encrypted copy.
+
+Both are idempotent and safe to re-run; they never touch the app.
+
+### Change the times
+Re-run `setup-backup-local.cmd` (asks, or `setup-backup-local.ps1 -BackupTimes '09:30,20:00'`) and then `setup-backup-cloud.cmd`. The full `setup.cmd`/`setup.ps1 -BackupTimes ...` does the same for both at once. The single source of truth for the slots is `deploy\windows\lib\backup-common.ps1` (`$script:BackupSlotTimes`, default `14:00,21:00`); the catch-up uses it too.
+
+### Encryption
+Cloud files are **encrypted on the laptop before upload** — Google only sees scrambled names and contents. The encryption password + salt were shown once during setup and written to `C:\IMPOC-backups\CLOUD-BACKUP-PASSWORD-SAVE-ME.txt`: **save them in your password manager and delete that file.** Without them the cloud backups cannot be read on another computer.
+
+### Verify health
+`C:\IMPOC-backups\last-status.json` shows the last local and cloud result and time; `logs\backup-YYYY-MM.log` lists every run.
 
 **If the cloud upload starts failing with a token / login error** (Google logins expire every few months): open PowerShell and run `rclone config reconnect gdrive:` — sign in again, done.
 
