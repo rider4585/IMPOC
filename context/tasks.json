@@ -2610,7 +2610,7 @@
     {
       "id": "R-66",
       "title": "Hide buying-templates UI (frontend only, reversible) — R-52 interim",
-      "status": "doing",
+      "status": "done",
       "priority": "medium",
       "assignee": "worker-r66-hide-templates-ui",
       "origin": "user (2026-09-18)",
@@ -2618,13 +2618,17 @@
         "R-52"
       ],
       "createdAt": "2026-09-18T03:55:00.000Z",
-      "details": "User: 'for now remove the template option UI only, keep the functionality just hide it from frontend.' Pre-agreed scope from R-52 humanQA option 1 (reversible, ~1h). Remove: /trips/:tripUuid/templates route in App.jsx; the Apply-template picker, 'No buying templates saved' note and 'Manage buying templates' button in StockForm.jsx (+ their fetch/state/imports); the 2 stockForm.test.jsx tests for removed UI. KEEP (restore later): TemplateForm.jsx, templatesApi.js, TEMPLATE_ROUTES, backend module + routes, stock_templates table + data. Backend untouched. Final R-52 fate decision still pending ~mid-Oct.\nSHIPPED but NOT DONE (2026-09-18): code on context 4ba5b78 + main 634d87e (ffc8a6c), vitest 434/434 + build clean in clean repo. Awaiting user verification before marking done. Reversible: TemplateForm.jsx/templatesApi.js/TEMPLATE_ROUTES/backend/table intact.",
+      "details": "User: 'for now remove the template option UI only, keep the functionality just hide it from frontend.' Pre-agreed scope from R-52 humanQA option 1 (reversible, ~1h). Remove: /trips/:tripUuid/templates route in App.jsx; the Apply-template picker, 'No buying templates saved' note and 'Manage buying templates' button in StockForm.jsx (+ their fetch/state/imports); the 2 stockForm.test.jsx tests for removed UI. KEEP (restore later): TemplateForm.jsx, templatesApi.js, TEMPLATE_ROUTES, backend module + routes, stock_templates table + data. Backend untouched. Final R-52 fate decision still pending ~mid-Oct.\nDONE 2026-09-18 (user sign-off): code on context 4ba5b78 + main 634d87e (ffc8a6c), vitest 434/434 + build clean. Frontend-only, reversible — TemplateForm.jsx/templatesApi.js/TEMPLATE_ROUTES/backend/table intact.",
       "humanQA": [
         {
           "q": "**Please check the shop app on your side — the buying templates UI is now hidden** (no more \"Pre-fill from a buying template\" / \"Manage buying templates\" on the stock form; the /trips/:tripUuid/templates page no longer opens).\n\nI will mark R-66 **done** only after you confirm it looks right. Functionality is fully intact and reversible — backend, data, `TemplateForm.jsx`, `templatesApi.js` all kept.",
-          "askedAt": "2026-09-18T03:50:00.000Z"
+          "askedAt": "2026-09-18T03:50:00.000Z",
+          "a": "Confirmed done by the user in-session (2026-09-18): \"you can mark the R-66 as done\".",
+          "answeredAt": "2026-09-18T04:10:00.000Z"
         }
-      ]
+      ],
+      "completedAt": "2026-09-18T04:10:00.000Z",
+      "doneBy": "worker-r66-hide-templates-ui"
     }
   ]
 }

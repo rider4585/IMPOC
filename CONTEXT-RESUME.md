@@ -17,8 +17,8 @@
 
 ## What Happened in the Last Sessions (2026-09-18)
 
-### Shipped — awaiting user verification (NOT done)
-- **R-66 hide Buying templates UI** (R-52 interim, user: "for now remove the template option UI only, keep the functionality just hide it from frontend"). Frontend-only + reversible: removed the `/trips/:tripUuid/templates` route + `TemplateForm` import in `App.jsx`; removed the *Pre-fill from a buying template* picker / *No buying templates saved* note / *Manage buying templates* button + their state/fetch/handler in `StockForm.jsx`; dropped the 2 StockForm tests for that UI. Kept for restore: `TemplateForm.jsx`, `templatesApi.js`, `TEMPLATE_ROUTES`, the backend module, `stock_templates` table + data. Verified vitest 434/434 (node v20.19.6) + `vite build` clean. On `context` 4ba5b78 + `main` 634d87e. **R-66 card = doing with humanQA — mark done only after the user confirms the templates option is gone from the UI.** R-52 stays blocked until ~mid-Oct fate decision.
+### Completed (user sign-off)
+- **R-66 hide Buying templates UI** (R-52 interim, user: "for now remove the template option UI only, keep the functionality just hide it from frontend"). Frontend-only + reversible: removed the `/trips/:tripUuid/templates` route + `TemplateForm` import in `App.jsx`; removed the *Pre-fill from a buying template* picker / *No buying templates saved* note / *Manage buying templates* button + their state/fetch/handler in `StockForm.jsx`; dropped the 2 StockForm tests for that UI. Kept for restore: `TemplateForm.jsx`, `templatesApi.js`, `TEMPLATE_ROUTES`, the backend module, `stock_templates` table + data. Verified vitest 434/434 (node v20.19.6) + `vite build` clean. On `context` 4ba5b78 + `main` 634d87e. **Done 2026-09-18 by user sign-off.** R-52 stays blocked until ~mid-Oct fate decision.
 
 ### Completed (2026-09-17)
 - **R-60 durable backups (user sign-off; laptop run still to do)** — `pg_dump` twice daily at 14:00 + 21:00 (local + encrypted Google Drive via rclone), log-driven catch-up at next power-on, first backup during setup. Already-setup laptop: run `setup-backup-local.cmd` then `setup-backup-cloud.cmd` as admin (elevated PowerShell). Commit `9f2aa17`; see `docs/WINDOWS_PRODUCTION_SETUP.md` §8.
@@ -46,14 +46,14 @@
 
 | Metric | Value |
 |--------|-------|
-| Done (tasks) | 150 |
-| Doing | 1 (R-66, shipped FE-only — awaiting user verification) |
+| Done (tasks) | 151 |
+| Doing | 0 |
 | Blocked | 1 (R-52, parked to ~2026-10-13) |
 | Todo | 15 (R-62 + a–n, all parked by user) |
 | Tests | jest 806/806, vitest 434/434 (was 436; −2 for the removed StockForm template-picker tests) |
 
 ### Notable Passive Items
-- **R-66** (shipped, **awaiting user OK to mark done**): Buying templates UI hidden (FE only, reversible). Verify in the app: no more *Pre-fill from a buying template* / *Manage buying templates* on the stock form.
+- **R-66** (done, user sign-off 2026-09-18): Buying templates UI hidden (FE only, reversible — `TemplateForm.jsx`/`templatesApi.js`/backend/table intact for a later keep/restore decision).
 - **R-60** (done by user sign-off, **laptop run still to do**): durable backups — `pg_dump` twice daily 14:00+21:00, log-driven catch-up, local + encrypted cloud. `docs/WINDOWS_PRODUCTION_SETUP.md` §8.
 - **R-52** (blocked, revisit ~2026-10-13): Buy/templates module — Hide/Remove/Keep decision after production use (interim = R-66 hide).
 - **R-62 + a–n** (todo, **parked**): Customer Communication & Campaign platform. User: "dont start any work on R-62 tasks". Do not dispatch until user says go. Phase 1 = email (Brevo SMTP) + WhatsApp `wa.me` hand-off; no public URL.
@@ -62,10 +62,10 @@
 
 ## What to Do Next
 
-1. **R-66** — the user verifies the Buying templates UI is gone from the shop app; on their OK, flip the card to done (+ CONTEXT.md).
-2. **R-47 follow-ups** (only if the user raises them): visual diff vs physical receipt → tweak seed HTML; add a real `<img>` in the template editor once the shop has the artwork (replace the `.receipt-image-slot` div).
-3. **R-62** — awaiting user go + mailbox decision. NOT to be started before that.
-4. **R-60** — user runs `setup-backup-local.cmd` + `setup-backup-cloud.cmd` on the shop laptop.
+1. **R-47 follow-ups** (only if the user raises them): visual diff vs physical receipt → tweak seed HTML; add a real `<img>` in the template editor once the shop has the artwork (replace the `.receipt-image-slot` div).
+2. **R-62** — awaiting user go + mailbox decision. NOT to be started before that.
+3. **R-60** — user runs `setup-backup-local.cmd` + `setup-backup-cloud.cmd` on the shop laptop.
+4. **R-52** — revisit ~2026-10-13: keep or fully remove the Buying templates module (interim R-66 hide).
 
 ---
 

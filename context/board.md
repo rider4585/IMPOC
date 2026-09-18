@@ -40,7 +40,7 @@
   - **R-62m** — LATER: PDF receipt attachment on invoice email (pdfkit already a dependency)
   - **R-62n** — LATER: public receipt page /r/:token + Cloudflare tunnel from the shop laptop
 
-### DONE (150)
+### DONE (151)
 **Foundation (T-series, 16):** T-00 Auth fix, T-01 Gitignore, T-02 Seed, T-03 Admin UI, T-05 Ops UI, T-06 Units backend, T-07 Service UI, T-08 Sales backend, T-09 Dashboard UI, T-10 Rentals backend, T-11 Receipt UI, T-12 Expenses backend, T-13 Reports backend, T-15 Dashboard frontend, T-16 Final QA.
 
 **Security (SEC-*, 28):** SEC-CR-1..3 (money TOCTOU/role privesc/JWT forgery), SEC-H-1..10 (rate-limit/PII/IDOR/localStorage), SEC-M-3..9 (idempotency/scoping/validation/delivery), SEC-L-1..8 (timing/creds/error-masking).
@@ -49,8 +49,8 @@
 
 **UI/UX (R-26, 25 cards):** UX-CR-1..3, UX-H-1..8, UX-M-1..10, UX-L-1..4.
 
-**Feature cards (R-24, R-30..R-48, R-51, R-53..R-65, 75):**
-R-24 Security umbrella, R-30 POS price edit, R-32 DB views/matviews, R-31 requestUuid frontend, R-33 Expense picklist, R-34 Collapsible nav, R-35 UPI QR + R-35a..f, R-36 Modal polish, R-37 DataGrid, R-38 Scrollbar, R-39 Sidebar rail, R-40 Nav rail toggle, R-41 Barcode scanner, R-42 Display polish + R-42a..d, R-43 Intake scan, R-44 Mobile responsiveness, R-45 Receipt redesign, R-47 Receipt template versioning + builder (R-47 rework, 2026-09-16), R-48 Barcode SHREE prefix, R-49 Print labels toast, R-50 Label configurator, R-51 GST on purchases, R-53 Digital pet, R-54 Review QR, R-55 Vendor bill photo, R-56 Sheet configurator, R-57 Inline colour/size, R-58 Theme drawer, R-59 Units scan, R-61 Scanner zoom, R-63 Customer enquiries, R-64 Barcode PDF always fresh (2026-09-16/17), R-65 Enquiry close — WhatsApp-only composer + delivery_logs ENQUIRY CHECK fix (2026-09-17, god).
+**Feature cards (R-24, R-30..R-48, R-51, R-53..R-66, 76):**
+R-24 Security umbrella, R-30 POS price edit, R-32 DB views/matviews, R-31 requestUuid frontend, R-33 Expense picklist, R-34 Collapsible nav, R-35 UPI QR + R-35a..f, R-36 Modal polish, R-37 DataGrid, R-38 Scrollbar, R-39 Sidebar rail, R-40 Nav rail toggle, R-41 Barcode scanner, R-42 Display polish + R-42a..d, R-43 Intake scan, R-44 Mobile responsiveness, R-45 Receipt redesign, R-47 Receipt template versioning + builder (R-47 rework, 2026-09-16), R-48 Barcode SHREE prefix, R-49 Print labels toast, R-50 Label configurator, R-51 GST on purchases, R-53 Digital pet, R-54 Review QR, R-55 Vendor bill photo, R-56 Sheet configurator, R-57 Inline colour/size, R-58 Theme drawer, R-59 Units scan, R-61 Scanner zoom, R-63 Customer enquiries, R-64 Barcode PDF always fresh (2026-09-16/17), R-65 Enquiry close — WhatsApp-only composer + delivery_logs ENQUIRY CHECK fix (2026-09-17, god), R-66 Hide buying templates UI, FE only + reversible (2026-09-18).
 
 ---
 
@@ -1248,3 +1248,9 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
 - KEPT intact for restore: TemplateForm.jsx, services/templatesApi.js, TEMPLATE_ROUTES, backend module, stock_templates table + data. Receipt Templates (R-47) untouched (different feature).
 - Verified in clean repo (node v20.19.6): vitest 434/434 (46 files), vite build clean. Routes: context 4ba5b78, main 634d87e (frontend identical on both → clean cherry-picks, pushed).
 - STATUS: R-66 = DOING + humanQA (user to verify the templates UI is gone; god marks done only after user sign-off). Board: 150 done / R-66 doing / R-52 blocked / R-62 family 15 todo parked. Awaits the user's confirmation.
+
+
+# SHIFT CLOSE #14 (2026-09-18, god)
+- **R-66 done (user sign-off)**: user confirmed "you can mark the R-66 as done" after verifying the shop app. R-66 (hide Buying templates UI, FE only + reversible) was shipped earlier today on context 4ba5b78 + main 634d87e (worker commit ffc8a6c), vitest 434/434 + build clean. Reversible: TemplateForm.jsx/templatesApi.js/TEMPLATE_ROUTES/backend/table intact.
+- tasks.json: 167 cards, **151 done** / 0 doing / R-52 blocked / 15 todo R-62 family parked. CONTEXT.md refreshed to 151 done + R-66 moved into done; CONTEXT-RESUME metrics updated.
+- Everything pushed: main (code 634d87e, since earlier) + origin/context (docs + code). Hive copies in lockstep. Board accurate, safe to close.
