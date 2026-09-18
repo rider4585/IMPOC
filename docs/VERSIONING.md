@@ -112,8 +112,14 @@ files) get **no bump and no tag** — they never reach the laptop as code.
 - One release per tag. From the tag `vX.Y.Z`, title `vX.Y.Z`.
 - Release notes: list the shipped tickets + 2–5 bullet "what changed" lines written for the
   shop owner (features and fixes in plain language, not ticket jargon).
-- Create it with `gh` when authenticated (`gh release create vX.Y.Z tag... --notes-file ...`)
-  or draft it in the GitHub web UI. God drafts; the user publishes / decides timing.
+- Create it with `gh` when authenticated (`gh release create vX.Y.Z ... --notes-file ...`) or
+  draft it in the GitHub web UI. God drafts; the user publishes / decides timing.
+- **No `gh` on this host yet** — a working CLI path: the GitHub token is in the macOS
+  keychain (`security find-internet-password -s github.com -w`). Create the release with a
+  POST to `https://api.github.com/repos/rider4585/IMPOC/releases` carrying
+  `Authorization: token <that token>` and a JSON payload `{tag_name, name, body, draft}`
+  (curl). Never echo the token; unset it right after. This is how v1.0.0 was released
+  (2026-09-18). Alternatively install `gh` (`brew install gh`) + `gh auth login`.
 
 ---
 
