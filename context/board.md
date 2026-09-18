@@ -1254,3 +1254,11 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
 - **R-66 done (user sign-off)**: user confirmed "you can mark the R-66 as done" after verifying the shop app. R-66 (hide Buying templates UI, FE only + reversible) was shipped earlier today on context 4ba5b78 + main 634d87e (worker commit ffc8a6c), vitest 434/434 + build clean. Reversible: TemplateForm.jsx/templatesApi.js/TEMPLATE_ROUTES/backend/table intact.
 - tasks.json: 167 cards, **151 done** / 0 doing / R-52 blocked / 15 todo R-62 family parked. CONTEXT.md refreshed to 151 done + R-66 moved into done; CONTEXT-RESUME metrics updated.
 - Everything pushed: main (code 634d87e, since earlier) + origin/context (docs + code). Hive copies in lockstep. Board accurate, safe to close.
+
+
+# SHIFT NOTE (2026-09-18, god) — SemVer versioning BASELINE v1.0.0
+- USER: "we are going to start versioning our IMPOC ... create a rule of how we are going to use semantic versioning ... we will also tag the commits and also create releases once in a while on github if there is a major improvement ... make a doc so whenever we start with new agents they should refer it."
+- Created `docs/VERSIONING.md` (on BOTH main + context): bump matrix PATCH=fix/tiny / MINOR=feature (default) / MAJOR=breaking or big rework; every shipped change = bump + annotated tag `vX.Y.Z` on main; version lives in backend/package.json + frontend/package.json (lockfiles gitignored); only god bumps+tags at integration; docs-only changes never bump; GitHub Releases only for major improvements (gh or web UI).
+- BASELINE: v1.0.0 = up to R-66 (main 634d87e). Bumped frontend 0.0.0 -> 1.0.0 (backend already 1.0.0). Main commit 2c48ad6 + tag `v1.0.0` pushed. Context 3556944 (app) + b00f1ff (CONTEXT.md/CONTEXT-RESUME.md convention bullets).
+- NOTE: gh CLI NOT installed on this host — GitHub Releases are created by the user in the web UI (or after installing gh). First release candidate: v1.0.0 (baseline / first production release).
+- Board unchanged ticket-wise (151 done). This is an ops baseline, not a ticket.
