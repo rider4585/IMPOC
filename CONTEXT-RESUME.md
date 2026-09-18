@@ -87,6 +87,7 @@
 ## Conventions to Follow
 
 - **Branch:** `context` for planning/docs, `main` for clean code only. Context-only changes (docs, `context/`, root `CONTEXT*`) never go to `main`; app code (backend/frontend) ships to both via cherry-pick.
+- **Versioning (SemVer, `docs/VERSIONING.md`):** every shipped change = version bump + annotated tag `vX.Y.Z` on `main` (baseline v1.0.0). PATCH = fix | MINOR = feature (default) | MAJOR = breaking/big. God bumps + tags at integration; workers never tag. GitHub Releases only for major improvements.
 - **Migrations:** ESM export style; CommonJS `module.exports` breaks under `type: module`.
 - **Money:** BIGINT paise end-to-end; DTOs return strings; never coerce to JS `Number`.
 - **Tests:** frontend `npx vitest run` (from frontend/); backend `NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules npx jest --forceExit` (never `--runInBand`).

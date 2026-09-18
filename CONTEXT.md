@@ -51,6 +51,8 @@ npm run dev                 # https://localhost:5173 (basic-ssl); dev:host for L
 
 ## Key conventions & gotchas
 
+- **Versioning (SemVer, see `docs/VERSIONING.md`):** every change that ships to the shop laptop gets a version bump + an annotated git tag `vX.Y.Z` on `main` (baseline **v1.0.0** = up to R-66, 2026-09-18). Bump by impact/size: PATCH = bug fix / tiny, MINOR = new feature (backwards-compatible, default), MAJOR = breaking / feature removal / big platform rework. Version lives in `backend/package.json` + `frontend/package.json` (+ lockfile root); all three must match the tag. Only god bumps+tags at integration. Docs-only changes never bump. GitHub **Releases** are created occasionally, only for major improvements (see the doc).
+
 - **GST (R-51):** stock rates are percents (`cgstRatePct`/`sgstRatePct`), bill GST is paise (`cgstPaise`/`sgstPaise`); `total_paid_paise` is GST-inclusive and is never reconciled against them. Landed cost is computed client-side only.
 - **Money:** BIGINT paise end-to-end; DTOs return strings; never coerce to JS `Number` for large values.
 - **Migrations:** ESM export style (`const migration = {...}; export const up = migration.up.bind(migration)`) — CommonJS `module.exports` breaks under `type: module`.
