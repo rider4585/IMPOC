@@ -4,7 +4,6 @@ import { Card, CardContent, Button, Input, SearchableSelect, useToast } from '..
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import { getTrip, createStock } from '../../services/tripsApi.js';
-import { getTemplates } from '../../services/templatesApi.js';
 import { getProductTypes, getSizes } from '../../services/picklistsApi.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { formatPaiseForInput, parseRupeesToPaise } from '../../platform/moneyInput.js';
@@ -27,9 +26,6 @@ export function StockForm() {
   const [sizes, setSizes] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  const [vendorTemplates, setVendorTemplates] = useState([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
 
   const [form, setForm] = useState(() => ({
     vendorUuid: prefill?.vendorUuid || '',
@@ -73,42 +69,8 @@ export function StockForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripUuid]);
 
-  const handleVendorChange = async (vendorUuid) => {
+  const handleVendorChange = (vendorUuid) => {
     setForm((f) => ({ ...f, vendorUuid }));
-    setVendorTemplates([]);
-    if (!vendorUuid) return;
-    setLoadingTemplates(true);
-    try {
-      const templates = await getTemplates(vendorUuid);
-      setVendorTemplates(Array.isArray(templates) ? templates : []);
-    } catch {
-      setVendorTemplates([]);
-    } finally {
-      setLoadingTemplates(false);
-    }
-  };
-
-  const applyTemplate = (uuid) => {
-    const tpl = vendorTemplates.find((t) => t.uuid === uuid);
-    if (!tpl) return;
-    setForm((f) => {
-      const next = {
-        ...f,
-        productTypeUuid: tpl.productTypeUuid || f.productTypeUuid,
-        subTypeUuid: tpl.subTypeUuid || '',
-        name: tpl.name || f.name,
-        quantity: tpl.defaultQuantity != null ? String(tpl.defaultQuantity) : f.quantity,
-        buyingPricePaise: rupeeOrEmpty(tpl.buyingPricePaise),
-        wholeBuyingPricePaise: rupeeOrEmpty(tpl.wholeBuyingPricePaise),
-        sellingPricePaise: rupeeOrEmpty(tpl.defaultSellingPricePaise),
-        floorPricePaise: rupeeOrEmpty(tpl.defaultFloorPricePaise),
-      };
-      if (next.subTypeUuid && !next.productTypeUuid) {
-        const sub = productTypes.find((t) => t.uuid === next.subTypeUuid);
-        if (sub?.parentUuid) next.productTypeUuid = sub.parentUuid;
-      }
-      return next;
-    });
   };
 
   const set = (key) => (e) =>
@@ -254,49 +216,6 @@ export function StockForm() {
           options={tripVendors.map(mapTripVendor)}
         />
         <p className="text-xs text-[var(--ink-faint)]">The stock's vendor must be one of the trip's vendors.</p>
-
-        {form.vendorUuid && vendorTemplates.length > 0 && (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-            <p className="mb-2 text-sm font-medium text-[var(--ink)]">
-              Pre-fill from a buying template
-            </p>
-            <div className="flex flex-col gap-3">
-              <SearchableSelect
-                label="Template"
-                value=""
-                onChange={applyTemplate}
-                placeholder="-- Select template --"
-                searchPlaceholder="Search templates…"
-                emptyMessage="No templates."
-                options={vendorTemplates.map((t) => ({
-                  value: t.uuid,
-                  label: t.name || 'Untitled template',
-                }))}
-              />
-              <p className="text-xs text-[var(--ink-faint)]">Applying a template pre-fills type and prices below (still editable).</p>
-              {loadingTemplates && (
-                <p className="text-xs text-[var(--ink-muted)]">Loading templates…</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {form.vendorUuid && !loadingTemplates && vendorTemplates.length === 0 && (
-          <p className="text-xs text-[var(--ink-muted)]">
-            No buying templates saved for this vendor yet.
-          </p>
-        )}
-
-        {form.vendorUuid && (
-          <button
-            type="button"
-            className="self-start text-xs font-medium text-[var(--accent)] underline-offset-2 hover:underline"
-            onClick={() => navigate(`/trips/${tripUuid}/templates`, { state: { vendorUuid: form.vendorUuid } })}
-            data-testid="manage-templates"
-          >
-            Manage buying templates
-          </button>
-        )}
 
         <SearchableSelect
           label="Type"
