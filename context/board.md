@@ -49,8 +49,8 @@
 
 **UI/UX (R-26, 25 cards):** UX-CR-1..3, UX-H-1..8, UX-M-1..10, UX-L-1..4.
 
-**Feature cards (R-24, R-30..R-48, R-51, R-53..R-64, 74):**
-R-24 Security umbrella, R-30 POS price edit, R-32 DB views/matviews, R-31 requestUuid frontend, R-33 Expense picklist, R-34 Collapsible nav, R-35 UPI QR + R-35a..f, R-36 Modal polish, R-37 DataGrid, R-38 Scrollbar, R-39 Sidebar rail, R-40 Nav rail toggle, R-41 Barcode scanner, R-42 Display polish + R-42a..d, R-43 Intake scan, R-44 Mobile responsiveness, R-45 Receipt redesign, R-47 Receipt template versioning + builder (R-47 rework, 2026-09-16), R-48 Barcode SHREE prefix, R-49 Print labels toast, R-50 Label configurator, R-51 GST on purchases, R-53 Digital pet, R-54 Review QR, R-55 Vendor bill photo, R-56 Sheet configurator, R-57 Inline colour/size, R-58 Theme drawer, R-59 Units scan, R-61 Scanner zoom, R-63 Customer enquiries, R-64 Barcode PDF always fresh (2026-09-16/17).
+**Feature cards (R-24, R-30..R-48, R-51, R-53..R-65, 75):**
+R-24 Security umbrella, R-30 POS price edit, R-32 DB views/matviews, R-31 requestUuid frontend, R-33 Expense picklist, R-34 Collapsible nav, R-35 UPI QR + R-35a..f, R-36 Modal polish, R-37 DataGrid, R-38 Scrollbar, R-39 Sidebar rail, R-40 Nav rail toggle, R-41 Barcode scanner, R-42 Display polish + R-42a..d, R-43 Intake scan, R-44 Mobile responsiveness, R-45 Receipt redesign, R-47 Receipt template versioning + builder (R-47 rework, 2026-09-16), R-48 Barcode SHREE prefix, R-49 Print labels toast, R-50 Label configurator, R-51 GST on purchases, R-53 Digital pet, R-54 Review QR, R-55 Vendor bill photo, R-56 Sheet configurator, R-57 Inline colour/size, R-58 Theme drawer, R-59 Units scan, R-61 Scanner zoom, R-63 Customer enquiries, R-64 Barcode PDF always fresh (2026-09-16/17), R-65 Enquiry close — WhatsApp-only composer + delivery_logs ENQUIRY CHECK fix (2026-09-17, god).
 
 ---
 
@@ -1240,3 +1240,11 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
 - tasks.json: 166 cards, **149 done** (R-65 added+done this shift; R-60 doing / R-52 blocked / 15 todo R-62 family unchanged). CONTEXT.md refreshed to 149 + R-65 bullet.
 - Everything pushed: main (code), origin/context (code + tasks + board + god-memory + CONTEXT.md). Hive copies in lockstep. Board accurate, safe to close.
 
+
+
+# SHIFT NOTE (2026-09-18, god) — R-66 hide buying-templates UI (SHIPPED, NOT DONE)
+- R-52 interim (user): "for now remove the template option UI only, keep the functionality just hide it from frontend." Executes the pre-agreed Hide option of R-52's humanQA (reversible ~1h). R-52 itself stays blocked till the ~mid-Oct fate decision.
+- Done by temp worker-r66-hide-templates-ui (commit ffc8a6c, +1/-130, FE only): removed the /trips/:tripUuid/templates route + TemplateForm import in App.jsx; removed the Apply-template picker / 'No buying templates saved' note / 'Manage buying templates' button + their state/fetch/handler in StockForm.jsx; dropped the 2 StockForm tests for that UI, kept the TemplateForm (R-11) describe block + mocks. No other FE entry points exist (navigation.js / TripDetailScreen swept).
+- KEPT intact for restore: TemplateForm.jsx, services/templatesApi.js, TEMPLATE_ROUTES, backend module, stock_templates table + data. Receipt Templates (R-47) untouched (different feature).
+- Verified in clean repo (node v20.19.6): vitest 434/434 (46 files), vite build clean. Routes: context 4ba5b78, main 634d87e (frontend identical on both → clean cherry-picks, pushed).
+- STATUS: R-66 = DOING + humanQA (user to verify the templates UI is gone; god marks done only after user sign-off). Board: 150 done / R-66 doing / R-52 blocked / R-62 family 15 todo parked. Awaits the user's confirmation.
