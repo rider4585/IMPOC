@@ -2606,6 +2606,21 @@
       "humanQA": [],
       "details": "USER (mid-session, interim until R-62): closing an Enquiries item as available must offer ONLY WhatsApp (Email/SMS hidden FE-side), open a window to WRITE the message, then send it via wa.me. DONE (FE-only): frontend/src/screens/enquiries/CloseEnquiryDialog.jsx drops Email/SMS from the channel list (CHANNEL_LABELS kept full so old CLOSED rows still label them); the post-close step is now a composer - textarea pre-filled from the server wa.me body, editable, Send rebuilds the wa.me URL with the typed text. Tests updated in enquiriesScreen.test.jsx. THEN the user hit POST /api/enquiries/:uuid/close -> 500: root cause = migration 20260905000004's delivery_logs_entity_type_check allowed only (SALE,RENTAL,QUOTE,GENERAL) while close-as-available writes ENQUIRY; jest never caught it because tests/utils/test-setup.js did not mirror those CHECKs. FIX: new migration 20260917000001 drops + re-adds the CHECK with ENQUIRY; test-setup.js now mirrors all three delivery_logs CHECKs (entity_type/channel/status). VERIFIED: dev DB migrate applied (constraint includes ENQUIRY, live 500 gone), fresh undo-all->migrate->seed on a throwaway scratch DB clean, backend jest 806/806, frontend vitest 436/436, build clean. Shipped main + context. Interim caveat: the close API logs the default body while the edited text is what wa.me sends; R-62 routes this through the real engine.",
       "doneAt": "2026-09-17T09:10:00Z"
+    },
+    {
+      "id": "R-66",
+      "title": "Hide buying-templates UI (frontend only, reversible) — R-52 interim",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "worker-r66-hide-templates-ui",
+      "origin": "user (2026-09-18)",
+      "deps": [
+        "R-52"
+      ],
+      "createdAt": "2026-09-18T03:55:00.000Z",
+      "details": "User: 'for now remove the template option UI only, keep the functionality just hide it from frontend.' Pre-agreed scope from R-52 humanQA option 1 (reversible, ~1h). Remove: /trips/:tripUuid/templates route in App.jsx; the Apply-template picker, 'No buying templates saved' note and 'Manage buying templates' button in StockForm.jsx (+ their fetch/state/imports); the 2 stockForm.test.jsx tests for removed UI. KEEP (restore later): TemplateForm.jsx, templatesApi.js, TEMPLATE_ROUTES, backend module + routes, stock_templates table + data. Backend untouched. Final R-52 fate decision still pending ~mid-Oct.\nSHIPPED 2026-09-18: commit ffc8a6c (cherry-picked context 4ba5b78 + main 634d87e). Frontend 434/434 vitest (node v20.19.6), vite build clean. Reversible: TemplateForm.jsx/templatesApi.js/TEMPLATE_ROUTES/backend/table intact. Board: 151 done.",
+      "completedAt": "2026-09-18T03:35:00.000Z",
+      "doneBy": "worker-r66-hide-templates-ui"
     }
   ]
 }
