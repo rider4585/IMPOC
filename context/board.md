@@ -1262,3 +1262,9 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
 - BASELINE: v1.0.0 = up to R-66 (main 634d87e). Bumped frontend 0.0.0 -> 1.0.0 (backend already 1.0.0). Main commit 2c48ad6 + tag `v1.0.0` pushed. Context 3556944 (app) + b00f1ff (CONTEXT.md/CONTEXT-RESUME.md convention bullets).
 - NOTE: gh CLI NOT installed on this host — GitHub Releases are created by the user in the web UI (or after installing gh). First release candidate: v1.0.0 (baseline / first production release).
 - Board unchanged ticket-wise (151 done). This is an ops baseline, not a ticket.
+
+## OFFICE CLOSE (2026-09-18)
+- v1.0.0 tagged (main 2c48ad6) + first GitHub Release published (CLI): https://github.com/rider4585/IMPOC/releases/tag/v1.0.0.
+- gh 2.101.0 installed (/opt/homebrew/bin/gh); auth = GH_TOKEN from macOS keychain (token lacks read:org → interactive gh auth login won't validate; repo-scoped ops fine). Recipe in docs/VERSIONING.md.
+- Handoff docs updated (CONTEXT.md / CONTEXT-RESUME.md): 151 done / 0 doing / 1 blocked (R-52, revisit ~mid-Oct) / 15 todo parked (R-62 family).
+- All pushed: main + context at origin. Board: 151 done.

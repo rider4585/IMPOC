@@ -846,3 +846,7 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - Auth: the osxkeychain github token has scopes read:user, repo, user:email, workflow — MISSING read:org, so `gh auth login` (both interactive-with-token validation and hosts.yml file tokens) reports "invalid / missing scope". Wrote and then REMOVED a hosts.yml with the keychain token because gh strictly rejects it.
 - WORKING RECIPE (verified): prefix with `GH_TOKEN="$(security find-internet-password -s github.com -w)"`. `gh release list/view`, `gh repo view` all work read+write with repo scope. Recipe updated in docs/VERSIONING.md (both branches, main d14da33 + context 26be3cf; docs-only → no version bump).
 - Optional for user: one-time interactive `gh auth login` (device flow) mints a full-scope token and removes the prefix. Offered, not required.
+
+## [2026-09-18 OFFICE CLOSE] final closing-time sync
+- Confirmed at closing: god-memory hive==context identical; board hive==context identical; tasks context==authoritative 167 (151 done/0 doing/1 blocked/15 todo), hive is the 21-card scratch board (differs BY DESIGN; R-60 delta on hive = known off-by-one duplicated V2-SHIPPED para + scheduler-echo-stripped humanQA — context card is the clean one, never copy hive→context).
+- v1.0.0 GitHub release published + gh installed (see earlier entries). Handoff docs CONTEXT.md + CONTEXT-RESUME.md now carry both (docs-only, no bump). Board + memory synced, both branches pushed.
