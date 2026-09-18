@@ -1259,6 +1259,11 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
 
 ---
 
+# SHIFT NOTE (2026-09-18, god) — "only 4 in DONE" root-caused: harness task-hygiene sweep
+- The done column kept dropping to 4 cards even after manual restores. ROOT CAUSE: the Munder Difflin app's hourly `tasks-hygiene` sweep (default `doneArchiveDays: 2`, `staleArchiveDays: 21`) auto-moves old cards from `hive/tasks.json` into `hive/tasks-archive.json` — 147 done cards were archived silently at 19:02 (log `archived:147 live:20`). NOT data loss.
+- FIX: `taskHygiene` in `~/Library/Application Support/munder-difflin/config.json` set to `doneArchiveDays: 999999` / `staleArchiveDays: 999999` so the sweep no longer archives. Then restored `hive/tasks.json` = `context/tasks.json` (167 cards, 151 done / 1 blocked / 15 todo) and emptied `hive/tasks-archive.json` (would duplicate). Pre-edit backups in temp dir.
+- Board accurate again; no tickets lost. Safe to close.
+
 # SHIFT CLOSE #14 (2026-09-18, god)
 - **R-66 done (user sign-off)**: user confirmed "you can mark the R-66 as done" after verifying the shop app. R-66 (hide Buying templates UI, FE only + reversible) was shipped earlier today on context 4ba5b78 + main 634d87e (worker commit ffc8a6c), vitest 434/434 + build clean. Reversible: TemplateForm.jsx/templatesApi.js/TEMPLATE_ROUTES/backend/table intact.
 - tasks.json: 167 cards, **151 done** / 0 doing / R-52 blocked / 15 todo R-62 family parked. CONTEXT.md refreshed to 151 done + R-66 moved into done; CONTEXT-RESUME metrics updated.
