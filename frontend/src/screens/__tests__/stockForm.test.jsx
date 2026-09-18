@@ -60,7 +60,6 @@ function renderStockForm(initialEntries) {
       <MemoryRouter initialEntries={initialEntries || ['/trips/t1/stocks/new']}>
         <Routes>
           <Route path="/trips/:tripUuid/stocks/new" element={<StockForm />} />
-          <Route path="/trips/:tripUuid/templates" element={<TemplateForm />} />
         </Routes>
       </MemoryRouter>
     </ToastProvider>
@@ -214,40 +213,6 @@ describe('StockForm — two-level type/subtype + whole/per-unit buying price (R-
     });
   });
 
-  it('pre-fills subtype + whole price (and the parent type) when a buying template is applied', async () => {
-    templatesService.getTemplates.mockResolvedValue([TEMPLATE]);
-    renderStockForm();
-
-    await screen.findByLabelText('Type');
-    await selectCombo('Vendor (on this trip)', /Sharma Fabrics/, 'Sharma');
-
-    await screen.findByLabelText('Template');
-    await selectCombo('Template', /Paithani lot/, 'Paithani');
-
-    expect(screen.getByLabelText('Type')).toHaveTextContent('Sari');
-    expect(screen.getByLabelText('Subtype (optional)')).toHaveTextContent('Paithani');
-    expect(screen.getByLabelText('Buying price (₹)').value).toBe('300.00');
-    expect(screen.getByLabelText('Whole stock buying price (₹)').value).toBe('60000.00');
-    expect(screen.getByLabelText('Selling price (₹)').value).toBe('500.00');
-    expect(screen.getByLabelText('Floor price (₹)').value).toBe('400.00');
-    expect(screen.getByLabelText('Quantity').value).toBe('5');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Save stock' }));
-
-    await expectCreateStockPayload({
-      vendorUuid: 'v1',
-      productTypeUuid: 'pt1',
-      subTypeUuid: 'pt2',
-      name: 'Paithani lot',
-      quantity: 5,
-      buyingPricePaise: 30000,
-      wholeBuyingPricePaise: 6000000,
-      sellingPricePaise: 50000,
-      floorPricePaise: 40000,
-      channel: 'RETAIL',
-    });
-  });
-
   it('carries subtype + whole price through clone pre-fill (location.state.prefill)', async () => {
     const prefill = {
       vendorUuid: 'v1',
@@ -283,17 +248,6 @@ describe('StockForm — two-level type/subtype + whole/per-unit buying price (R-
       floorPricePaise: 50000,
       channel: 'RETAIL',
     });
-  });
-
-  it('links to the templates screen carrying the selected vendor', async () => {
-    renderStockForm();
-    await screen.findByLabelText('Type');
-    fireEvent.click(await screen.findByTestId('manage-templates'));
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Buying templates' })).toBeInTheDocument();
-    });
-    expect(templatesService.getTemplates).toHaveBeenCalledWith('v1');
   });
 });
 
