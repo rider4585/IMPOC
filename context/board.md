@@ -14,16 +14,14 @@
 
 ---
 
-## KANBAN BOARD (as of 2026-09-17)
+## KANBAN BOARD (as of 2026-09-18)
 
-### DOING (1)
-- **R-60** — Durable backups on the shop laptop: pg_dump twice daily, manual encrypted Google Drive upload, restore script. Code complete; awaiting user to run `setup.cmd` on the laptop.
+### DOING (0)
 
 ### BLOCKED (1)
-- **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use.
+- **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use. Interim: templates UI hidden FE-only + reversible (R-66, done 2026-09-18).
 
-### TODO (16)
-- **R-46** — ~~Instagram publishing module~~ — REMOVED (too soon to plan, user 2026-09-15).
+### TODO (15, all parked)
 - **R-62** — Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later). 15 sub-cards below.
   - **R-62a** — Comm foundation: migrations (comm_templates, delivery_logs extension, customers preferences)
   - **R-62b** — Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}})
@@ -1249,6 +1247,17 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
 - Verified in clean repo (node v20.19.6): vitest 434/434 (46 files), vite build clean. Routes: context 4ba5b78, main 634d87e (frontend identical on both → clean cherry-picks, pushed).
 - STATUS: R-66 = DOING + humanQA (user to verify the templates UI is gone; god marks done only after user sign-off). Board: 150 done / R-66 doing / R-52 blocked / R-62 family 15 todo parked. Awaits the user's confirmation.
 
+
+# STANDUP 2026-09-18 ~12:32Z (god)
+
+- Floor: god only live (healthy). All workers archived; no pending spawn-requests. Inbox: 1 scheduler standup -> .done; no outbox reply (scheduler-bounce convention).
+- Board: 167 cards = **151 done / 0 doing / 1 blocked (R-52 parked to ~mid-Oct, interim R-66 shipped) / 15 todo (R-62 family, parked by user)**. Nothing in flight, nothing unowned, no stale/at-risk work.
+- Repo: context 1847533 == origin/context, main d14da33 == origin/main (both in sync); tree clean except expected leave-alone untracked (.claude/, frontend/vite.http.config.js, worktrees/).
+- BOARD FIX: KANBAN header was stale (dated 2026-09-17, R-60 in DOING, R-46 in TODO) -> corrected to 2026-09-18, DOING (0), R-52 note carries R-66 interim, TODO (15, all parked). hive/board.md == context/board.md re-synced.
+- R-52/R-60 note: R-60 marked done by user 2026-09-17 (laptop run pending is user-side, listed on the card's humanQA); R-52 stays blocked.
+- Safe to close.
+
+---
 
 # SHIFT CLOSE #14 (2026-09-18, god)
 - **R-66 done (user sign-off)**: user confirmed "you can mark the R-66 as done" after verifying the shop app. R-66 (hide Buying templates UI, FE only + reversible) was shipped earlier today on context 4ba5b78 + main 634d87e (worker commit ffc8a6c), vitest 434/434 + build clean. Reversible: TemplateForm.jsx/templatesApi.js/TEMPLATE_ROUTES/backend/table intact.

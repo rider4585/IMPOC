@@ -847,6 +847,15 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - WORKING RECIPE (verified): prefix with `GH_TOKEN="$(security find-internet-password -s github.com -w)"`. `gh release list/view`, `gh repo view` all work read+write with repo scope. Recipe updated in docs/VERSIONING.md (both branches, main d14da33 + context 26be3cf; docs-only → no version bump).
 - Optional for user: one-time interactive `gh auth login` (device flow) mints a full-scope token and removes the prefix. Offered, not required.
 
+## [2026-09-18 ~12:32Z] Hourly ops standup (scheduler)
+
+- Floor: god only live (healthy). All workers archived; no pending spawn-requests (only .done/.failed). Inbox: 1 scheduler standup -> .done; no outbox reply (scheduler-bounce convention).
+- Board (context/tasks.json authoritative): 167 cards = **151 done / 0 doing / 1 blocked (R-52, parked to ~mid-Oct) / 15 todo (R-62 family, parked by user)**. Nothing in flight, nothing unowned, no at-risk work.
+- Repo: context 1847533 == origin/context, main d14da33 == origin/main, tree clean (untracked .claude/, frontend/vite.http.config.js, worktrees/ = expected leave-alone).
+- BOARD FIX: KANBAN header was stale (2026-09-17 date, R-60 in DOING, removed R-46 still in TODO) -> corrected to 2026-09-18, DOING (0), R-52 blocked line notes the R-66 interim, TODO (15, all parked). hive/board.md re-synced == context/board.md.
+- NOTE: R-60 card is done (user sign-off 2026-09-17) but its laptop setup run remains user-side — the humanQA on the card still lists the run steps. No dispatch needed.
+- Safe to close. No outbox/reply to scheduler.
+
 ## [2026-09-18 OFFICE CLOSE] final closing-time sync
 - Confirmed at closing: god-memory hive==context identical; board hive==context identical; tasks context==authoritative 167 (151 done/0 doing/1 blocked/15 todo), hive is the 21-card scratch board (differs BY DESIGN; R-60 delta on hive = known off-by-one duplicated V2-SHIPPED para + scheduler-echo-stripped humanQA — context card is the clean one, never copy hive→context).
 - v1.0.0 GitHub release published + gh installed (see earlier entries). Handoff docs CONTEXT.md + CONTEXT-RESUME.md now carry both (docs-only, no bump). Board + memory synced, both branches pushed.
