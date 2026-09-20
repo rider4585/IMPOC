@@ -920,3 +920,14 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
   - Code shipped to `main` (`6fb1219`) and synchronized on `context` (`836855c`).
   - Worker worktree and branch removed.
 - **Card Status:** `R-67` card kept in `doing` with `humanQA` asking user to test the Wi-Fi icon in the header and verify dynamic QR/URL on their devices before marking done (R-60/R-66 pattern).
+
+## [2026-09-20 ~14:55Z] R-68 PLANNED (plan-only, user: 'just create the tickets, dont start working on them')
+
+- **User request:** Admin panel to see all signed-in users and from which devices they connect.
+- **Card created:** `R-68` (status: `todo`, assignee: `unassigned`) in `context/tasks.json` + `hive/tasks.json` (169 cards total: 151 done / 1 doing [R-67 awaiting user verify] / 1 blocked / 16 todo).
+- **Board updated:** `R-68` listed in TODO on `context/board.md` + `hive/board.md`.
+- **Scope summary:**
+  1. DB: Add `ip_address`, `user_agent`, `device_type`, `browser`, `os` columns to `auth_sessions` table.
+  2. Backend: `deviceParser.js` utility; capture IP and device telemetry in `auth.controller.js` login and refresh handlers; `GET /api/admin/sessions` (auth + `users.view`), `DELETE /api/admin/sessions/:sessionUuid` (revoke), `DELETE /api/admin/users/:userUuid/sessions`.
+  3. Frontend: `/admin/sessions` in navigation; `SessionsScreen.jsx` DataGrid with device icons, user names, IP badges, activity timestamps, and remote revoke actions; top metric cards (total active, unique users, device breakdown).
+  4. NOT DISPATCHED — card sits in `todo` until user says GO and picks CLI engine.

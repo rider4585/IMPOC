@@ -2646,6 +2646,17 @@
           "askedAt": "2026-09-20T14:52:00.000Z"
         }
       ]
+    },
+    {
+      "id": "R-68",
+      "title": "Active Sessions & Device Management panel (Admin)",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": "unassigned",
+      "origin": "user (2026-09-20)",
+      "deps": [],
+      "createdAt": "2026-09-20T14:55:00.000Z",
+      "details": "User request: Admin panel to see all signed-in users and from which devices. PLAN ONLY per user (\"for now just create the tickets, dont start working on them\").\n\nScope:\n1. DB Migration: add ip_address (VARCHAR 64), user_agent (TEXT), device_type (VARCHAR 32), browser (VARCHAR 64), os (VARCHAR 64) to auth_sessions table.\n2. Backend: deviceParser utility; update login & refresh in auth.controller.js to record IP and parsed device telemetry; GET /api/admin/sessions (auth + users.view) returning sessions joined with User details, ?activeOnly filter, isCurrent flag; DELETE /api/admin/sessions/:sessionUuid (users.update) to revoke session; DELETE /api/admin/users/:userUuid/sessions to revoke all sessions for a user.\n3. Frontend: /admin/sessions in navigationRegistry & navigationSections (Admin group); SessionsScreen.jsx DataGrid with user details, device icon/OS/browser, IP badge, sign-in time, last active time, status, and Revoke action; top metric cards (active sessions, unique users, device breakdown); sessionsApi.js.\n4. Verification: db:migrate/refresh lifecycle checks, unit/integration jest tests, frontend vitest & vite build."
     }
   ]
 }
