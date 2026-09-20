@@ -2635,7 +2635,7 @@
       "title": "Wi-Fi / LAN Network Access Modal & Dynamic IP QR (multi-device access)",
       "status": "doing",
       "priority": "high",
-      "assignee": "worker-r67-wifi-access",
+      "assignee": "worker-r67-wifi-access-agy",
       "origin": "user (2026-09-20)",
       "deps": [],
       "createdAt": "2026-09-20T14:25:00.000Z",

@@ -892,3 +892,10 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - **Board updated:** `R-67` in DOING on `context/board.md` + `hive/board.md`.
 - **Spawned temp:** `worker-r67-wifi-access` (engine: `opencode`, provider: `opencode`, isolate: true, tokenCap: 250000). Live on floor with isolated worktree.
 - **Contract:** Backend `GET /api/system/network` (returns active IPv4 interfaces via `os.networkInterfaces()`, port, primary URL) + LAN CORS permissions; Frontend `NetworkAccessModal` with `QRCodeSVG` (qrcode.react), copy URL button with toast, network interface picker, step-by-step connection guide; Header `Wifi` button in `AppShell.jsx` on both mobile & desktop; full vitest + jest + vite build passing.
+
+## [2026-09-20 ~14:32Z] R-67 respawned under Antigravity CLI (agy) + Standing User Rule
+
+- **STANDING USER RULE (PINNED):** Before spawning ANY new agent on the floor, ALWAYS ask the user which agent/engine (Antigravity CLI `agy`, opencode, Claude, etc.) to use. Do not assume or pick an engine without asking first.
+- **Dismissal:** Dismissed `worker-r67-wifi-access` (opencode) at user request. Terminated process and cleaned up worktree.
+- **Respawn:** Spawned `worker-r67-wifi-access-agy` with provider `antigravity` and command `agy` (`/Users/ravirajbugge/.local/bin/agy`, isolated worktree). Verified process active and working.
+- **Board & Tasks:** `R-67` assignee updated to `worker-r67-wifi-access-agy` in `tasks.json` (both `context/` and `hive/`) and `board.md` (both `context/` and `hive/`).
