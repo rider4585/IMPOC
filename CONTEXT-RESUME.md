@@ -1,6 +1,6 @@
 # CONTEXT-RESUME.md — Handoff for Other AI Tools
 
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-20
 **Branch:** `context` (all planning docs live here; clean code goes to `main`)
 
 ---
@@ -14,6 +14,16 @@
 5. **This file** — what happened in the last session, what's next, what needs attention.
 
 ---
+
+## What Happened in the Last Sessions (2026-09-20)
+
+### Integrated & Shipped — Awaiting User Verification
+- **R-67 Wi-Fi & LAN Network Access Modal + Dynamic IP QR (v1.1.0 release)**:
+  - User requested a screen or modal to display the exact Wi-Fi link for other devices (phones/tablets) to connect to IMPOC over local Wi-Fi with static/dynamic router IP.
+  - User decisions: Header icon only (no dedicated router screen) + dynamic IP fetch on every modal open.
+  - Backend: Added `GET /api/system/network` (`backend/src/modules/system/`) returning active IPv4 interfaces, server port, and primary URL via `os.networkInterfaces()`. Updated CORS in `backend/app.js` to allow private LAN IP ranges (`192.168.*`, `10.*`, `172.16-31.*`, `localhost`) with credentials so Wi-Fi devices are never blocked. Test suite `backend/tests/system/system.test.js` (11/11 pass).
+  - Frontend: Added `NetworkAccessModal.jsx` featuring `QRCodeSVG` (qrcode.react with center shop monogram), monospace URL box with 1-click Copy button + toast, network interface picker (Wi-Fi vs Ethernet), and 3-step mobile connection guide. Integrated `Wifi` button into `AppShell.jsx` desktop and mobile headers. Unit tests in `NetworkAccessModal.test.jsx` and `systemApi.test.js` (all 48 test files, 442/442 vitest tests pass; vite build clean).
+  - Versioning: Bumped `backend/package.json` and `frontend/package.json` to **1.1.0**, annotated git tag **`v1.1.0`** pushed to origin. Shipped to both `main` (6fb1219) and `context` (836855c). Card is in `doing` awaiting user verification.
 
 ## What Happened in the Last Sessions (2026-09-18)
 

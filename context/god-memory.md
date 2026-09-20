@@ -906,3 +906,17 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - **Task board:** 168 cards = 151 done / 1 doing (R-67 owned by worker-r67-wifi-access-agy) / 1 blocked (R-52 parked to ~mid-Oct) / 15 todo (R-62 communication platform, parked by user).
 - **Inbox:** Handled standup message `2026-09-20T14-32-17-185Z-430ae8.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
 - **In-flight work:** R-67 on track with worker-r67-wifi-access-agy. Nothing stalled or unowned.
+
+## [2026-09-20 ~14:52Z] R-67 INTEGRATED & SHIPPED (v1.1.0 release) — Awaiting User Verification
+
+- **Delivered by:** `worker-r67-wifi-access-agy` (Antigravity CLI `agy` temp). Reported done with commit `6db9713` in isolated worktree.
+- **Verification (god sign-off):**
+  - Frontend vitest: all 48 test files, 442/442 passing.
+  - Frontend vite build: clean production build in `frontend/dist`.
+  - Backend jest: aligned `tests/system/system.test.js` with codebase `testMatch: ['**/tests/**/*.test.js']` convention; all 52 suites (817 tests) passing.
+- **SemVer Bump & Shipping:**
+  - Minor feature release: bumped `backend/package.json` and `frontend/package.json` from 1.0.0 to **1.1.0**.
+  - Annotated tag **`v1.1.0`** created and pushed to origin.
+  - Code shipped to `main` (`6fb1219`) and synchronized on `context` (`836855c`).
+  - Worker worktree and branch removed.
+- **Card Status:** `R-67` card kept in `doing` with `humanQA` asking user to test the Wi-Fi icon in the header and verify dynamic QR/URL on their devices before marking done (R-60/R-66 pattern).

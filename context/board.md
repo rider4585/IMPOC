@@ -17,7 +17,7 @@
 ## KANBAN BOARD (as of 2026-09-20)
 
 ### DOING (1)
-- **R-67** — Wi-Fi / LAN Network Access Modal & Dynamic IP QR (worker-r67-wifi-access-agy)
+- **R-67** — Wi-Fi / LAN Network Access Modal & Dynamic IP QR (code integrated v1.1.0, awaiting user verification)
 
 ### BLOCKED (1)
 - **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use. Interim: templates UI hidden FE-only + reversible (R-66, done 2026-09-18).
