@@ -1,6 +1,6 @@
 import request from 'supertest';
-import app from '../../../../app.js';
-import { getNetworkInfo } from '../system.service.js';
+import app from '../../app.js';
+import { getNetworkInfo } from '../../src/modules/system/system.service.js';
 
 describe('System Module - Network Info & Wi-Fi Access (R-67)', () => {
     describe('system.service - getNetworkInfo()', () => {
