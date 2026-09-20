@@ -88,6 +88,7 @@ export function getNetworkInfo(options = {}) {
                     isDefault: true,
                 },
             ],
+            isLoopback: true,
         };
     }
 
@@ -113,5 +114,6 @@ export function getNetworkInfo(options = {}) {
         port,
         primaryUrl,
         interfaces,
+        isLoopback: false,
     };
 }

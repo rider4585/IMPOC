@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Wifi, RotateCw, Copy, Check } from 'lucide-react';
+import { Wifi, RotateCw, Copy, Check, AlertTriangle, WifiOff } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/Dialog.jsx';
 import { qrLogoSettings } from '../platform/qrLogo.js';
@@ -31,13 +31,21 @@ export function NetworkAccessModal({ open, onClose }) {
   const [networkData, setNetworkData] = useState(null);
   const [selectedUrl, setSelectedUrl] = useState('');
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(null);
   const branding = useBranding();
   const toast = useSafeToast();
 
   const loadNetworkInfo = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await getNetworkInfo();
+      if (!data || data.success === false) {
+        setError(data?.error || 'Unable to detect Wi-Fi IP address. Please check server status.');
+        setNetworkData(data || null);
+        setSelectedUrl('');
+        return;
+      }
       setNetworkData(data);
       const interfaces = data?.interfaces || [];
       const defaultIface = interfaces.find((i) => i.isDefault) || interfaces[0];
@@ -45,6 +53,9 @@ export function NetworkAccessModal({ open, onClose }) {
       setSelectedUrl(targetUrl);
     } catch (err) {
       console.error('Failed to load network info:', err);
+      setError('Cannot connect to backend server. Please check that it is running.');
+      setNetworkData(null);
+      setSelectedUrl('');
     } finally {
       setLoading(false);
     }
@@ -105,10 +116,31 @@ export function NetworkAccessModal({ open, onClose }) {
 
         {/* Status Badge */}
         <div className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Ready for connections</span>
-          </div>
+          {error ? (
+            <div
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+              data-testid="status-badge-error"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+              <span>Server unreachable</span>
+            </div>
+          ) : networkData?.isLoopback ? (
+            <div
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+              data-testid="status-badge-offline"
+            >
+              <WifiOff className="h-3.5 w-3.5 text-amber-600" />
+              <span>No Wi-Fi network found</span>
+            </div>
+          ) : (
+            <div
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400"
+              data-testid="status-badge-ready"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Ready for connections</span>
+            </div>
+          )}
           {loading && (
             <span className="text-xs text-[var(--ink-muted)]">Updating…</span>
           )}
@@ -140,9 +172,38 @@ export function NetworkAccessModal({ open, onClose }) {
           </div>
         )}
 
-        {/* QR Code Container */}
+        {/* QR Code / State Container */}
         <div className="flex flex-col items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] p-4 shadow-inner">
-          {currentUrl ? (
+          {loading ? (
+            <div className="flex h-[180px] w-[180px] flex-col items-center justify-center gap-2 text-xs text-[var(--ink-muted)]">
+              <RotateCw className="h-5 w-5 animate-spin text-primary" />
+              <span>Detecting network…</span>
+            </div>
+          ) : error ? (
+            <div className="flex min-h-[180px] w-full flex-col items-center justify-center gap-2 p-4 text-center">
+              <AlertTriangle className="h-8 w-8 text-amber-600" />
+              <p className="text-xs font-semibold text-[var(--ink)]">Cannot detect Wi-Fi address</p>
+              <p className="max-w-xs text-[11px] text-[var(--ink-muted)] leading-relaxed">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={loadNetworkInfo}
+                className="mt-1 inline-flex items-center gap-1.5 rounded bg-[var(--surface-raised)] border border-[var(--border)] px-3 py-1 text-xs font-medium text-[var(--ink)] shadow-sm hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+              >
+                <RotateCw className="h-3.5 w-3.5" />
+                Retry detection
+              </button>
+            </div>
+          ) : networkData?.isLoopback ? (
+            <div className="flex min-h-[180px] w-full flex-col items-center justify-center gap-2 p-4 text-center">
+              <WifiOff className="h-8 w-8 text-amber-600" />
+              <p className="text-xs font-semibold text-[var(--ink)]">No Wi-Fi network detected</p>
+              <p className="max-w-xs text-[11px] text-[var(--ink-muted)] leading-relaxed">
+                This computer is not connected to a Wi-Fi or LAN network. Please connect to your Wi-Fi and click Refresh.
+              </p>
+            </div>
+          ) : currentUrl ? (
             <div className="rounded-md bg-white p-2.5 shadow-sm" data-testid="wifi-qr-container">
               <QRCodeSVG
                 value={currentUrl}
@@ -154,7 +215,7 @@ export function NetworkAccessModal({ open, onClose }) {
             </div>
           ) : (
             <div className="flex h-[180px] w-[180px] items-center justify-center text-sm text-[var(--ink-muted)]">
-              {loading ? 'Detecting network…' : 'No network URL available'}
+              No network URL available
             </div>
           )}
         </div>
@@ -162,10 +223,14 @@ export function NetworkAccessModal({ open, onClose }) {
         {/* Clean Monospace URL display box + 1-click Copy button */}
         <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] p-1.5 pl-3">
           <code
-            className="flex-1 truncate font-mono text-xs font-semibold text-[var(--ink)] select-all"
+            className={`flex-1 truncate font-mono text-xs select-all ${
+              currentUrl ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-muted)] italic'
+            }`}
             data-testid="network-url-display"
           >
-            {currentUrl || 'Detecting network address…'}
+            {loading
+              ? 'Detecting network address…'
+              : currentUrl || (error ? 'Connection failed — server unreachable' : 'No Wi-Fi address detected')}
           </code>
           <button
             type="button"
