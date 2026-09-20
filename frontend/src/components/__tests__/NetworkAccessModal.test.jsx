@@ -168,7 +168,7 @@ describe('NetworkAccessModal (Ticket R-67)', () => {
     expect(screen.getByTestId('network-url-display')).toHaveTextContent('http://10.0.0.12:3000');
   });
 
-  it('falls back gracefully when network fetch fails', async () => {
+  it('displays error state with Server unreachable badge and retry button when network fetch fails', async () => {
     vi.spyOn(systemApi, 'getNetworkInfo').mockRejectedValue(new Error('Network error'));
 
     renderModal({ open: true });
@@ -177,6 +177,33 @@ describe('NetworkAccessModal (Ticket R-67)', () => {
       expect(screen.getByText('Wi-Fi & LAN Access')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Ready for connections')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('status-badge-error')).toBeInTheDocument();
+      expect(screen.getByTestId('status-badge-error')).toHaveTextContent('Server unreachable');
+    });
+
+    expect(screen.getByText('Cannot detect Wi-Fi address')).toBeInTheDocument();
+    expect(screen.getByText(/Retry detection/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('wifi-qr-code')).toBeNull();
+  });
+
+  it('displays offline state when only loopback is available', async () => {
+    vi.spyOn(systemApi, 'getNetworkInfo').mockResolvedValue({
+      success: true,
+      port: 3000,
+      primaryUrl: '',
+      interfaces: [],
+      isLoopback: true,
+    });
+
+    renderModal({ open: true });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-badge-offline')).toBeInTheDocument();
+      expect(screen.getByText('No Wi-Fi network found')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('No Wi-Fi network detected')).toBeInTheDocument();
+    expect(screen.queryByTestId('wifi-qr-code')).toBeNull();
   });
 });
