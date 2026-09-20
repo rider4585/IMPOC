@@ -87,6 +87,7 @@ const ICONS = {
   dashboardItem: <Layers {...iconProps} />,
   stocks: <Package {...iconProps} />,
   units: <Tags {...iconProps} />,
+  receiptTemplates: <NotebookPen {...iconProps} />,
 };
 
 function iconFor(name) {
@@ -110,6 +111,7 @@ const itemIcon = {
   '/customers': 'customers',
   '/enquiries': 'enquiries',
   '/dashboard': 'dashboardItem',
+  '/receipt-templates': 'receiptTemplates',
 };
 
 // Desktop shell kicks in at/above this many CSS pixels (mobile-first default).

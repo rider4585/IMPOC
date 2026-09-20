@@ -130,13 +130,16 @@ describe('NetworkAccessModal (Ticket R-67)', () => {
     renderModal({ open: true });
 
     await waitFor(() => {
-      expect(screen.getByTestId('copy-url-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('network-url-display')).toHaveTextContent('http://192.168.1.50:3000');
+      expect(screen.getByTestId('copy-url-btn')).not.toBeDisabled();
     });
 
     const copyBtn = screen.getByTestId('copy-url-btn');
     fireEvent.click(copyBtn);
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('http://192.168.1.50:3000');
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('http://192.168.1.50:3000');
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Copied!')).toBeInTheDocument();
