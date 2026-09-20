@@ -5,6 +5,7 @@ import { navigationSections } from './navigation';
 import { ShopLogo } from '../components/ShopLogo';
 import { SettingsDrawer, useBranding } from '../theme/index.js';
 import { NavItem } from '../components/ui';
+import { NetworkAccessModal } from '../components/NetworkAccessModal.jsx';
 import { primeMediaPermissions } from '../platform/mediaPermissions.js';
 import {
   Boxes,
@@ -27,6 +28,7 @@ import {
   KeyRound,
   ListChecks,
   Settings,
+  Wifi,
   Layers,
   Package,
   Tags,
@@ -129,6 +131,7 @@ export function AppShell({ children }) {
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= DESKTOP_BREAKPOINT);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [networkModalOpen, setNetworkModalOpen] = useState(false);
   // Which desktop nav sections are collapsed, remembered across reloads.
   const [collapsedSections, setCollapsedSections] = useState(loadCollapsedSections);
   // Whether desktop rail is in icon-only mode.
@@ -312,6 +315,15 @@ export function AppShell({ children }) {
             <button
               type="button"
               className="flex h-11 w-11 items-center justify-center rounded-md text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
+              onClick={() => setNetworkModalOpen(true)}
+              aria-label="Connect devices over Wi-Fi"
+              title="Wi-Fi & Network Access"
+            >
+              <Wifi className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              className="flex h-11 w-11 items-center justify-center rounded-md text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
               onClick={() => setSettingsOpen(true)}
               aria-label="Open theme settings"
               title="Theme settings"
@@ -390,6 +402,15 @@ export function AppShell({ children }) {
               <button
                 type="button"
                 className="flex h-11 w-11 items-center justify-center rounded-md text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
+                onClick={() => setNetworkModalOpen(true)}
+                aria-label="Connect devices over Wi-Fi"
+                title="Wi-Fi & Network Access"
+              >
+                <Wifi className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                className="flex h-11 w-11 items-center justify-center rounded-md text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
                 onClick={() => setSettingsOpen(true)}
                 aria-label="Open theme settings"
                 title="Theme settings"
@@ -445,6 +466,7 @@ export function AppShell({ children }) {
       )}
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <NetworkAccessModal open={networkModalOpen} onClose={() => setNetworkModalOpen(false)} />
     </div>
   );
 }

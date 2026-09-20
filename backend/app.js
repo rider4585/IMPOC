@@ -36,6 +36,7 @@ import enquiryRoutes from './src/modules/enquiries/enquiries.routes.js';
 import deliveryRoutes from './src/modules/delivery/delivery.routes.js';
 import receiptRoutes from './src/modules/receipts/receipts.routes.js';
 import { receiptTemplateRoutes, receiptSnapshotRoutes } from './src/modules/receipt-templates/receipt-templates.routes.js';
+import systemRoutes from './src/modules/system/system.routes.js';
 import errorMiddleware from './src/middleware/error.middleware.js';
 
 import { assertJwtSecrets } from './src/modules/auth/token.service.js';
@@ -66,8 +67,44 @@ try {
     throw new Error(`FRONTEND_ORIGIN is not a valid URL: ${frontendOrigin}`);
 }
 
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true;
+    if (origin === frontendOrigin) return true;
+
+    try {
+        const parsed = new URL(origin);
+        const hostname = parsed.hostname;
+
+        // Allow localhost and 127.0.0.1
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return true;
+        }
+
+        // Allow private LAN IPv4 (10.*, 192.168.*, 172.16-31.*)
+        if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+            return true;
+        }
+        if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+            return true;
+        }
+        if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+            return true;
+        }
+    } catch {
+        return false;
+    }
+
+    return false;
+};
+
 const corsConfig = {
-    origin: frontendOrigin,
+    origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) {
+            callback(null, true);
+        } else {
+            callback(null, false);
+        }
+    },
     credentials: true,
 };
 
@@ -111,6 +148,7 @@ app.use('/api/delivery', deliveryRoutes);
 app.use('/api/receipts', receiptRoutes);
 app.use('/api/receipt-templates', receiptTemplateRoutes);
 app.use('/api/receipt-snapshots', receiptSnapshotRoutes);
+app.use('/api/system', systemRoutes);
 
 /*
  * Production: serve the built frontend from the same origin as the API, so a

@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -87,6 +87,28 @@ export const Dialog = ({
                 )}
               </div>
             )}
+            {!title && onClose && (
+              <div className="flex shrink-0 justify-end mb-2">
+                <button
+                  type="button"
+                  className="rounded-sm text-[var(--ink-muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+                  onClick={onClose}
+                  aria-label="Close dialog"
+                >
+                  <svg
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
             {/*
               -mx-2 px-2: `overflow-y-auto` also clips the X axis, which would
               cut a full-width field's 2px focus ring flush at the body edge
@@ -103,5 +125,29 @@ export const Dialog = ({
     document.body
   );
 };
+
+export const DialogContent = ({ className = '', children, ...props }) => (
+  <div className={`space-y-4 ${className}`.trim()} {...props}>
+    {children}
+  </div>
+);
+
+export const DialogHeader = ({ className = '', children, ...props }) => (
+  <div className={`flex flex-col space-y-1.5 ${className}`.trim()} {...props}>
+    {children}
+  </div>
+);
+
+export const DialogTitle = ({ className = '', children, ...props }) => (
+  <h2 className={`text-lg font-semibold leading-none tracking-tight ${className}`.trim()} {...props}>
+    {children}
+  </h2>
+);
+
+export const DialogDescription = ({ className = '', children, ...props }) => (
+  <p className={`text-sm text-[var(--ink-muted)] ${className}`.trim()} {...props}>
+    {children}
+  </p>
+);
 
 export default Dialog;
