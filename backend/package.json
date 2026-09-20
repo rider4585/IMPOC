@@ -1,6 +1,6 @@
 {
   "name": "impoc-backend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Backend API for IMPOC Shop Management System",
   "main": "server.js",
   "type": "module",
