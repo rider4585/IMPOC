@@ -10,7 +10,13 @@ export {
   CardContent,
   CardFooter,
 } from './Card.jsx';
-export { default as Dialog } from './Dialog.jsx';
+export {
+  default as Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from './Dialog.jsx';
 export {
   default as Table,
   TableHead,
