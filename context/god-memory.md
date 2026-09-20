@@ -931,3 +931,17 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
   2. Backend: `deviceParser.js` utility; capture IP and device telemetry in `auth.controller.js` login and refresh handlers; `GET /api/admin/sessions` (auth + `users.view`), `DELETE /api/admin/sessions/:sessionUuid` (revoke), `DELETE /api/admin/users/:userUuid/sessions`.
   3. Frontend: `/admin/sessions` in navigation; `SessionsScreen.jsx` DataGrid with device icons, user names, IP badges, activity timestamps, and remote revoke actions; top metric cards (total active, unique users, device breakdown).
   4. NOT DISPATCHED — card sits in `todo` until user says GO and picks CLI engine.
+
+## [2026-09-20 ~15:10Z] R-67 Wi-Fi / LAN Modal Bug Fix — Dynamic Port Harmonization & Loopback Protection
+
+- **Bug reported by user:** Wi-Fi modal displayed `https://localhost:5174` instead of the actual `<ip>:<port>` link that other devices on the same Wi-Fi can scan or browse to.
+- **Root cause:**
+  1. In `frontend/src/services/systemApi.js`, the catch block fell back blindly to `${window.location.protocol}//${window.location.host}` (`https://localhost:5174`) whenever the backend network request failed (e.g. before server start or connection refused), presenting loopback `localhost` as a valid Wi-Fi link.
+  2. The URLs returned by the backend were fixed to port 3000 (HTTP), whereas in development the user is browsing on Vite's dev server (`https:` on port 5173/5174), which companion devices need to hit for camera SSL and live assets.
+- **Fix delivered:**
+  1. `frontend/src/services/systemApi.js`: Added `isLoopbackAddress()` helper. `getNetworkInfo()` now harmonizes LAN interface URLs with the active web application's protocol (`https:` in dev) and port (`window.location.port`). Filtered loopback addresses from LAN interfaces. When backend is unreachable on localhost, it returns `success: false` with an explicit error message instead of constructing a fake localhost URL.
+  2. `backend/src/modules/system/system.service.js`: Added `isLoopback: true/false` flag to `getNetworkInfo()` response.
+  3. `frontend/src/components/NetworkAccessModal.jsx`: Added proper error and offline states. If backend is unreachable, displays amber badge "Server unreachable", alert icon, error message, and "Retry detection" button. If machine has no Wi-Fi/LAN connection, displays amber badge "No Wi-Fi network found". Never exposes `localhost` or fake QR codes to other devices.
+  4. Tests: 48/48 frontend test files (445 tests) passing; Vite production build passing; 52/52 backend test suites (817 tests) passing.
+  5. Shipped to `main` (`ff34092`) and synced on `context` (`b33f83e`).
+
