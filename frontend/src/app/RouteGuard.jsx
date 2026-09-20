@@ -8,23 +8,56 @@ import SignIn from '../screens/SignIn';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
   }
 
-  componentDidCatch(error) {
-    console.error('RouteGuard error:', error);
+  componentDidCatch(error, errorInfo) {
+    console.error('RouteGuard error:', error, errorInfo);
+    this.setState({ errorInfo });
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-10 text-center">
-          <h2>Something went wrong</h2>
-          <p>Please try refreshing the page or signing in again.</p>
+        <div className="mx-auto max-w-lg p-6 text-center">
+          <h2 className="mb-2 text-xl font-bold text-[var(--danger,#e11d48)]">Something went wrong</h2>
+          <p className="mb-4 text-sm text-[var(--ink-muted,#6b7280)]">
+            Please try refreshing the page or signing in again.
+          </p>
+          <div className="mb-4 flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-md bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+            >
+              Refresh page
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = '/';
+              }}
+              className="rounded-md border border-[var(--border,#d1d5db)] px-3.5 py-2 text-xs font-semibold text-[var(--ink,#111827)] hover:bg-[var(--surface-sunken,#f3f4f6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+            >
+              Go to sign in
+            </button>
+          </div>
+          {this.state.error && (
+            <details className="mt-4 text-left rounded-md border border-[var(--danger,#e11d48)]/20 bg-[var(--danger,#e11d48)]/5 p-3 text-xs text-[var(--danger,#e11d48)]">
+              <summary className="cursor-pointer font-semibold select-none">
+                Error details ({this.state.error.name || 'Error'})
+              </summary>
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed">
+                {this.state.error.message || String(this.state.error)}
+                {this.state.error.stack ? `\n\n${this.state.error.stack}` : ''}
+                {this.state.errorInfo?.componentStack ? `\n\nComponent stack:${this.state.errorInfo.componentStack}` : ''}
+              </pre>
+            </details>
+          )}
         </div>
       );
     }

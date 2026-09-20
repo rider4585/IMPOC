@@ -50,4 +50,38 @@ describe('requestKey', () => {
       crypto.randomUUID = originalRandomUUID;
     }
   });
+
+  it('generates a valid UUID v4 when crypto.randomUUID is undefined (e.g. non-secure mobile context)', () => {
+    const originalRandomUUID = crypto.randomUUID;
+    const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    try {
+      delete crypto.randomUUID;
+      const key = createRequestKey();
+      expect(typeof key).toBe('string');
+      expect(key.length).toBe(36);
+      expect(uuidv4Regex.test(key)).toBe(true);
+    } finally {
+      crypto.randomUUID = originalRandomUUID;
+    }
+  });
+
+  it('generates a valid UUID v4 when crypto is completely unavailable', () => {
+    const originalRandomUUID = crypto.randomUUID;
+    const originalGetRandomValues = crypto.getRandomValues;
+    const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    try {
+      delete crypto.randomUUID;
+      delete crypto.getRandomValues;
+      const key = createRequestKey();
+      expect(typeof key).toBe('string');
+      expect(key.length).toBe(36);
+      expect(uuidv4Regex.test(key)).toBe(true);
+    } finally {
+      crypto.randomUUID = originalRandomUUID;
+      crypto.getRandomValues = originalGetRandomValues;
+    }
+  });
 });
+

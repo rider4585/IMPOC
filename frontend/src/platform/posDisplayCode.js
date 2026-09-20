@@ -15,7 +15,13 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function generateDisplayCode(length = 6) {
   const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < length; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
   return Array.from(bytes, (b) => CODE_CHARS[b % CODE_CHARS.length]).join('');
 }
 

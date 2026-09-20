@@ -6,6 +6,7 @@
 
 import apiClient from '../platform/apiClient.js';
 import buildError from '../platform/buildError.js';
+import { createRequestKey } from '../platform/requestKey.js';
 
 /**
  * POST /auth/login
@@ -39,7 +40,7 @@ export async function refresh() {
   try {
     const response = await apiClient.post('/auth/refresh', {}, {
       headers: {
-        'X-Idempotency-Key': crypto.randomUUID(),
+        'X-Idempotency-Key': createRequestKey(),
       },
     });
 
