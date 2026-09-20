@@ -967,3 +967,10 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
   8. Tests & Build: 48/48 test files (447 tests) green; Vite production build passing in 1.09s.
   9. Shipped to `main` (`d464308`) and synced on `context` (`457d94b`).
 
+## [2026-09-20 ~15:48Z] R-67 DONE — Wi-Fi / LAN Access Modal Verified by User
+
+- User confirmed: "you can mark the R-67 as done".
+- `R-67` card in `hive/tasks.json` transitioned from `doing` -> `done` with humanQA answer recorded.
+- `hive/board.md` updated: `DOING (0)`, `DONE (152)`.
+- Synchronized to `context/tasks.json`, `context/board.md`, and `context/god-memory.md`.
+
