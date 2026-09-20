@@ -872,3 +872,23 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 ## [2026-09-18 OFFICE CLOSE] final closing-time sync
 - Confirmed at closing: god-memory hive==context identical; board hive==context identical; tasks context==authoritative 167 (151 done/0 doing/1 blocked/15 todo), hive is the 21-card scratch board (differs BY DESIGN; R-60 delta on hive = known off-by-one duplicated V2-SHIPPED para + scheduler-echo-stripped humanQA — context card is the clean one, never copy hive→context).
 - v1.0.0 GitHub release published + gh installed (see earlier entries). Handoff docs CONTEXT.md + CONTEXT-RESUME.md now carry both (docs-only, no bump). Board + memory synced, both branches pushed.
+
+## [2026-09-20 ~14:05Z] Session start & floor check-in (Michael / god)
+
+- **Floor:** god only (healthy, idle). All past temps archived. Breaker healthy, 0 pending spawn-requests.
+- **Inbox:** 0 pending messages (drained and clean).
+- **Kanban status:** 167 cards = 151 done / 0 doing / 1 blocked (R-52 parked to ~mid-Oct) / 15 todo (R-62 communication suite, parked by user).
+- **Repository:** branch `context`, up to date with origin/context. Clean tree.
+- **Running build:** Munder Difflin v0.5.2.
+- Floor is clear and standing by for tasks.
+
+## [2026-09-20 ~14:25Z] R-67 planned and dispatched — Wi-Fi / LAN Network Access Modal (user request)
+
+- **User request:** Display on which exact URL other devices can connect to IMPOC over Wi-Fi when the host machine connects to Wi-Fi with static/dynamic IP set on router level.
+- **User choices confirmed:**
+  1. Header icon only (in AppShell mobile + desktop headers) opening a dedicated modal; no separate routing screen.
+  2. Dynamic IP updates: modal dynamically fetches the freshest active network info on every open so router static/DHCP IP changes immediately reflect the live link.
+- **Ticket created:** `R-67` (status: `doing`, assignee: `worker-r67-wifi-access`) in `context/tasks.json` + `hive/tasks.json` (168 tasks total: 151 done / 1 doing / 1 blocked / 15 todo).
+- **Board updated:** `R-67` in DOING on `context/board.md` + `hive/board.md`.
+- **Spawned temp:** `worker-r67-wifi-access` (engine: `opencode`, provider: `opencode`, isolate: true, tokenCap: 250000). Live on floor with isolated worktree.
+- **Contract:** Backend `GET /api/system/network` (returns active IPv4 interfaces via `os.networkInterfaces()`, port, primary URL) + LAN CORS permissions; Frontend `NetworkAccessModal` with `QRCodeSVG` (qrcode.react), copy URL button with toast, network interface picker, step-by-step connection guide; Header `Wifi` button in `AppShell.jsx` on both mobile & desktop; full vitest + jest + vite build passing.

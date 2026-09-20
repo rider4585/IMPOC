@@ -2629,6 +2629,17 @@
       ],
       "completedAt": "2026-09-18T04:10:00.000Z",
       "doneBy": "worker-r66-hide-templates-ui"
+    },
+    {
+      "id": "R-67",
+      "title": "Wi-Fi / LAN Network Access Modal & Dynamic IP QR (multi-device access)",
+      "status": "doing",
+      "priority": "high",
+      "assignee": "worker-r67-wifi-access",
+      "origin": "user (2026-09-20)",
+      "deps": [],
+      "createdAt": "2026-09-20T14:25:00.000Z",
+      "details": "User request: connecting to Wi-Fi with static/dynamic IP set on router level; wants to see on which exact URL other devices should connect to IMPOC over the same Wi-Fi. Specification: (1) Header Wi-Fi icon button (AppShell) on both mobile and desktop headers opening a dedicated NetworkAccessModal (no separate screen requested). (2) Modal fetches latest dynamic network info on every open (GET /api/system/network) so dynamic/static IP changes are immediately reflected. (3) Displays exact URL, port, scannable QR code (qrcode.react with shop logo), 1-click Copy URL button with toast, network interface picker (if multiple), and connection guide. (4) Backend GET /api/system/network returns active IPv4 non-internal interfaces + port + primary URL; CORS allows LAN IP origins (192.168.*, 10.*, 172.16-31.*, localhost) so devices connecting via Wi-Fi do not get CORS-blocked."
     }
   ]
 }
