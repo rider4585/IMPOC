@@ -945,3 +945,25 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
   4. Tests: 48/48 frontend test files (445 tests) passing; Vite production build passing; 52/52 backend test suites (817 tests) passing.
   5. Shipped to `main` (`ff34092`) and synced on `context` (`b33f83e`).
 
+## [2026-09-20 ~15:32Z] Mobile Sign-In ErrorBoundary Crash Fix — Resilient UUID v4 Generation & Diagnostics
+
+- **Bug reported by user:** Scanning the Wi-Fi QR code on mobile loaded IMPOC login screen, but upon submitting username/password, the screen crashed with `"Something went wrong. Please try refreshing the page or signing in again."` Refreshing and signing in again reproduced the exact same crash.
+- **Root cause:**
+  1. Post-login, `status` switches to `'signed-in'`. `AppShell` renders and `LandingRedirect` redirects `/` to the user's first accessible path (`/barcode-sheets` -> `<BarcodePrintScreen />`).
+  2. In `frontend/src/screens/BarcodePrintScreen.jsx`, `useState(() => createRequestKey())` executes during initial component mount.
+  3. In `frontend/src/platform/requestKey.js`, `createRequestKey()` called `crypto.randomUUID()`.
+  4. On mobile devices accessing the dev server over LAN IP (`https://192.168.31.211:5173/`) with Vite's self-signed development certificate (`@vitejs/plugin-basic-ssl`), mobile WebKit (Safari) and Chrome do not mark the IP address as a fully trusted secure context (`isSecureContext === false`), or in older WebKit versions where `crypto.randomUUID` is undefined.
+  5. `crypto.randomUUID` being `undefined` threw `TypeError: crypto.randomUUID is not a function`, caught in `createRequestKey` and rethrown as `TypeError: Failed to generate request key: ...`.
+  6. Because this error occurred during synchronous React component render, React caught it in `RouteGuard`'s `ErrorBoundary`, which displayed the generic error message and masked the stack trace from the user.
+  7. Similar vulnerable direct `crypto.randomUUID()` calls existed in `frontend/src/services/authApi.js` (`refresh()`).
+- **Fix delivered:**
+  1. `frontend/src/platform/requestKey.js`: Enhanced `createRequestKey()` with a resilient fallback chain: uses `crypto.randomUUID()` if available; if unavailable (non-secure context, mobile WebKit), falls back to RFC 4122 v4 UUID generation via `crypto.getRandomValues()`; with an additional `Math.random` fallback. Preserved TypeError propagation when `crypto.randomUUID` is present but explicitly throws.
+  2. `frontend/src/platform/requestKey.test.js`: Added unit tests for `crypto.getRandomValues` fallback and total crypto-unavailable fallback.
+  3. `frontend/src/services/authApi.js`: Updated `refresh()` to use `createRequestKey()` instead of raw `crypto.randomUUID()`.
+  4. `frontend/src/platform/posDisplayCode.js`: Added safe fallback for `crypto.getRandomValues()`.
+  5. `frontend/src/app/RouteGuard.jsx`: Enhanced `ErrorBoundary` to record `error` and `errorInfo` in state, render "Refresh page" and "Go to sign in" recovery buttons, and a collapsible `<details>` section showing the error name, message, stack, and component stack.
+  6. `frontend/src/app/AppShell.jsx`: Added missing `receiptTemplates` icon mapping to `ICONS` and `itemIcon`.
+  7. `frontend/src/components/__tests__/NetworkAccessModal.test.jsx`: Fixed race condition in clipboard copy test.
+  8. Tests & Build: 48/48 test files (447 tests) green; Vite production build passing in 1.09s.
+  9. Shipped to `main` (`d464308`) and synced on `context` (`457d94b`).
+
