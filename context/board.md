@@ -16,14 +16,13 @@
 
 ## KANBAN BOARD (as of 2026-09-21)
 
-### DOING (0)
-_None in flight._
+### DOING (1)
+- **R-69** — DataGrid action column popover / overflow menu pattern (System-wide). Single primary action directly visible + secondary/destructive actions grouped under ActionMenu popover menu. Implemented across UsersScreen, RolesScreen, VendorsScreen, FlatPicklistManager, ExpensesScreen, StocksScreen, EnquiriesScreen. Verified with full Vitest (51/51 files, 467/467 tests), clean build, 53/53 backend suites (828/828 tests). Awaiting user testing before push.
 
 ### BLOCKED (1)
 - **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use. Interim: templates UI hidden FE-only + reversible (R-66, done 2026-09-18).
 
-### TODO (16)
-- **R-69** — DataGrid action column popover / overflow menu pattern (System-wide). Single primary action directly visible + secondary/destructive actions grouped under dropdown/popover menu. Plan only per user instruction.
+### TODO (15)
 - **R-62** — Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later). 15 sub-cards below.
   - **R-62a** — Comm foundation: migrations (comm_templates, delivery_logs extension, customers preferences)
   - **R-62b** — Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}})

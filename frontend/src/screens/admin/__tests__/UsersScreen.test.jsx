@@ -111,15 +111,23 @@ describe('UsersScreen - Role column', () => {
     expect(screen.queryByText('noroleuser')).not.toBeInTheDocument();
   });
 
-  it('opens roles management dialog for user', async () => {
+  it('opens roles management dialog for user via action menu', async () => {
     renderWithToast(<UsersScreen />);
 
     await waitFor(() => {
       expect(screen.getByText('adminuser')).toBeInTheDocument();
     });
 
-    const rolesButtons = screen.getAllByRole('button', { name: 'Roles' });
-    fireEvent.click(rolesButtons[0]);
+    // Primary action button is Edit
+    expect(screen.getByTestId('user-edit-user-1')).toBeInTheDocument();
+
+    // Trigger overflow menu for user-1
+    const triggerBtn = screen.getByTestId('user-actions-user-1-trigger');
+    fireEvent.click(triggerBtn);
+
+    // Click Roles in the opened popover menu
+    const rolesOption = screen.getByTestId('user-roles-btn-user-1');
+    fireEvent.click(rolesOption);
 
     await waitFor(() => {
       expect(screen.getByText('Roles — adminuser')).toBeInTheDocument();

@@ -10,7 +10,8 @@ import {
   Dialog,
   Badge,
   useToast,
-} from '../../components/ui';
+  ActionMenu,
+} from '../../components/ui/index.js';
 import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
@@ -116,22 +117,33 @@ export function FlatPicklistManager({
     cols.push({
       id: 'actions',
       header: 'Actions',
-      size: 200,
+      size: 130,
       cell: (info) => {
         const item = info.row.original;
         return (
-          <div className="flex flex-wrap gap-2">
-            {canUpdate && (
-              <Button variant="outline" size="sm" onClick={() => { setEditing(item); setFormOpen(true); }}>
-                Edit
-              </Button>
-            )}
-            {canUpdate && (
-              <Button variant="ghost" size="sm" onClick={() => handleToggleActive(item)}>
-                {item.isActive ? 'Deactivate' : 'Activate'}
-              </Button>
-            )}
-          </div>
+          <ActionMenu
+            primary={
+              canUpdate
+                ? {
+                    label: 'Edit',
+                    onClick: () => {
+                      setEditing(item);
+                      setFormOpen(true);
+                    },
+                    dataTestid: `picklist-edit-${item.uuid}`,
+                  }
+                : null
+            }
+            items={[
+              canUpdate && {
+                label: item.isActive ? 'Deactivate' : 'Activate',
+                onClick: () => handleToggleActive(item),
+                danger: item.isActive,
+                dataTestid: `picklist-status-${item.uuid}`,
+              },
+            ]}
+            dataTestid={`picklist-actions-${item.uuid}`}
+          />
         );
       },
       enableSorting: false,

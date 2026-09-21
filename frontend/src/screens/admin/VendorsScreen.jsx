@@ -9,7 +9,8 @@ import {
   Dialog,
   Badge,
   useToast,
-} from '../../components/ui';
+  ActionMenu,
+} from '../../components/ui/index.js';
 import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
@@ -102,25 +103,42 @@ export function VendorsScreen() {
     {
       id: 'actions',
       header: 'Actions',
-      size: 180,
+      size: 140,
       cell: (info) => {
         const v = info.row.original;
         return (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => openHistory(v)}>
-              History
-            </Button>
-            {canUpdate && (
-              <Button variant="outline" size="sm" onClick={() => { setEditing(v); setFormOpen(true); }}>
-                Edit
-              </Button>
-            )}
-            {canUpdate && (
-              <Button variant="ghost" size="sm" onClick={() => handleToggleActive(v)}>
-                {v.isActive ? 'Deactivate' : 'Activate'}
-              </Button>
-            )}
-          </div>
+          <ActionMenu
+            primary={
+              canUpdate
+                ? {
+                    label: 'Edit',
+                    onClick: () => {
+                      setEditing(v);
+                      setFormOpen(true);
+                    },
+                    dataTestid: `vendor-edit-${v.uuid}`,
+                  }
+                : {
+                    label: 'History',
+                    onClick: () => openHistory(v),
+                    dataTestid: `vendor-history-${v.uuid}`,
+                  }
+            }
+            items={[
+              canUpdate && {
+                label: 'History',
+                onClick: () => openHistory(v),
+                dataTestid: `vendor-history-${v.uuid}`,
+              },
+              canUpdate && {
+                label: v.isActive ? 'Deactivate' : 'Activate',
+                onClick: () => handleToggleActive(v),
+                danger: v.isActive,
+                dataTestid: `vendor-status-${v.uuid}`,
+              },
+            ]}
+            dataTestid={`vendor-actions-${v.uuid}`}
+          />
         );
       },
       enableSorting: false,

@@ -166,6 +166,7 @@ describe('EnquiriesScreen (R-63)', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     renderScreen();
     await waitFor(() => expect(screen.getByText('Priya Sharma')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('enquiry-actions-e1-trigger'));
     fireEvent.click(screen.getByTestId('enquiry-close-e1'));
 
     // "Tell the customer" is the default because WhatsApp is reachable.
@@ -204,6 +205,7 @@ describe('EnquiriesScreen (R-63)', () => {
     enquiriesApi.closeEnquiry.mockResolvedValue({ enquiry: { ...OPEN[0], status: 'CLOSED' }, handoffs: [] });
     renderScreen();
     await waitFor(() => expect(screen.getByText('Priya Sharma')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('enquiry-actions-e1-trigger'));
     fireEvent.click(screen.getByTestId('enquiry-close-e1'));
     fireEvent.click(screen.getByTestId('enquiry-close-quiet'));
     expect(screen.queryByTestId('enquiry-close-channels')).not.toBeInTheDocument();
@@ -221,6 +223,7 @@ describe('EnquiriesScreen (R-63)', () => {
     });
     renderScreen();
     await waitFor(() => expect(screen.getByText('Priya Sharma')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('enquiry-actions-e1-trigger'));
     fireEvent.click(screen.getByTestId('enquiry-close-e1'));
     expect(screen.getByTestId('enquiry-close-quiet')).toBeChecked();
     fireEvent.click(screen.getByTestId('enquiry-close-notify'));

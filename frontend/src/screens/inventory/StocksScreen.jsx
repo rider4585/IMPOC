@@ -4,7 +4,8 @@ import {
   Button,
   Input,
   SearchableSelect,
-} from '../../components/ui';
+  ActionMenu,
+} from '../../components/ui/index.js';
 import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
@@ -177,18 +178,25 @@ export function StocksScreen() {
     {
       id: 'actions',
       header: 'Actions',
-      size: 150,
+      size: 130,
       cell: (info) => {
         const stock = info.row.original;
         return (
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/units?stockUuid=${encodeURIComponent(stock.uuid)}`)} data-testid="stock-units">
-              Units
-            </Button>
-            <Button size="sm" onClick={() => navigate(`/trips/${encodeURIComponent(stock.tripUuid)}/stocks/${encodeURIComponent(stock.uuid)}/scan`)} data-testid="stock-scan">
-              Scan
-            </Button>
-          </div>
+          <ActionMenu
+            primary={{
+              label: 'Units',
+              onClick: () => navigate(`/units?stockUuid=${encodeURIComponent(stock.uuid)}`),
+              dataTestid: 'stock-units',
+            }}
+            items={[
+              {
+                label: 'Scan',
+                onClick: () => navigate(`/trips/${encodeURIComponent(stock.tripUuid)}/stocks/${encodeURIComponent(stock.uuid)}/scan`),
+                dataTestid: 'stock-scan',
+              },
+            ]}
+            dataTestid={`stock-actions-${stock.uuid}`}
+          />
         );
       },
       enableSorting: false,

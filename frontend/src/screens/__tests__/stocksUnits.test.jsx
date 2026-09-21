@@ -214,6 +214,8 @@ describe('StocksScreen (R-12)', () => {
     );
     await screen.findByTestId('stock-row');
 
+    // Click overflow trigger, then Scan
+    fireEvent.click(screen.getByTestId('stock-actions-st1-trigger'));
     fireEvent.click(screen.getByTestId('stock-scan'));
     await waitFor(() => {
       expect(screen.getByTestId('probe-path')).toHaveTextContent('/trips/t1/stocks/st1/scan');
