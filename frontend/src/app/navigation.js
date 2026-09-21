@@ -6,6 +6,7 @@ import PermissionsScreen from '../screens/admin/PermissionsScreen';
 import PicklistManagementScreen from '../screens/admin/PicklistManagementScreen';
 import VendorsScreen from '../screens/admin/VendorsScreen';
 import ReceiptTemplatesScreen from '../screens/admin/ReceiptTemplatesScreen';
+import SessionsScreen from '../screens/admin/SessionsScreen.jsx';
 import TripsScreen from '../screens/inventory/TripsScreen';
 import TripDetailScreen from '../screens/inventory/TripDetailScreen';
 import StockForm from '../screens/inventory/StockForm';
@@ -37,6 +38,7 @@ export const navigationRegistry = [
   { permission: PERMISSIONS.ROLES.VIEW, label: 'Roles', path: '/roles', element: RolesScreen },
   { permission: PERMISSIONS.ROLES.VIEW, label: 'Permissions', path: '/permissions', element: PermissionsScreen },
   { permission: PERMISSIONS.PICKLISTS.VIEW, label: 'Picklists', path: '/picklists', element: PicklistManagementScreen },
+  { permission: PERMISSIONS.USERS.VIEW, label: 'Active Sessions', path: '/sessions', element: SessionsScreen },
   { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Vendors', path: '/vendors', element: VendorsScreen },
   { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Trips', path: '/trips', element: TripsScreen },
   { permission: PERMISSIONS.INVENTORY.VIEW, label: 'Stocks', path: '/stocks', element: StocksScreen },
@@ -103,6 +105,7 @@ export const navigationSections = [
       { permission: PERMISSIONS.ROLES.VIEW, label: 'Roles', path: '/roles' },
       { permission: PERMISSIONS.ROLES.VIEW, label: 'Permissions', path: '/permissions' },
       { permission: PERMISSIONS.PICKLISTS.VIEW, label: 'Picklists', path: '/picklists' },
+      { permission: PERMISSIONS.USERS.VIEW, label: 'Active Sessions', path: '/sessions' },
       { permission: PERMISSIONS.CUSTOMERS.VIEW, label: 'Customers', path: '/customers' },
       { permission: PERMISSIONS.RECEIPT_TEMPLATES.VIEW, label: 'Receipt Templates', path: '/receipt-templates' },
     ],

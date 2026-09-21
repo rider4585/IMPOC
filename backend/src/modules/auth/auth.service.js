@@ -13,7 +13,7 @@ const runDummyVerify = async (password) => {
     await verifyPassword(DUMMY_PASSWORD_HASH, password);
 };
 
-export const login = async ({ username, password }) => {
+export const login = async ({ username, password }, telemetry = {}) => {
     const normalizedUsername = username.toLowerCase();
 
     const user = await User.findOne({
@@ -55,7 +55,7 @@ export const login = async ({ username, password }) => {
         lastLoginAt: new Date(),
     });
 
-    const tokens = await createAuthTokens(user);
+    const tokens = await createAuthTokens(user, telemetry);
 
     return {
         user,

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import authRoutes from './src/modules/auth/auth.routes.js';
 import userRoutes from './src/modules/users/user.routes.js';
+import adminSessionsRoutes from './src/modules/admin-sessions/admin-sessions.routes.js';
 import roleRoutes from './src/modules/roles/role.routes.js';
 import permissionRoutes from './src/modules/permissions/permission.routes.js';
 import barcodeRoutes from './src/modules/barcode/barcode.routes.js';
@@ -117,6 +118,7 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/admin/sessions', adminSessionsRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/barcodes', barcodeRoutes);

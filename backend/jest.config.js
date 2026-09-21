@@ -1,6 +1,9 @@
 export default {
   testEnvironment: 'node',
-  testMatch: ['**/tests/**/*.test.js'],
+  testMatch: [
+    '**/tests/**/*.test.js',
+    '<rootDir>/src/modules/admin-sessions/__tests__/**/*.test.js',
+  ],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   collectCoverageFrom: [
     'src/**/*.js',

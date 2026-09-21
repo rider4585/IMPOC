@@ -14,11 +14,11 @@ import {
     rotateAuthSession,
 } from './auth-session.service.js';
 
-export const createAuthTokens = async (user) => {
+export const createAuthTokens = async (user, telemetry = {}) => {
     const {
         session,
         refreshToken,
-    } = await createAuthSession(user);
+    } = await createAuthSession(user, telemetry);
 
     const accessToken = generateAccessToken({
         userUuid: user.uuid,
@@ -33,7 +33,8 @@ export const createAuthTokens = async (user) => {
 };
 
 export const refreshAuthTokens = async (
-    refreshToken
+    refreshToken,
+    telemetry = {}
 ) => {
     const sessionUuid =
         getSessionUuidFromRefreshToken(refreshToken);
@@ -80,6 +81,7 @@ export const refreshAuthTokens = async (
     } = await rotateAuthSession(
         session.uuid,
         refreshToken,
+        telemetry,
     );
 
     const accessToken = generateAccessToken({
