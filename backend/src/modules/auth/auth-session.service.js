@@ -79,7 +79,7 @@ export const rotateAuthSession = async (
          */
         if (session.revokedAt) {
             const error = new Error(
-                'Refresh token reuse detected'
+                'Session has been revoked'
             );
             error.statusCode = 401;
             throw error;

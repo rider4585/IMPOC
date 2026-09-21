@@ -49,7 +49,7 @@ function getDeviceIcon(deviceType) {
 }
 
 export function SessionsScreen() {
-  const { permissions, signOut } = useAuth();
+  const { permissions, currentUser, signOut } = useAuth();
   const toast = useToast();
 
   const can = useCallback(
@@ -125,6 +125,11 @@ export function SessionsScreen() {
     if (!sessionToRevoke) return;
     setRevoking(true);
     try {
+      const willRevokeSelf = Boolean(
+        sessionToRevoke.isCurrent ||
+        (revokeAllForUser && sessionToRevoke.user?.uuid === currentUser?.uuid)
+      );
+
       if (revokeAllForUser) {
         await revokeUserSessions(sessionToRevoke.user.uuid);
         toast.success('All user sessions revoked');
@@ -135,8 +140,8 @@ export function SessionsScreen() {
 
       setDialogOpen(false);
 
-      if (sessionToRevoke.isCurrent) {
-        signOut();
+      if (willRevokeSelf) {
+        await signOut();
       } else {
         await loadSessions();
       }
@@ -429,11 +434,11 @@ export function SessionsScreen() {
             Revoke Session? The user on this device will be signed out immediately.
           </p>
 
-          {sessionToRevoke?.isCurrent && (
+          {(sessionToRevoke?.isCurrent || (revokeAllForUser && sessionToRevoke?.user?.uuid === currentUser?.uuid)) && (
             <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 text-xs flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
               <span>
-                <strong>Warning:</strong> This is your current session. You will be signed out.
+                <strong>Warning:</strong> {sessionToRevoke?.isCurrent ? 'This is your current session. You will be signed out.' : 'This will also revoke your current session. You will be signed out.'}
               </span>
             </div>
           )}
