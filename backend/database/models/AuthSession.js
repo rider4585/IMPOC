@@ -47,6 +47,36 @@ export default (sequelize) => {
                 field: 'last_used_at',
             },
 
+            ipAddress: {
+                type: DataTypes.STRING(64),
+                allowNull: true,
+                field: 'ip_address',
+            },
+
+            userAgent: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+                field: 'user_agent',
+            },
+
+            deviceType: {
+                type: DataTypes.STRING(32),
+                allowNull: true,
+                field: 'device_type',
+            },
+
+            browser: {
+                type: DataTypes.STRING(64),
+                allowNull: true,
+                field: 'browser',
+            },
+
+            os: {
+                type: DataTypes.STRING(64),
+                allowNull: true,
+                field: 'os',
+            },
+
             createdAt: {
                 type: DataTypes.DATE,
                 allowNull: false,

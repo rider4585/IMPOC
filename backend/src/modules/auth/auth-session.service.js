@@ -9,7 +9,7 @@ import {
     getRefreshTokenExpiry,
 } from './token.service.js';
 
-export const createAuthSession = async (user) => {
+export const createAuthSession = async (user, telemetry = {}) => {
     const sessionUuid = randomUUID();
 
     const refreshToken = generateRefreshToken(sessionUuid);
@@ -23,6 +23,11 @@ export const createAuthSession = async (user) => {
         userId: user.id,
         refreshTokenHash,
         expiresAt,
+        ipAddress: telemetry.ipAddress || null,
+        userAgent: telemetry.userAgent || null,
+        deviceType: telemetry.deviceType || null,
+        browser: telemetry.browser || null,
+        os: telemetry.os || null,
     });
 
     return {
@@ -43,7 +48,8 @@ export const findSessionByRefreshToken = async (refreshToken) => {
 
 export const rotateAuthSession = async (
     sessionUuid,
-    refreshToken
+    refreshToken,
+    telemetry = {}
 ) => {
     const transaction =
         await AuthSession.sequelize.transaction();
@@ -130,12 +136,22 @@ export const rotateAuthSession = async (
         const newExpiresAt =
             getRefreshTokenExpiry();
 
+        const updateData = {
+            refreshTokenHash: newRefreshTokenHash,
+            expiresAt: newExpiresAt,
+            lastUsedAt: new Date(),
+        };
+
+        if (telemetry && Object.keys(telemetry).length > 0) {
+            if (telemetry.ipAddress !== undefined) updateData.ipAddress = telemetry.ipAddress;
+            if (telemetry.userAgent !== undefined) updateData.userAgent = telemetry.userAgent;
+            if (telemetry.deviceType !== undefined) updateData.deviceType = telemetry.deviceType;
+            if (telemetry.browser !== undefined) updateData.browser = telemetry.browser;
+            if (telemetry.os !== undefined) updateData.os = telemetry.os;
+        }
+
         await session.update(
-            {
-                refreshTokenHash: newRefreshTokenHash,
-                expiresAt: newExpiresAt,
-                lastUsedAt: new Date(),
-            },
+            updateData,
             {
                 transaction,
             }
@@ -259,3 +275,116 @@ export const revokeSingleSession = async (uuid, userId) => {
 
     return session;
 };
+
+export const getAllAdminSessions = async ({
+    activeOnly = false,
+    currentSessionUuid = null,
+} = {}) => {
+    const now = new Date();
+    const where = {};
+
+    if (activeOnly) {
+        where.revokedAt = null;
+        where.expiresAt = {
+            [Op.gt]: now,
+        };
+    }
+
+    const sessions = await AuthSession.findAll({
+        where,
+        include: [
+            {
+                model: User,
+                as: 'user',
+                attributes: [
+                    'uuid',
+                    'username',
+                    'email',
+                    'firstName',
+                    'lastName',
+                    'status',
+                ],
+            },
+        ],
+        order: [
+            [AuthSession.sequelize.literal('"AuthSession"."last_used_at" DESC NULLS LAST')],
+            ['createdAt', 'DESC'],
+        ],
+    });
+
+    const mappedSessions = sessions.map((session) => {
+        let status = 'ACTIVE';
+        if (session.revokedAt) {
+            status = 'REVOKED';
+        } else if (new Date(session.expiresAt) <= now) {
+            status = 'EXPIRED';
+        }
+
+        const user = session.user
+            ? {
+                  uuid: session.user.uuid,
+                  username: session.user.username,
+                  email: session.user.email,
+                  firstName: session.user.firstName,
+                  lastName: session.user.lastName,
+                  fullName:
+                      [session.user.firstName, session.user.lastName]
+                          .filter(Boolean)
+                          .join(' ') ||
+                      session.user.username ||
+                      '',
+                  status: session.user.status,
+              }
+            : null;
+
+        return {
+            uuid: session.uuid,
+            user,
+            ipAddress: session.ipAddress,
+            userAgent: session.userAgent,
+            deviceType: session.deviceType || 'unknown',
+            browser: session.browser || 'Unknown',
+            os: session.os || 'Unknown',
+            expiresAt: session.expiresAt,
+            revokedAt: session.revokedAt,
+            lastUsedAt: session.lastUsedAt,
+            createdAt: session.createdAt,
+            isCurrent: Boolean(currentSessionUuid && session.uuid === currentSessionUuid),
+            status,
+        };
+    });
+
+    // Summary stats calculated over active sessions
+    const activeSessionsList = mappedSessions.filter((s) => s.status === 'ACTIVE');
+    const uniqueUserUuids = new Set(
+        activeSessionsList.map((s) => s.user?.uuid).filter(Boolean)
+    );
+
+    const deviceBreakdown = {
+        desktop: 0,
+        mobile: 0,
+        tablet: 0,
+        unknown: 0,
+    };
+
+    for (const s of activeSessionsList) {
+        const dt = (s.deviceType || 'unknown').toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(deviceBreakdown, dt)) {
+            deviceBreakdown[dt] += 1;
+        } else {
+            deviceBreakdown.unknown += 1;
+        }
+    }
+
+    const stats = {
+        activeSessions: activeSessionsList.length,
+        uniqueUsersCount: uniqueUserUuids.size,
+        deviceBreakdown,
+    };
+
+    return {
+        sessions: mappedSessions,
+        stats,
+    };
+};
+

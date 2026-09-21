@@ -32,6 +32,7 @@ import {
   Layers,
   Package,
   Tags,
+  Monitor,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -88,6 +89,7 @@ const ICONS = {
   stocks: <Package {...iconProps} />,
   units: <Tags {...iconProps} />,
   receiptTemplates: <NotebookPen {...iconProps} />,
+  sessions: <Monitor {...iconProps} />,
 };
 
 function iconFor(name) {
@@ -108,6 +110,7 @@ const itemIcon = {
   '/roles': 'roles',
   '/permissions': 'permissions',
   '/picklists': 'picklists',
+  '/sessions': 'sessions',
   '/customers': 'customers',
   '/enquiries': 'enquiries',
   '/dashboard': 'dashboardItem',

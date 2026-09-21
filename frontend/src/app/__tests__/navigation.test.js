@@ -40,7 +40,7 @@ describe('navigationSections — grouped, labelled, iconed', () => {
     expect(sectionItems.pos).toEqual(['/pos', '/sales', '/enquiries']);
     expect(sectionItems.rentals).toEqual(['/rentals']);
     expect(sectionItems.expenses).toEqual(['/expenses']);
-    expect(sectionItems.admin).toEqual(['/users', '/roles', '/permissions', '/picklists', '/customers', '/receipt-templates']);
+    expect(sectionItems.admin).toEqual(['/users', '/roles', '/permissions', '/picklists', '/sessions', '/customers', '/receipt-templates']);
     expect(sectionItems.dashboard).toEqual(['/dashboard']);
   });
 
@@ -120,7 +120,7 @@ describe('Role visibility — absent-not-disabled (preserved)', () => {
       .flatMap((s) => s.items)
       .filter((item) => perms.includes(item.permission))
       .map((item) => item.label);
-    expect(visible).toEqual(['Users', 'Roles', 'Permissions', 'Picklists']);
+    expect(visible).toEqual(['Users', 'Roles', 'Permissions', 'Picklists', 'Active Sessions']);
   });
 
   it('should expose empty items for a role with no held permission (absent, not disabled)', () => {
