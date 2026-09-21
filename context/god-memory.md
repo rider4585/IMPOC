@@ -1119,4 +1119,34 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
   - Scope: System-wide action column overflow pattern. Expose single primary action directly in table cell; group secondary/destructive actions under popover/dropdown menu. Plan only per user instruction.
 - **Inbox:** Handled standup message `2026-09-21T16-33-14-232Z-0c83db.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
 
+## [2026-09-21 ~17:25Z] R-69 Shipped: DataGrid Action Column Popover / Overflow Menu Pattern
+
+- **User Request:** "i have tested the grid and it is working correctly, now you can start working on R-69. and don't push the changes to git until i test them" → Built, verified, user tested and approved ("working correctly, push it and update the memory and context docs").
+- **Task board:** 170 cards total = **154 done / 0 doing / 1 blocked / 15 todo**.
+- **Implementation:**
+  - Created reusable primitive `frontend/src/components/ui/ActionMenu.jsx` (exported from `frontend/src/components/ui/index.js`):
+    - **Single Action:** Renders as standalone Button (no menu trigger).
+    - **2+ Actions:** Standalone primary Button + `⋯` (`MoreHorizontal`) overflow trigger button.
+    - **Portal Popover:** Rendered via `createPortal(..., document.body)` so table `overflow-x-auto` / `overflow-y-auto` never clips the menu.
+    - **Smart Positioning:** Flip-above logic near bottom viewport edge, right-aligned to trigger, window/table scroll & resize listeners.
+    - **A11y & Interactions:** StopPropagation prevents row clicks, Escape restores trigger focus, ArrowUp/ArrowDown navigation, ARIA menu/menuitem roles.
+    - **Theming:** Full dark/light token compatibility with danger styling for destructive items and optional separator dividers.
+  - Converted multi-action screens:
+    - `UsersScreen.jsx`: Primary `Edit` (standalone); Menu: `Roles`, `Deactivate/Activate`, `Delete` (danger). Action column width reduced from 320 to 130px.
+    - `RolesScreen.jsx`: Primary `Permissions` (standalone); Menu: `Edit`, `Delete` (danger). Width reduced from 200 to 150px.
+    - `VendorsScreen.jsx`: Primary `Edit` (standalone); Menu: `History`, `Deactivate/Activate`. Width reduced from 180 to 140px.
+    - `FlatPicklistManager.jsx`: Primary `Edit` (standalone); Menu: `Deactivate/Activate`. Width reduced from 200 to 130px.
+    - `ExpensesScreen.jsx`: Primary `Edit` (standalone); Menu: `Cancel` (danger). Width reduced from 170 to 130px.
+    - `StocksScreen.jsx`: Primary `Units` (standalone); Menu: `Scan`. Width reduced from 150 to 130px.
+    - `EnquiriesScreen.jsx`: When open: Primary `Edit` (standalone), Menu: `Close`. When closed: standalone `Reopen`. Width reduced from 170 to 130px.
+  - Verified 1-action screens retain standalone buttons (`CustomersScreen`, `SessionsScreen`, `SalesListScreen`, `TripsScreen`, `TripDetailScreen`, `VendorDetail`).
+  - Fixed toast unmount timer cleanup in `ToastProvider` (`frontend/src/components/ui/Toast.jsx`).
+- **Verification:**
+  - Component tests: `ActionMenu.test.jsx` (8/8 pass).
+  - Screen tests: updated `UsersScreen.test.jsx`, `stocksUnits.test.jsx`, `enquiriesScreen.test.jsx`.
+  - Full frontend suite: 51/51 test files pass, 467/467 tests pass.
+  - Frontend production build: `npm run build` succeeds (1.44s).
+  - Full backend suite: 53/53 test suites pass, 828/828 tests pass.
+- **Shipment:** Tested and approved by user, pushed to `origin/context` and `origin/main`.
+
 

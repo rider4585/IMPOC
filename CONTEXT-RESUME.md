@@ -18,37 +18,26 @@
 ## What Happened in the Last Sessions (2026-09-20 / 2026-09-21)
 
 ### Completed (user sign-off)
+- **R-69 DataGrid action column popover / overflow menu pattern (system-wide)**:
+  - User requested: System-wide pattern for grids with action columns — if an action column has more than 1 action button, show the most-used action directly in the cell, and group all other options in a small popover/dropdown menu. If only 1 action, keep it as a standalone button.
+  - Implemented reusable primitive `ActionMenu.jsx` (`frontend/src/components/ui/`):
+    - 1 action: renders standalone Button (no menu).
+    - 2+ actions: primary action button + `⋯` (`MoreHorizontal`) overflow trigger button opening a portal popover (`createPortal`).
+    - Smart viewport positioning (flip-above near viewport bottom), keyboard navigation (ArrowUp/Down, Escape), stopPropagation on row clicks, full dark/light mode token support.
+  - Converted multi-action screens: `UsersScreen` (Edit + Menu: Roles, Deactivate/Activate, Delete), `RolesScreen` (Permissions + Menu: Edit, Delete), `VendorsScreen` (Edit + Menu: History, Deactivate/Activate), `FlatPicklistManager` (Edit + Menu: Deactivate/Activate), `ExpensesScreen` (Edit + Menu: Cancel), `StocksScreen` (Units + Menu: Scan), `EnquiriesScreen` (Edit + Menu: Close; standalone Reopen when closed).
+  - Single action screens verified as standalone buttons: `CustomersScreen`, `SessionsScreen`, `SalesListScreen`, `TripsScreen`, `TripDetailScreen`, `VendorDetail`.
+  - Streamlined action column widths from 180-320px down to 130-150px, recovering significant horizontal space for data columns across all screens.
+  - Fixed unmounted toast timer cleanup in `ToastProvider`.
+  - Verified: 8/8 ActionMenu tests, full frontend suite (51/51 files, 467/467 tests pass), build clean, 53/53 backend suites (828/828 tests pass). Shipped on user sign-off.
+- **R-68 Active Sessions & Device Management in Admin**:
+  - Full active session tracking and device management panel in Admin under `/sessions`.
+  - User/device telemetry (OS, browser, device, IP, last active), status tracking (`ACTIVE`, `REVOKED`, `EXPIRED`), multi-device breakdown cards, and remote revocation.
 - **R-67 Wi-Fi & LAN Network Access Modal + Dynamic IP QR (v1.1.0 release)**:
   - User requested a screen or modal to display the exact Wi-Fi link for other devices (phones/tablets) to connect to IMPOC over local Wi-Fi with static/dynamic router IP.
   - User decisions: Header icon only (no dedicated router screen) + dynamic IP fetch on every modal open.
   - Backend: Added `GET /api/system/network` (`backend/src/modules/system/`) returning active IPv4 interfaces, server port, and primary URL via `os.networkInterfaces()`. Updated CORS in `backend/app.js` to allow private LAN IP ranges (`192.168.*`, `10.*`, `172.16-31.*`, localhost) with credentials so Wi-Fi devices are never blocked. Test suite `backend/tests/system/system.test.js` (11/11 pass).
   - Frontend: Added `NetworkAccessModal.jsx` featuring `QRCodeSVG` (qrcode.react with center shop monogram), monospace URL box with 1-click Copy button + toast, network interface picker (Wi-Fi vs Ethernet), and 3-step mobile connection guide. Integrated `Wifi` button into `AppShell.jsx` desktop and mobile headers.
-  - Bug fixes delivered:
-    1. Dynamic port harmonization (`frontend/src/services/systemApi.js`) + loopback guard (prevented fallback to `localhost:5174` on network errors; harmonized LAN URL with active client port).
-    2. Mobile sign-in crash fix: Added resilient fallback chain to `createRequestKey()` (`frontend/src/platform/requestKey.js`) and `authApi.js` when `crypto.randomUUID()` is unavailable in non-secure mobile browser contexts (e.g. self-signed HTTPS over LAN IP), and enhanced `RouteGuard`'s `ErrorBoundary` with diagnostics.
-  - Versioning: Bumped `backend/package.json` and `frontend/package.json` to **1.1.0**, annotated git tag **`v1.1.0`** pushed to origin. Shipped to both `main` (`d464308`) and `context` (`457d94b`). Verified by user and marked **DONE**.
-
-### Planned (not dispatched)
-- **R-68 Active Sessions & Device Management in Admin**: Planned per user request (view signed-in users, device telemetry, IP, remote session revoke). Ticket created in `tasks.json` (`todo`, `unassigned`); listed in `board.md`. Parked until user says GO.
-
-## What Happened in the Last Sessions (2026-09-18)
-
-### Completed (user sign-off)
-- **R-66 hide Buying templates UI** (R-52 interim, user: "for now remove the template option UI only, keep the functionality just hide it from frontend"). Frontend-only + reversible: removed the `/trips/:tripUuid/templates` route + `TemplateForm` import in `App.jsx`; removed the *Pre-fill from a buying template* picker / *No buying templates saved* note / *Manage buying templates* button + their state/fetch/handler in `StockForm.jsx`; dropped the 2 StockForm tests for that UI. Kept for restore: `TemplateForm.jsx`, `templatesApi.js`, `TEMPLATE_ROUTES`, the backend module, `stock_templates` table + data. Verified vitest 434/434 (node v20.19.6) + `vite build` clean. On `context` 4ba5b78 + `main` 634d87e. **Done 2026-09-18 by user sign-off.** R-52 stays blocked until ~mid-Oct fate decision.
-- **SemVer baseline + first release** (2026-09-18): bumped both `package.json`s to **1.0.0**, annotated tag **`v1.0.0`** on `main` (`2c48ad6`), and **published the first GitHub Release** at https://github.com/rider4585/IMPOC/releases/tag/v1.0.0 from the CLI (keychain token + curl; see `docs/VERSIONING.md`). `gh` 2.101.0 installed (`/opt/homebrew/bin/gh`) — token lacks `read:org`, so use `GH_TOKEN="$(security find-internet-password -s github.com -w)" gh ...`.
-
-### Completed (2026-09-17)
-- **R-60 durable backups (user sign-off; laptop run still to do)** — `pg_dump` twice daily at 14:00 + 21:00 (local + encrypted Google Drive via rclone), log-driven catch-up at next power-on, first backup during setup. Already-setup laptop: run `setup-backup-local.cmd` then `setup-backup-cloud.cmd` as admin (elevated PowerShell). Commit `9f2aa17`; see `docs/WINDOWS_PRODUCTION_SETUP.md` §8.
-- **R-65 enquiry close** — WhatsApp-only composer (temp, pre-R-62) + fixed the close 500 (`delivery_logs` entity-type CHECK gained `ENQUIRY`, migration `20260917000001`, test-setup mirrors the CHECKs).
-- **R-64 barcode PDF always fresh** — removed the `request_keys` idempotency replay so `GET /api/barcodes/generate` never returns a cached JSON marker on cold start (the "Waking the system up" lockout). Backend `barcode.service.js`/`barcode.controller.js` + frontend `wakingRequest.js` + unit/integration tests. Shipped both branches (`context` bcb1740, `main` 172e0b6). No migrations.
-- **Single canonical `context/tasks.json`** — consolidated the split (99 cards + `context/tasks-archive.json`) into ONE file: **165 tasks (148 done / R-60 doing / R-52 blocked / 15 todo R-62 family)**; archive removed. Commit b5439de. `hive/tasks.json` kept in sync. Never overwrite `context/tasks.json` from a stale/truncated copy — patch it in place.
-
-### Completed (2026-09-16)
-- **R-47 receipt-template rework** (user re-scope) — shipped to `context` and cherry-picked to `main` (clean code only).
-- **Hive ops**: scheduler standup handled + filed; a reply to `scheduler` bounced again (not a floor agent — never reply to scheduler, handle standups locally). R-47 card set to done; board + memory + `context/` snapshots synced.
-
-### Open item (non-blocking)
-- The physical-receipt photo could not be machine-read by the orchestrator; the template replicates the R-45 branded A5 design. If the printed receipt differs (address/phone block, GST lines, extra note), that is a small seed-HTML tweak — tell the team when convenient.
+  - Versioning: Bumped `backend/package.json` and `frontend/package.json` to **1.1.0**, annotated git tag **`v1.1.0`** pushed to origin. Shipped to both `main` and `context`. Verified by user and marked **DONE**.
 
 ---
 
@@ -56,18 +45,19 @@
 
 | Metric | Value |
 |--------|-------|
-| Done (tasks) | 152 |
+| Done (tasks) | 154 |
 | Doing | 0 |
 | Blocked | 1 (R-52, parked to ~2026-10-13) |
-| Todo | 16 (R-68 plan-only + 15 R-62 family, all parked) |
-| Tests | jest 817/817 (52 suites), vitest 447/447 (48 files) — 100% passing |
+| Todo | 15 (R-62 family, all parked) |
+| Tests | jest 828/828 (53 suites), vitest 467/467 (51 files) — 100% passing |
 
 ### Notable Passive Items
+- **R-69** (done, user sign-off 2026-09-21): DataGrid action column popover / overflow menu pattern (ActionMenu).
+- **R-68** (done, user sign-off 2026-09-21): Active Sessions & Device Management in Admin.
 - **R-67** (done, user sign-off 2026-09-20): Wi-Fi & LAN access modal with dynamic IP QR + connection guide (v1.1.0).
-- **R-66** (done, user sign-off 2026-09-18): Buying templates UI hidden (FE only, reversible — `TemplateForm.jsx`/`templatesApi.js`/backend/table intact for a later keep/restore decision).
+- **R-66** (done, user sign-off 2026-09-18): Buying templates UI hidden (FE only, reversible).
 - **R-60** (done by user sign-off, **laptop run still to do**): durable backups — `pg_dump` twice daily 14:00+21:00, log-driven catch-up, local + encrypted cloud. `docs/WINDOWS_PRODUCTION_SETUP.md` §8.
 - **R-52** (blocked, revisit ~2026-10-13): Buy/templates module — Hide/Remove/Keep decision after production use (interim = R-66 hide).
-- **R-68** (todo, **plan-only**): Active Sessions & Device Management in Admin.
 - **R-62 + a–n** (todo, **parked**): Customer Communication & Campaign platform. User: "dont start any work on R-62 tasks". Do not dispatch until user says go. Phase 1 = email (Brevo SMTP) + WhatsApp `wa.me` hand-off; no public URL.
 
 ---
