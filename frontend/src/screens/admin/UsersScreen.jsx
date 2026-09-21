@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Card,
-  CardContent,
   Button,
   Input,
   SearchableSelect,
-  Dialog,
   Badge,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DataGrid,
   useToast,
-} from '../../components/ui';
-import { DataGrid } from '../../components/ui/DataGrid.jsx';
+  ActionMenu,
+} from '../../components/ui/index.js';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
 import {
@@ -313,36 +317,42 @@ export function UsersScreen() {
     {
       id: 'actions',
       header: 'Actions',
-      size: 320,
+      size: 130,
       cell: (info) => {
         const user = info.row.original;
         return (
-          <div className="flex items-center gap-1.5 whitespace-nowrap">
-            {canUpdate && (
-              <Button variant="outline" size="sm" onClick={() => openEdit(user)}>
-                Edit
-              </Button>
-            )}
-            {canUpdate && (
-              <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)}>
-                Roles
-              </Button>
-            )}
-            {canUpdate && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleStatusToggle(user)}
-              >
-                {user.status === 'active' ? 'Deactivate' : 'Activate'}
-              </Button>
-            )}
-            {canDelete && (
-              <Button variant="danger" size="sm" onClick={() => requestDelete(user)}>
-                Delete
-              </Button>
-            )}
-          </div>
+          <ActionMenu
+            primary={
+              canUpdate
+                ? {
+                    label: 'Edit',
+                    onClick: () => openEdit(user),
+                    dataTestid: `user-edit-${user.uuid}`,
+                  }
+                : null
+            }
+            items={[
+              canUpdate && {
+                label: 'Roles',
+                onClick: () => openRoleDialog(user),
+                dataTestid: `user-roles-btn-${user.uuid}`,
+              },
+              canUpdate && {
+                label: user.status === 'active' ? 'Deactivate' : 'Activate',
+                onClick: () => handleStatusToggle(user),
+                danger: user.status === 'active',
+                dataTestid: `user-status-${user.uuid}`,
+              },
+              canDelete && {
+                label: 'Delete',
+                onClick: () => requestDelete(user),
+                danger: true,
+                divider: true,
+                dataTestid: `user-delete-${user.uuid}`,
+              },
+            ]}
+            dataTestid={`user-actions-${user.uuid}`}
+          />
         );
       },
       enableSorting: false,

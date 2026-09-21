@@ -8,7 +8,8 @@ import {
   SearchableSelect,
   Dialog,
   useToast,
-} from '../../components/ui';
+  ActionMenu,
+} from '../../components/ui/index.js';
 import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
@@ -179,27 +180,36 @@ export function RolesScreen() {
     {
       id: 'actions',
       header: 'Actions',
-      size: 200,
+      size: 150,
       cell: (info) => {
         const role = info.row.original;
         return (
-          <div className="flex flex-wrap gap-2">
-            {canManage && (
-              <Button variant="outline" size="sm" onClick={() => openEdit(role)}>
-                Edit
-              </Button>
-            )}
-            {canManage && (
-              <Button variant="outline" size="sm" onClick={() => openPermsDialog(role)}>
-                Permissions
-              </Button>
-            )}
-            {canManage && (
-              <Button variant="danger" size="sm" onClick={() => requestDelete(role)}>
-                Delete
-              </Button>
-            )}
-          </div>
+          <ActionMenu
+            primary={
+              canManage
+                ? {
+                    label: 'Permissions',
+                    onClick: () => openPermsDialog(role),
+                    dataTestid: `role-perms-${role.uuid}`,
+                  }
+                : null
+            }
+            items={[
+              canManage && {
+                label: 'Edit',
+                onClick: () => openEdit(role),
+                dataTestid: `role-edit-${role.uuid}`,
+              },
+              canManage && {
+                label: 'Delete',
+                onClick: () => requestDelete(role),
+                danger: true,
+                divider: true,
+                dataTestid: `role-delete-${role.uuid}`,
+              },
+            ]}
+            dataTestid={`role-actions-${role.uuid}`}
+          />
         );
       },
       enableSorting: false,

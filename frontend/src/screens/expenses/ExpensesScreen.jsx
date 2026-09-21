@@ -5,7 +5,8 @@ import {
   Dialog,
   Badge,
   useToast,
-} from '../../components/ui';
+  ActionMenu,
+} from '../../components/ui/index.js';
 import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
@@ -160,24 +161,35 @@ export function ExpensesScreen() {
     {
       id: 'actions',
       header: 'Actions',
-      size: 170,
+      size: 130,
       enableSorting: false,
       cell: (info) => {
         const e = info.row.original;
         if (e.status === 'cancelled' || !canUpdate) return null;
         return (
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setEditing(e); setFormOpen(true); }}>
-              Edit
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { cancelKeyRef.current = createRequestKey(); setCancelling(e); setCancelReason(''); }}
-            >
-              Cancel
-            </Button>
-          </div>
+          <ActionMenu
+            primary={{
+              label: 'Edit',
+              onClick: () => {
+                setEditing(e);
+                setFormOpen(true);
+              },
+              dataTestid: `expense-edit-${e.uuid}`,
+            }}
+            items={[
+              {
+                label: 'Cancel',
+                onClick: () => {
+                  cancelKeyRef.current = createRequestKey();
+                  setCancelling(e);
+                  setCancelReason('');
+                },
+                danger: true,
+                dataTestid: `expense-cancel-${e.uuid}`,
+              },
+            ]}
+            dataTestid={`expense-actions-${e.uuid}`}
+          />
         );
       },
     },

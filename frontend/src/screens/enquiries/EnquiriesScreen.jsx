@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Button, Input, Badge, Tabs, Tab, useToast } from '../../components/ui';
+import { Button, Input, Badge, Tabs, Tab, useToast, ActionMenu } from '../../components/ui/index.js';
 import { DataGrid } from '../../components/ui/DataGrid.jsx';
 import { useAuth } from '../../auth/useAuth.js';
 import { PERMISSIONS } from '../../constants/permissions.js';
@@ -250,7 +250,7 @@ export function EnquiriesScreen() {
       {
         id: 'actions',
         header: 'Actions',
-        size: 170,
+        size: 130,
         enableSorting: false,
         cell: (info) => {
           const e = info.row.original;
@@ -263,21 +263,24 @@ export function EnquiriesScreen() {
             );
           }
           return (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
+            <ActionMenu
+              primary={{
+                label: 'Edit',
+                onClick: () => {
                   setEditing(e);
                   setFormOpen(true);
-                }}
-              >
-                Edit
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setClosing(e)} data-testid={`enquiry-close-${e.uuid}`}>
-                Close
-              </Button>
-            </div>
+                },
+                dataTestid: `enquiry-edit-${e.uuid}`,
+              }}
+              items={[
+                {
+                  label: 'Close',
+                  onClick: () => setClosing(e),
+                  dataTestid: `enquiry-close-${e.uuid}`,
+                },
+              ]}
+              dataTestid={`enquiry-actions-${e.uuid}`}
+            />
           );
         },
       }
