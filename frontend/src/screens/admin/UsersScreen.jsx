@@ -313,11 +313,11 @@ export function UsersScreen() {
     {
       id: 'actions',
       header: 'Actions',
-      size: 240,
+      size: 320,
       cell: (info) => {
         const user = info.row.original;
         return (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
             {canUpdate && (
               <Button variant="outline" size="sm" onClick={() => openEdit(user)}>
                 Edit
@@ -350,7 +350,7 @@ export function UsersScreen() {
   ], [roles, canUpdate, canDelete]);
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1100px] flex-col gap-5 p-6 overflow-hidden">
+    <div className="flex h-full min-h-0 w-full flex-col gap-5 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="typography-heading mb-1">Users</h1>
@@ -368,7 +368,7 @@ export function UsersScreen() {
       {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.USERS.VIEW) && (
-        <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
           <div className="max-w-[360px]">
             <Input
               type="search"
@@ -387,6 +387,7 @@ export function UsersScreen() {
               isEmpty={filteredUsers.length === 0}
               emptyMessage="No users found."
               loadingMessage="Loading users…"
+              className="flex-1"
             />
           </div>
         </div>
