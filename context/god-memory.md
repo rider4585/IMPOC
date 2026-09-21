@@ -974,3 +974,15 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - `hive/board.md` updated: `DOING (0)`, `DONE (152)`.
 - Synchronized to `context/tasks.json`, `context/board.md`, and `context/god-memory.md`.
 
+## [2026-09-21 ~11:37Z] Hourly ops standup (scheduler)
+
+- **Floor:** god (Michael) only active (`idle`, breaker: `healthy`, 0 tokens/0 USD). All workers archived in `registry.json` (`worker-worker-barcode-fresh-pdf`, `worker-r60-backup-v2`, `worker-r60-v2-opencode`, `worker-r66-hide-templates-ui`, `worker-r67-wifi-access`, `worker-r67-wifi-access-agy`). No active temps.
+- **Task board:** 169 cards total = **152 done / 0 doing / 1 blocked / 16 todo**.
+  - `DOING (0)`: Nothing in flight.
+  - `BLOCKED (1)`: `R-52` (Buying templates module — parked to ~2026-10-13 to decide Hide/Remove/Keep after production use; interim FE-only hide `R-66` completed).
+  - `TODO (16)`: `R-68` (Active Sessions & Device Management panel in Admin — plan-only, awaiting user GO) + `R-62` family (Customer Communication & Campaign platform — 15 sub-cards, parked by user, do not dispatch).
+  - `DONE (152)`: 16 Foundation, 28 Security, 7 Revamp, 25 UI/UX, 76 Feature cards (including `R-67` v1.1.0).
+- **Spawn requests:** Clean (only `.done/` and `.failed/` present, no pending spawns).
+- **Inbox:** Handled standup message `2026-09-21T11-14-53-182Z-633260.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
+- **In-flight work:** None. No stalled agents, no unowned tasks, no at-risk items. Floor is clean and synchronized.
+
