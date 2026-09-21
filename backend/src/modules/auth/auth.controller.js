@@ -13,6 +13,7 @@ import { refreshAuthTokens } from './auth-token.service.js';
 import { revokeAuthSession, revokeAllAuthSessions } from './auth-session.service.js';
 
 import { getUserPermissions } from './permission.service.js';
+import { parseClientInfo } from '../../utils/deviceParser.js';
 
 /*
  * The refresh-token cookie is only ever read by the auth endpoints
@@ -93,11 +94,12 @@ function cookieClearOptions(req) {
 export const login = async (req, res, next) => {
     try {
         const data = loginSchema.parse(req.body);
+        const telemetry = parseClientInfo(req);
 
         const {
             user,
             tokens,
-        } = await loginUser(data);
+        } = await loginUser(data, telemetry);
 
         const permissionsSet = await getUserPermissions(user.uuid);
         const permissions = Array.from(permissionsSet).sort();
@@ -143,7 +145,8 @@ export const refresh = async (req, res, next) => {
             throw error;
         }
 
-        const tokens = await refreshAuthTokens(refreshToken);
+        const telemetry = parseClientInfo(req);
+        const tokens = await refreshAuthTokens(refreshToken, telemetry);
 
         // Set new refresh token as an httpOnly cookie
         try {
