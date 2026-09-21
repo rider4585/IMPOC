@@ -227,4 +227,23 @@ describe('SessionsScreen (R-68)', () => {
       expect(sessionsApi.revokeUserSessions).toHaveBeenCalledWith('u-2');
     });
   });
+
+  it('renders unknown / legacy devices badge when unknown count > 0', async () => {
+    sessionsApi.getAdminSessions.mockResolvedValueOnce({
+      ...SAMPLE_DATA,
+      stats: {
+        ...SAMPLE_DATA.stats,
+        activeSessions: 5,
+        deviceBreakdown: { desktop: 1, mobile: 0, tablet: 0, unknown: 4 },
+      },
+    });
+
+    renderWithToast(<SessionsScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('metric-device-unknown')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('metric-device-unknown').textContent).toBe('4');
+  });
 });
+

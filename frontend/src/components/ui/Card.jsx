@@ -50,8 +50,11 @@ export const CardContent = React.forwardRef(function CardContent(
   { className = '', children, ...rest },
   ref
 ) {
+  const hasCustomPadding = /(^|\s)p[a-z0-9_-]*/.test(className);
+  const baseClasses = hasCustomPadding ? '' : 'p-6 pt-0';
+  const finalClass = [baseClasses, className].filter(Boolean).join(' ').trim();
   return (
-    <div ref={ref} className={`p-6 pt-0 ${className}`.trim()} {...rest}>
+    <div ref={ref} className={finalClass} {...rest}>
       {children}
     </div>
   );

@@ -248,7 +248,7 @@ export function SessionsScreen() {
               {row.isCurrent && (
                 <span
                   data-testid="current-session-badge"
-                  className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700"
+                  className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400"
                 >
                   Current Session
                 </span>
@@ -270,7 +270,7 @@ export function SessionsScreen() {
             <Button
               variant="outline"
               size="sm"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 h-8 px-2.5 text-xs"
+              className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-500/10 border-red-500/30 h-8 px-2.5 text-xs"
               disabled={isRevoked}
               onClick={() => openRevokeDialog(row)}
             >
@@ -309,7 +309,7 @@ export function SessionsScreen() {
                 {stats?.activeSessions ?? 0}
               </p>
             </div>
-            <div className="p-2.5 rounded-lg bg-[var(--status-in-stock)]/10 text-[var(--status-in-stock)]">
+            <div className="p-2.5 rounded-lg bg-[var(--status-in-stock)]/10 text-[var(--status-in-stock)] shrink-0">
               <ShieldCheck className="h-5 w-5" />
             </div>
           </CardContent>
@@ -325,39 +325,53 @@ export function SessionsScreen() {
                 {stats?.uniqueUsersCount ?? 0}
               </p>
             </div>
-            <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600">
+            <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
               <Users className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4 flex flex-col justify-between">
-            <p className="text-xs font-medium text-[var(--ink-muted)] uppercase tracking-wider mb-2">
-              Device Breakdown
-            </p>
-            <div className="flex items-center gap-4 text-xs text-[var(--ink)]">
-              <div className="flex items-center gap-1.5" title="Desktop">
-                <Monitor className="h-4 w-4 text-[var(--ink-muted)]" />
-                <span className="font-semibold" data-testid="metric-device-desktop">
-                  {stats?.deviceBreakdown?.desktop ?? 0}
-                </span>
-                <span className="text-[var(--ink-muted)] text-[11px]">desktop</span>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[var(--ink-muted)] uppercase tracking-wider">
+                Device Breakdown
+              </p>
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-[var(--ink)]">
+                <div className="flex items-center gap-1.5" title="Desktop">
+                  <Monitor className="h-4 w-4 text-[var(--ink-muted)] shrink-0" />
+                  <span className="font-semibold" data-testid="metric-device-desktop">
+                    {stats?.deviceBreakdown?.desktop ?? 0}
+                  </span>
+                  <span className="text-[var(--ink-muted)] text-[11px]">desktop</span>
+                </div>
+                <div className="flex items-center gap-1.5" title="Mobile">
+                  <Smartphone className="h-4 w-4 text-[var(--ink-muted)] shrink-0" />
+                  <span className="font-semibold" data-testid="metric-device-mobile">
+                    {stats?.deviceBreakdown?.mobile ?? 0}
+                  </span>
+                  <span className="text-[var(--ink-muted)] text-[11px]">mobile</span>
+                </div>
+                <div className="flex items-center gap-1.5" title="Tablet">
+                  <Tablet className="h-4 w-4 text-[var(--ink-muted)] shrink-0" />
+                  <span className="font-semibold" data-testid="metric-device-tablet">
+                    {stats?.deviceBreakdown?.tablet ?? 0}
+                  </span>
+                  <span className="text-[var(--ink-muted)] text-[11px]">tablet</span>
+                </div>
+                {Boolean(stats?.deviceBreakdown?.unknown) && (
+                  <div className="flex items-center gap-1.5" title="Other / Legacy">
+                    <Laptop className="h-4 w-4 text-[var(--ink-muted)] shrink-0" />
+                    <span className="font-semibold" data-testid="metric-device-unknown">
+                      {stats.deviceBreakdown.unknown}
+                    </span>
+                    <span className="text-[var(--ink-muted)] text-[11px]">other</span>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-1.5" title="Mobile">
-                <Smartphone className="h-4 w-4 text-[var(--ink-muted)]" />
-                <span className="font-semibold" data-testid="metric-device-mobile">
-                  {stats?.deviceBreakdown?.mobile ?? 0}
-                </span>
-                <span className="text-[var(--ink-muted)] text-[11px]">mobile</span>
-              </div>
-              <div className="flex items-center gap-1.5" title="Tablet">
-                <Tablet className="h-4 w-4 text-[var(--ink-muted)]" />
-                <span className="font-semibold" data-testid="metric-device-tablet">
-                  {stats?.deviceBreakdown?.tablet ?? 0}
-                </span>
-                <span className="text-[var(--ink-muted)] text-[11px]">tablet</span>
-              </div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0 ml-2">
+              <Laptop className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
@@ -405,7 +419,7 @@ export function SessionsScreen() {
 
       {/* Error state */}
       {error && (
-        <div className="p-4 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm">
+        <div className="p-4 rounded-md border border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400 text-sm">
           {error}
         </div>
       )}
@@ -435,8 +449,8 @@ export function SessionsScreen() {
           </p>
 
           {(sessionToRevoke?.isCurrent || (revokeAllForUser && sessionToRevoke?.user?.uuid === currentUser?.uuid)) && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 text-xs flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <span>
                 <strong>Warning:</strong> {sessionToRevoke?.isCurrent ? 'This is your current session. You will be signed out.' : 'This will also revoke your current session. You will be signed out.'}
               </span>
