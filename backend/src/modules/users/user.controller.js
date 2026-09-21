@@ -42,6 +42,11 @@ export const getUsers = async (req, res, next) => {
                 lastLoginAt: user.lastLoginAt,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
+                roles: (user.roles || []).map((r) => ({
+                    uuid: r.uuid,
+                    name: r.name,
+                    description: r.description,
+                })),
             })),
         });
     } catch (error) {
@@ -94,6 +99,11 @@ export const getUserByUuid = async (req, res, next) => {
                 lastLoginAt: user.lastLoginAt,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
+                roles: (user.roles || []).map((r) => ({
+                    uuid: r.uuid,
+                    name: r.name,
+                    description: r.description,
+                })),
             },
         });
     } catch (error) {

@@ -83,11 +83,12 @@ export function UsersScreen() {
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return users;
-    return users.filter((u) =>
-      [u.username, u.email, u.firstName, u.lastName, u.phone]
+    return users.filter((u) => {
+      const roleNames = (u.roles || []).map((r) => (typeof r === 'string' ? r : r.name));
+      return [u.username, u.email, u.firstName, u.lastName, u.phone, ...roleNames]
         .filter(Boolean)
-        .some((f) => String(f).toLowerCase().includes(q))
-    );
+        .some((f) => String(f).toLowerCase().includes(q));
+    });
   }, [users, search]);
 
   const openCreate = () => {
@@ -174,6 +175,13 @@ export function UsersScreen() {
     try {
       const assigned = await assignRoleToUser(rolesTarget.uuid, assignedUuid);
       setAssignedRoles((prev) => [...prev, assigned]);
+      setUsers((prevUsers) =>
+        prevUsers.map((u) =>
+          u.uuid === rolesTarget.uuid
+            ? { ...u, roles: [...(u.roles || []), assigned] }
+            : u
+        )
+      );
       setRoleUuid('');
       toast.success({ title: 'Role assigned' });
     } catch (err) {
@@ -187,6 +195,13 @@ export function UsersScreen() {
     try {
       await removeRoleFromUser(rolesTarget.uuid, role.uuid);
       setAssignedRoles((prev) => prev.filter((r) => r.uuid !== role.uuid));
+      setUsers((prevUsers) =>
+        prevUsers.map((u) =>
+          u.uuid === rolesTarget.uuid
+            ? { ...u, roles: (u.roles || []).filter((r) => r.uuid !== role.uuid) }
+            : u
+        )
+      );
       toast.success({ title: 'Role removed' });
     } catch (err) {
       toast.error({ title: 'Remove failed', description: err.message });
@@ -213,6 +228,49 @@ export function UsersScreen() {
       header: 'Username',
       size: 140,
       filter: { type: 'text' },
+    },
+    {
+      id: 'roles',
+      header: 'Role',
+      size: 160,
+      accessorFn: (row) =>
+        (row.roles || []).map((r) => (typeof r === 'string' ? r : r.name)).join(', '),
+      filter: {
+        type: 'picklist',
+        options: roles.map((r) => ({ value: r.name, label: r.name })),
+      },
+      filterFn: (row, columnId, filterValue) => {
+        if (!filterValue) return true;
+        const userRoles = row.original?.roles || [];
+        return userRoles.some((r) => {
+          const name = typeof r === 'string' ? r : r.name;
+          return name === filterValue;
+        });
+      },
+      cell: (info) => {
+        const user = info.row.original;
+        const userRoles = user.roles || [];
+        if (!userRoles.length) {
+          return <span className="text-[var(--ink-muted)] text-xs">—</span>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1" data-testid={`user-roles-${user.uuid}`}>
+            {userRoles.map((r) => {
+              const roleName = typeof r === 'string' ? r : r.name;
+              const isPrivileged = roleName === 'ADMIN' || r.isPrivileged;
+              return (
+                <Badge
+                  key={r.uuid || roleName}
+                  variant={isPrivileged ? 'brand' : 'neutral'}
+                  className="font-medium text-[11px]"
+                >
+                  {roleName}
+                </Badge>
+              );
+            })}
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'email',
@@ -289,7 +347,7 @@ export function UsersScreen() {
       },
       enableSorting: false,
     },
-  ], [canUpdate, canDelete]);
+  ], [roles, canUpdate, canDelete]);
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-[1100px] flex-col gap-5 p-6 overflow-hidden">
@@ -314,7 +372,7 @@ export function UsersScreen() {
           <div className="max-w-[360px]">
             <Input
               type="search"
-              placeholder="Search by name, username, email…"
+              placeholder="Search by name, username, role, email…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search users"
@@ -348,10 +406,21 @@ export function UsersScreen() {
       {rolesOpen && (
         <Dialog
           open={rolesOpen}
-          onClose={() => setRolesOpen(false)}
+          onClose={() => {
+            setRolesOpen(false);
+            setRolesTarget(null);
+            load();
+          }}
           title={`Roles — ${rolesTarget?.username || ''}`}
           footer={
-            <Button variant="outline" onClick={() => setRolesOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRolesOpen(false);
+                setRolesTarget(null);
+                load();
+              }}
+            >
               Close
             </Button>
           }

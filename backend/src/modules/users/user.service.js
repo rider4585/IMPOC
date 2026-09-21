@@ -128,6 +128,14 @@ export const getUsers = async () => {
             'createdAt',
             'updatedAt',
         ],
+        include: {
+            model: Role,
+            as: 'roles',
+            attributes: ['uuid', 'name', 'description'],
+            through: {
+                attributes: [],
+            },
+        },
         order: [['createdAt', 'DESC']],
     });
 
@@ -252,6 +260,14 @@ export const getUserByUuid = async (uuid) => {
             'createdAt',
             'updatedAt',
         ],
+        include: {
+            model: Role,
+            as: 'roles',
+            attributes: ['uuid', 'name', 'description'],
+            through: {
+                attributes: [],
+            },
+        },
     });
 
     if (!user) {
