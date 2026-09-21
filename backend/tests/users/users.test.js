@@ -108,6 +108,19 @@ describe('Users Module - /api/users', () => {
       expect(Array.isArray(res.body.data)).toBe(true);
     });
 
+    it('should include roles array for each user', async () => {
+      const res = await request(app)
+        .get('/api/users')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data.length).toBeGreaterThan(0);
+      const foundAdmin = res.body.data.find((u) => u.username === adminUser.username);
+      expect(foundAdmin).toBeDefined();
+      expect(Array.isArray(foundAdmin.roles)).toBe(true);
+      expect(foundAdmin.roles.some((r) => r.name === 'ADMIN')).toBe(true);
+    });
+
     it('should return 403 for unauthorized CASHIER role', async () => {
       const res = await request(app)
         .get('/api/users')
