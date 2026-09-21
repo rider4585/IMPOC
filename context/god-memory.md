@@ -997,4 +997,14 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
   4. **Documentation:** Updated `docs/WINDOWS_PRODUCTION_SETUP.md` table and procedure steps to note automatic UAC elevation.
   5. **Shipped:** Committed to `main` (`4b96b92`), pushed to `origin/main`; cherry-picked to `context` (`6d3c697`), pushed to `origin/context`.
 
+## [2026-09-21 ~11:56Z] REVERTED Deploy Scripts Auto-Elevation Changes (User Request)
+
+- **User request:** "something is wrong, please revert the changes".
+- **Action taken:**
+  - Reverted commit `4b96b92` on `main` via `git revert 4b96b92` (`2fb394f`), pushed to `origin/main`.
+  - Reverted commit `6d3c697` on `context` via `git revert 6d3c697` (`f30d7f3`), pushed to `origin/context`.
+  - All deploy scripts in `deploy/windows/` and `docs/WINDOWS_PRODUCTION_SETUP.md` restored to exact original pre-change states.
+  - New wrapper `restore-db.cmd` removed.
+
+
 
