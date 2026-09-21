@@ -1,6 +1,6 @@
 # CONTEXT-RESUME.md — Handoff for Other AI Tools
 
-**Last updated:** 2026-09-20
+**Last updated:** 2026-09-21
 **Branch:** `context` (all planning docs live here; clean code goes to `main`)
 
 ---
@@ -15,15 +15,21 @@
 
 ---
 
-## What Happened in the Last Sessions (2026-09-20)
+## What Happened in the Last Sessions (2026-09-20 / 2026-09-21)
 
-### Integrated & Shipped — Awaiting User Verification
+### Completed (user sign-off)
 - **R-67 Wi-Fi & LAN Network Access Modal + Dynamic IP QR (v1.1.0 release)**:
   - User requested a screen or modal to display the exact Wi-Fi link for other devices (phones/tablets) to connect to IMPOC over local Wi-Fi with static/dynamic router IP.
   - User decisions: Header icon only (no dedicated router screen) + dynamic IP fetch on every modal open.
-  - Backend: Added `GET /api/system/network` (`backend/src/modules/system/`) returning active IPv4 interfaces, server port, and primary URL via `os.networkInterfaces()`. Updated CORS in `backend/app.js` to allow private LAN IP ranges (`192.168.*`, `10.*`, `172.16-31.*`, `localhost`) with credentials so Wi-Fi devices are never blocked. Test suite `backend/tests/system/system.test.js` (11/11 pass).
-  - Frontend: Added `NetworkAccessModal.jsx` featuring `QRCodeSVG` (qrcode.react with center shop monogram), monospace URL box with 1-click Copy button + toast, network interface picker (Wi-Fi vs Ethernet), and 3-step mobile connection guide. Integrated `Wifi` button into `AppShell.jsx` desktop and mobile headers. Unit tests in `NetworkAccessModal.test.jsx` and `systemApi.test.js` (all 48 test files, 442/442 vitest tests pass; vite build clean).
-  - Versioning: Bumped `backend/package.json` and `frontend/package.json` to **1.1.0**, annotated git tag **`v1.1.0`** pushed to origin. Shipped to both `main` (6fb1219) and `context` (836855c). Card is in `doing` awaiting user verification.
+  - Backend: Added `GET /api/system/network` (`backend/src/modules/system/`) returning active IPv4 interfaces, server port, and primary URL via `os.networkInterfaces()`. Updated CORS in `backend/app.js` to allow private LAN IP ranges (`192.168.*`, `10.*`, `172.16-31.*`, localhost) with credentials so Wi-Fi devices are never blocked. Test suite `backend/tests/system/system.test.js` (11/11 pass).
+  - Frontend: Added `NetworkAccessModal.jsx` featuring `QRCodeSVG` (qrcode.react with center shop monogram), monospace URL box with 1-click Copy button + toast, network interface picker (Wi-Fi vs Ethernet), and 3-step mobile connection guide. Integrated `Wifi` button into `AppShell.jsx` desktop and mobile headers.
+  - Bug fixes delivered:
+    1. Dynamic port harmonization (`frontend/src/services/systemApi.js`) + loopback guard (prevented fallback to `localhost:5174` on network errors; harmonized LAN URL with active client port).
+    2. Mobile sign-in crash fix: Added resilient fallback chain to `createRequestKey()` (`frontend/src/platform/requestKey.js`) and `authApi.js` when `crypto.randomUUID()` is unavailable in non-secure mobile browser contexts (e.g. self-signed HTTPS over LAN IP), and enhanced `RouteGuard`'s `ErrorBoundary` with diagnostics.
+  - Versioning: Bumped `backend/package.json` and `frontend/package.json` to **1.1.0**, annotated git tag **`v1.1.0`** pushed to origin. Shipped to both `main` (`d464308`) and `context` (`457d94b`). Verified by user and marked **DONE**.
+
+### Planned (not dispatched)
+- **R-68 Active Sessions & Device Management in Admin**: Planned per user request (view signed-in users, device telemetry, IP, remote session revoke). Ticket created in `tasks.json` (`todo`, `unassigned`); listed in `board.md`. Parked until user says GO.
 
 ## What Happened in the Last Sessions (2026-09-18)
 
@@ -38,14 +44,7 @@
 - **Single canonical `context/tasks.json`** — consolidated the split (99 cards + `context/tasks-archive.json`) into ONE file: **165 tasks (148 done / R-60 doing / R-52 blocked / 15 todo R-62 family)**; archive removed. Commit b5439de. `hive/tasks.json` kept in sync. Never overwrite `context/tasks.json` from a stale/truncated copy — patch it in place.
 
 ### Completed (2026-09-16)
-- **R-47 receipt-template rework** (user re-scope) — shipped to `context` and cherry-picked to `main` (clean code only). Recaps:
-  - Only **2 templates** (Sale/Rental), creation removed from backend + frontend.
-  - Each save = **new version** row (draft, `max+1`); the published version stays live; **Publish** (`POST /:uuid/activate`) marks a version active.
-  - POS/rentals render the **ACTIVE** template via the engine (`renderReceiptFromPayload`) through `captureSnapshot`; preview + snapshots no longer silently used `buildBrandedReceiptHtml`.
-  - Fixed the **blank-on-edit** editor: `TemplateBuilder.jsx` rewritten from `react-email-editor` (Unlayer can't load raw HTML) to an HTML source editor with insert-placeholder / item-loop / image-slot + server Preview.
-  - Engine gained `store.wordmark` and **image slots** (`<div class="receipt-image-slot">`): dashed box in preview, stripped from printed receipts until replaced with a real `<img>` — the shop will add images later.
-  - Migrations `20260916000001` (publish rules) + `20260916000002` (image-slot content onto published rows); seeder `20260915000007` updated (RENTAL active, names 'Sale Receipt'/'Rental Receipt', HTML now exports `SALE_TEMPLATE_HTML`).
-  - Verified: `db:migrate`/`db:seed`/`db:refresh` clean, backend jest 806/806, frontend vitest 436/436, build clean.
+- **R-47 receipt-template rework** (user re-scope) — shipped to `context` and cherry-picked to `main` (clean code only).
 - **Hive ops**: scheduler standup handled + filed; a reply to `scheduler` bounced again (not a floor agent — never reply to scheduler, handle standups locally). R-47 card set to done; board + memory + `context/` snapshots synced.
 
 ### Open item (non-blocking)
@@ -57,16 +56,18 @@
 
 | Metric | Value |
 |--------|-------|
-| Done (tasks) | 151 |
+| Done (tasks) | 152 |
 | Doing | 0 |
 | Blocked | 1 (R-52, parked to ~2026-10-13) |
-| Todo | 15 (R-62 + a–n, all parked by user) |
-| Tests | jest 806/806, vitest 434/434 (was 436; −2 for the removed StockForm template-picker tests) |
+| Todo | 16 (R-68 plan-only + 15 R-62 family, all parked) |
+| Tests | jest 817/817 (52 suites), vitest 447/447 (48 files) — 100% passing |
 
 ### Notable Passive Items
+- **R-67** (done, user sign-off 2026-09-20): Wi-Fi & LAN access modal with dynamic IP QR + connection guide (v1.1.0).
 - **R-66** (done, user sign-off 2026-09-18): Buying templates UI hidden (FE only, reversible — `TemplateForm.jsx`/`templatesApi.js`/backend/table intact for a later keep/restore decision).
 - **R-60** (done by user sign-off, **laptop run still to do**): durable backups — `pg_dump` twice daily 14:00+21:00, log-driven catch-up, local + encrypted cloud. `docs/WINDOWS_PRODUCTION_SETUP.md` §8.
 - **R-52** (blocked, revisit ~2026-10-13): Buy/templates module — Hide/Remove/Keep decision after production use (interim = R-66 hide).
+- **R-68** (todo, **plan-only**): Active Sessions & Device Management in Admin.
 - **R-62 + a–n** (todo, **parked**): Customer Communication & Campaign platform. User: "dont start any work on R-62 tasks". Do not dispatch until user says go. Phase 1 = email (Brevo SMTP) + WhatsApp `wa.me` hand-off; no public URL.
 
 ---
