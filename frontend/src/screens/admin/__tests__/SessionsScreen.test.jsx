@@ -82,6 +82,7 @@ describe('SessionsScreen (R-68)', () => {
     vi.clearAllMocks();
     authModule.useAuth.mockReturnValue({
       permissions: [PERMISSIONS.USERS.VIEW, PERMISSIONS.USERS.UPDATE],
+      currentUser: { uuid: 'u-1', username: 'alice' },
       signOut: mockSignOut,
     });
     sessionsApi.getAdminSessions.mockResolvedValue(SAMPLE_DATA);
