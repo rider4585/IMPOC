@@ -16,14 +16,13 @@
 
 ## KANBAN BOARD (as of 2026-09-21)
 
-### DOING (0)
-_None in flight._
+### DOING (1)
+- **R-68** — Active Sessions & Device Management panel in Admin (assignee: worker-r68-sessions-agy)
 
 ### BLOCKED (1)
 - **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use. Interim: templates UI hidden FE-only + reversible (R-66, done 2026-09-18).
 
-### TODO (16)
-- **R-68** — Active Sessions & Device Management panel in Admin (plan-only, awaiting GO)
+### TODO (15)
 - **R-62** — Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later). 15 sub-cards below.
   - **R-62a** — Comm foundation: migrations (comm_templates, delivery_logs extension, customers preferences)
   - **R-62b** — Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}})
