@@ -1006,5 +1006,18 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
   - All deploy scripts in `deploy/windows/` and `docs/WINDOWS_PRODUCTION_SETUP.md` restored to exact original pre-change states.
   - New wrapper `restore-db.cmd` removed.
 
+## [2026-09-21 ~12:15Z] Hourly ops standup (scheduler)
+
+- **Floor:** god (Michael) only active (`idle`, breaker: `healthy`, 0 tokens/0 USD). All workers archived in `registry.json`. No active temps.
+- **Task board:** 169 cards total = **152 done / 0 doing / 1 blocked / 16 todo**.
+  - `DOING (0)`: Nothing in flight.
+  - `BLOCKED (1)`: `R-52` (Buying templates module — parked to ~2026-10-13 to decide Hide/Remove/Keep after production use; interim FE-only hide `R-66` completed).
+  - `TODO (16)`: `R-68` (Active Sessions & Device Management panel in Admin — plan-only, awaiting user GO) + `R-62` family (Customer Communication & Campaign platform — 15 sub-cards, parked by user, do not dispatch).
+  - `DONE (152)`: 16 Foundation, 28 Security, 7 Revamp, 25 UI/UX, 76 Feature cards.
+- **Spawn requests:** Clean (only `.done/` and `.failed/` present, no pending spawns).
+- **Inbox:** Handled standup message `2026-09-21T12-14-53-298Z-0b9112.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
+- **In-flight work:** None. No stalled agents, no unowned tasks, no at-risk items. Floor is clean and synchronized.
+
+
 
 
