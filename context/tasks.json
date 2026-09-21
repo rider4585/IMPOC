@@ -2664,6 +2664,17 @@
       "completedAt": "2026-09-21T14:58:00.000Z",
       "doneBy": "worker-r68-sessions-agy",
       "updatedAt": "2026-09-21T14:58:00.000Z"
+    },
+    {
+      "id": "R-69",
+      "title": "DataGrid action column popover / overflow menu pattern (System-wide)",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "origin": "user (2026-09-21)",
+      "deps": [],
+      "createdAt": "2026-09-21T16:50:00.000Z",
+      "details": "User request: System wide change for grid with action column, that if the action column has more than one action button then show it under a dropdown or a small popover menu. In the action column the most used can be shown separately and then we will group all other options in the popover. PLAN ONLY per user (\"for now only create a ticket don't start the implementation\").\n\nScope:\n1. Reusable Primitive: Create a clean, accessible ActionMenu or DataGridActionGroup component (using existing Popover/Dropdown primitive or custom floating menu with keyboard nav, click-outside, and dark/light mode tokens).\n2. Convention & Rules:\n   - Exactly 1 action: render as normal button (no menu).\n   - 2+ actions: single most-used primary action rendered as primary/outline button (e.g. 'Edit' on Users/Picklists, 'View' on Trips/Sales, 'Revoke' on Sessions), and remaining actions grouped in an overflow menu ('⋯' or 'More' with dropdown chevron).\n   - Destructive actions (e.g. Delete, Deactivate, Revoke) styled distinctly with red tint in menu.\n   - Tooltip / ARIA accessibility on the overflow trigger.\n3. Screen Audit & Adoption:\n   - UsersScreen (Primary: 'Edit'; Overflow: 'Roles', 'Deactivate/Activate', 'Delete')\n   - SessionsScreen (Primary: 'Revoke')\n   - VendorsScreen (Primary: 'Edit'; Overflow: 'Delete')\n   - PicklistsScreen / FlatPicklistManager (Primary: 'Edit'; Overflow: 'Deactivate/Activate', 'Delete')\n   - RolesScreen (Primary: 'Permissions'; Overflow: 'Edit', 'Delete')\n   - TripsScreen / TripDetailScreen\n   - SalesListScreen\n   - EnquiriesScreen\n4. Verification: Vitest component tests for ActionMenu, screen integration tests, build checks."
     }
   ]
 }

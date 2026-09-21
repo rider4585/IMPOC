@@ -172,7 +172,10 @@ export function DataGrid({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)]">
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full border-collapse text-sm">
+          <table
+            className="w-full border-collapse text-sm"
+            style={{ minWidth: `${table.getTotalSize()}px` }}
+          >
             <thead className="sticky top-0 bg-[var(--surface-sunken)]">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="border-b border-[var(--border)]">
@@ -182,8 +185,8 @@ export function DataGrid({
                     return (
                       <th
                         key={header.id}
-                        className="px-4 py-3 text-left text-xs font-semibold text-[var(--ink)] "
-                        style={{ width: header.getSize() }}
+                        className="px-4 py-3 text-left text-xs font-semibold text-[var(--ink)]"
+                        style={{ width: header.getSize(), minWidth: `${header.getSize()}px` }}
                       >
                         <div className="flex items-center gap-2">
                           <div className="flex flex-1 flex-col gap-1">
@@ -256,7 +259,11 @@ export function DataGrid({
                     onClick={() => onRowClick?.(row.original)}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3" style={{ width: cell.column.getSize() }}>
+                      <td
+                        key={cell.id}
+                        className="px-4 py-3"
+                        style={{ width: cell.column.getSize(), minWidth: `${cell.column.getSize()}px` }}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}

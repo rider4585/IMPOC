@@ -1098,3 +1098,25 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - **Inbox:** Handled standup message `2026-09-21T15-27-25-859Z-490746.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
 - **In-flight work:** None. No stalled agents, no unowned tasks, no at-risk items. Floor is clean and synchronized.
 
+## [2026-09-21 ~16:35Z] Hourly ops standup (scheduler), Users Grid Scroll Fix & Ticket R-69 (Action Column Popover)
+
+- **Floor & Fleet:** god (Michael) only active (`idle`, breaker: `healthy`, 0 tokens/0 USD). All workers archived in `registry.json` (`archived: true`). No active temps.
+- **Task board:** 170 cards total = **153 done / 0 doing / 1 blocked / 16 todo**.
+  - `DOING (0)`: Nothing in flight.
+  - `BLOCKED (1)`: `R-52` (Buying templates module — parked to ~2026-10-13 to decide Hide/Remove/Keep after production use; interim FE-only hide `R-66` completed).
+  - `TODO (16)`: `R-69` (DataGrid action column popover / overflow menu pattern, plan-only) + `R-62` family (Customer Communication & Campaign platform — 15 sub-cards, parked by user, do not dispatch).
+  - `DONE (153)`: 16 Foundation, 28 Security, 7 Revamp, 25 UI/UX, 77 Feature cards.
+- **Users Grid Scroll & Actions Layout Fix:**
+  - **Issue:** Users grid scroll was not working and action buttons were stacking on top of each other.
+  - **Root Causes:**
+    1. In `DataGrid.jsx`, `table` used `w-full` without `minWidth: table.getTotalSize()`, and `th`/`td` lacked `minWidth: getSize()`. When columns exceeded container width, browser compressed cells to 100% instead of overflowing, squashing columns and causing `flex-wrap` in the Actions column to wrap buttons into a vertical stack.
+    2. In `UsersScreen.jsx`, root container had `max-w-[1100px]` and `overflow-hidden`, and the intermediate search wrapper lacked `min-h-0 flex-1`, breaking the flex scroll chain.
+  - **Fixes Applied:**
+    1. In `DataGrid.jsx`: Added `minWidth: `${table.getTotalSize()}px`` to `<table>` and `minWidth: `${size}px`` to `<th>` and `<td>`. Now tables maintain column sizes and trigger smooth horizontal scrolling when needed.
+    2. In `UsersScreen.jsx`: Removed artificial `max-w-[1100px]`, set `flex-1 min-h-0` flex chain, passed `className="flex-1"` to `<DataGrid>`, increased Actions column to `size: 320`, and changed action buttons to `flex items-center gap-1.5 whitespace-nowrap`.
+- **Ticket R-69 Planned:**
+  - Created card `R-69` in `hive/tasks.json` and `context/tasks.json`, and added to `hive/board.md` and `context/board.md`.
+  - Scope: System-wide action column overflow pattern. Expose single primary action directly in table cell; group secondary/destructive actions under popover/dropdown menu. Plan only per user instruction.
+- **Inbox:** Handled standup message `2026-09-21T16-33-14-232Z-0c83db.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
+
+
