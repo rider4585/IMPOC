@@ -986,3 +986,15 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - **Inbox:** Handled standup message `2026-09-21T11-14-53-182Z-633260.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
 - **In-flight work:** None. No stalled agents, no unowned tasks, no at-risk items. Floor is clean and synchronized.
 
+## [2026-09-21 ~11:45Z] Deploy Scripts Auto-Elevation (UAC) Implemented
+
+- **User request:** "update the deploy scripts and make them ask admin previlage and then run on admin previlage".
+- **Problem solved:** Previously `setup.cmd` / `setup.ps1` failed with an error message if not manually right-clicked -> "Run as administrator", and other deploy scripts lacked elevation checks or wrappers.
+- **Changes delivered:**
+  1. **Batch launchers (`.cmd`):** Added elevation check via `net session >nul 2>&1`. If not running with Administrator privileges, requests elevation via PowerShell `Start-Process '%comspec%' -WorkingDirectory '%SCRIPT_DIR%' -ArgumentList ... -Verb RunAs` which triggers the native Windows UAC elevation dialog and relaunches the script elevated. Covers: `setup.cmd`, `update.cmd`, `start.cmd`, `setup-backup-local.cmd`, `setup-backup-cloud.cmd`, and new `restore-db.cmd`.
+  2. **PowerShell scripts (`.ps1`):** Added native self-elevation via `WindowsPrincipal.IsInRole(Administrator)`. When run directly in PowerShell without elevation, re-launches itself via `Start-Process powershell.exe ... -Verb RunAs` preserving all bound parameters, switches, and unbound arguments. Covers: `setup.ps1`, `update.ps1`, `start.ps1`, `setup-backup-local.ps1`, `setup-backup-cloud.ps1`, `restore-db.ps1`.
+  3. **New tool:** Added `deploy/windows/restore-db.cmd` for convenient double-click database restore.
+  4. **Documentation:** Updated `docs/WINDOWS_PRODUCTION_SETUP.md` table and procedure steps to note automatic UAC elevation.
+  5. **Shipped:** Committed to `main` (`4b96b92`), pushed to `origin/main`; cherry-picked to `context` (`6d3c697`), pushed to `origin/context`.
+
+
