@@ -34,26 +34,6 @@ function Log($msg) {
     Add-Content -Path $LogFile -Value $line
 }
 
-# ---------------------------------------------------------------------------
-# Admin check & self-elevation
-# ---------------------------------------------------------------------------
-$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
-           ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) {
-    Log 'Requesting Administrator privileges...'
-    try {
-        $passedArgs = @()
-        if ($NoBrowser) { $passedArgs += '-NoBrowser' }
-        if ($args) { foreach ($a in $args) { $passedArgs += "`"$a`"" } }
-        $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"") + $passedArgs
-        $proc = Start-Process -FilePath "powershell.exe" -WorkingDirectory $PSScriptRoot -ArgumentList $argList -Verb RunAs -PassThru -Wait
-        exit $proc.ExitCode
-    } catch {
-        Log 'ERROR: Administrator privileges are required to manage services. Please approve the elevation prompt.'
-        exit 1
-    }
-}
-
 # Port from backend\.env (default 3000)
 $Port = 3000
 $envPath = Join-Path $Backend '.env'

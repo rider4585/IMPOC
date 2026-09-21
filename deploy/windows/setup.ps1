@@ -79,30 +79,11 @@ function Write-Utf8NoBom([string]$path, [string]$text) {
 }
 
 # ---------------------------------------------------------------------------
-# 0. Admin check & self-elevation
+# 0. Admin check
 # ---------------------------------------------------------------------------
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
            ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) {
-    Step 'Requesting Administrator privileges...'
-    try {
-        $passedArgs = @()
-        foreach ($entry in $PSBoundParameters.GetEnumerator()) {
-            if ($entry.Value -is [System.Management.Automation.SwitchParameter]) {
-                if ($entry.Value.IsPresent) { $passedArgs += "-$($entry.Key)" }
-            } else {
-                $passedArgs += "-$($entry.Key)"
-                $passedArgs += "`"$($entry.Value)`""
-            }
-        }
-        if ($args) { foreach ($a in $args) { $passedArgs += "`"$a`"" } }
-        $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"") + $passedArgs
-        $proc = Start-Process -FilePath "powershell.exe" -WorkingDirectory $PSScriptRoot -ArgumentList $argList -Verb RunAs -PassThru -Wait
-        exit $proc.ExitCode
-    } catch {
-        Fail 'Administrator privileges are required. Please approve the elevation prompt to continue.'
-    }
-}
+if (-not $isAdmin) { Fail 'Please run this script from an Administrator PowerShell (needed for the firewall rule).' }
 
 # ---------------------------------------------------------------------------
 # 1. Prerequisites

@@ -32,32 +32,6 @@ $Backend  = Join-Path $RepoRoot 'backend'
 function Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Fail($msg) { Write-Host "`nERROR: $msg" -ForegroundColor Red; exit 1 }
 
-# ---------------------------------------------------------------------------
-# Admin check & self-elevation
-# ---------------------------------------------------------------------------
-$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
-           ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) {
-    Step 'Requesting Administrator privileges...'
-    try {
-        $passedArgs = @()
-        foreach ($entry in $PSBoundParameters.GetEnumerator()) {
-            if ($entry.Value -is [System.Management.Automation.SwitchParameter]) {
-                if ($entry.Value.IsPresent) { $passedArgs += "-$($entry.Key)" }
-            } else {
-                $passedArgs += "-$($entry.Key)"
-                $passedArgs += "`"$($entry.Value)`""
-            }
-        }
-        if ($args) { foreach ($a in $args) { $passedArgs += "`"$a`"" } }
-        $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"") + $passedArgs
-        $proc = Start-Process -FilePath "powershell.exe" -WorkingDirectory $PSScriptRoot -ArgumentList $argList -Verb RunAs -PassThru -Wait
-        exit $proc.ExitCode
-    } catch {
-        Fail 'Administrator privileges are required to stop/start services and restore the database. Please approve the elevation prompt.'
-    }
-}
-
 $dirs = Initialize-BackupDirs
 $envVars = Read-DotEnv (Join-Path $Backend '.env')
 if (-not $envVars['DB_NAME']) { Fail 'backend\.env not found - nothing to restore into.' }

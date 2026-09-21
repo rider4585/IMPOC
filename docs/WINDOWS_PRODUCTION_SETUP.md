@@ -8,12 +8,11 @@ Scripts live in [`deploy/windows/`](../deploy/windows/):
 
 | File | What it does |
 |---|---|
-| `setup.cmd` / `setup.ps1` | One-time install. Double-click (automatically requests Administrator privileges via UAC). Safe to re-run. |
-| `update.cmd` / `update.ps1` | Pull from GitHub, install, migrate, rebuild, restart. Double-click (automatically requests Administrator privileges via UAC). |
-| `start.cmd` / `start.ps1` | Brings everything up: PostgreSQL → pm2 → opens the app in a browser window. Runs at every login or double-click (automatically requests Administrator privileges via UAC). `start.cmd --no-browser` starts the services only. |
-| `setup-backup-local.cmd` / `setup-backup-local.ps1` | Set up / update the **local** backups only (automatically requests Administrator privileges). Ask for two times, default 14:00, 21:00. Safe to re-run. |
-| `setup-backup-cloud.cmd` / `setup-backup-cloud.ps1` | Set up / update the **cloud** backups only (automatically requests Administrator privileges). Needs a one-time Google sign-in. Safe to re-run. |
-| `restore-db.cmd` / `restore-db.ps1` | Restore database from backup (automatically requests Administrator privileges). Interactive dump picker + confirmation. |
+| `setup.cmd` / `setup.ps1` | One-time install. Right-click → *Run as administrator*. Safe to re-run. |
+| `update.cmd` / `update.ps1` | Pull from GitHub, install, migrate, rebuild, restart. Double-click whenever there is a new version. |
+| `start.cmd` / `start.ps1` | Brings everything up: PostgreSQL → pm2 → opens the app in a browser window. Runs at every login (setup puts a shortcut in the Startup folder). Double-click it if the app ever looks down. `start.cmd --no-browser` starts the services only. |
+| `setup-backup-local.cmd` | Set up / update the **local** backups only (no full setup). Ask for two times, default 14:00, 21:00. Safe to re-run. |
+| `setup-backup-cloud.cmd` | Set up / update the **cloud** backups only (rclone → Google Drive, encrypted). Needs a one-time Google sign-in. Safe to re-run. |
 
 ---
 
@@ -48,7 +47,7 @@ Keep the path short and without spaces (`C:\impoc`) — long paths inside `node_
 
 ## 4. Run the setup script (once)
 
-In `C:\impoc\deploy\windows`, double-click **`setup.cmd`** (it will ask for administrator privileges via the Windows UAC prompt and run elevated).
+In `C:\impoc\deploy\windows`, right-click **`setup.cmd`** → **Run as administrator**.
 Run it as the **same Windows user** that will be signed in on the shop laptop (pm2 keeps its process list per user).
 
 It asks for:
@@ -160,7 +159,7 @@ Cloud files are **encrypted on the laptop before upload** — Google only sees s
 **If the cloud upload starts failing with a token / login error** (Google logins expire every few months): open PowerShell and run `rclone config reconnect gdrive:` — sign in again, done.
 
 ### Restore
-Double-click **`deploy\windows\restore-db.cmd`** (or run from PowerShell; both ask for Administrator privileges automatically via UAC):
+From an **Administrator** PowerShell in the code folder:
 ```
 .\deploy\windows\restore-db.ps1               # choose from local backups
 .\deploy\windows\restore-db.ps1 -FromCloud    # list + download from Google Drive first
