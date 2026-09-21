@@ -22,6 +22,25 @@ param()
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\backup-setup.ps1')
 
+# ---------------------------------------------------------------------------
+# Admin check & self-elevation
+# ---------------------------------------------------------------------------
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
+           ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Step 'Requesting Administrator privileges...'
+    try {
+        $passedArgs = @()
+        if ($args) { foreach ($a in $args) { $passedArgs += "`"$a`"" } }
+        $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"") + $passedArgs
+        $proc = Start-Process -FilePath "powershell.exe" -WorkingDirectory $PSScriptRoot -ArgumentList $argList -Verb RunAs -PassThru -Wait
+        exit $proc.ExitCode
+    } catch {
+        Warn 'Administrator privileges are required to install rclone and configure cloud tasks. Please approve the elevation prompt.'
+        exit 1
+    }
+}
+
 Step 'Cloud backups (rclone + Google Drive, twice daily)'
 
 try {

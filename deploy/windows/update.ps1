@@ -48,6 +48,32 @@ function Step($msg) { Log "==> $msg" 'Cyan' }
 function Ok($msg)   { Log "    OK  $msg" 'Green' }
 function Fail($msg) { Log "ERROR: $msg" 'Red'; Write-Host "`nUpdate stopped. Nothing else was changed." -ForegroundColor Red; exit 1 }
 
+# ---------------------------------------------------------------------------
+# Admin check & self-elevation
+# ---------------------------------------------------------------------------
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
+           ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Step 'Requesting Administrator privileges...'
+    try {
+        $passedArgs = @()
+        foreach ($entry in $PSBoundParameters.GetEnumerator()) {
+            if ($entry.Value -is [System.Management.Automation.SwitchParameter]) {
+                if ($entry.Value.IsPresent) { $passedArgs += "-$($entry.Key)" }
+            } else {
+                $passedArgs += "-$($entry.Key)"
+                $passedArgs += "`"$($entry.Value)`""
+            }
+        }
+        if ($args) { foreach ($a in $args) { $passedArgs += "`"$a`"" } }
+        $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"") + $passedArgs
+        $proc = Start-Process -FilePath "powershell.exe" -WorkingDirectory $PSScriptRoot -ArgumentList $argList -Verb RunAs -PassThru -Wait
+        exit $proc.ExitCode
+    } catch {
+        Fail 'Administrator privileges are required. Please approve the elevation prompt to continue.'
+    }
+}
+
 function Read-DotEnv([string]$path) {
     $map = @{}
     if (Test-Path $path) {
