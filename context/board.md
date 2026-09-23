@@ -14,7 +14,7 @@
 
 ---
 
-## KANBAN BOARD (as of 2026-09-21)
+## KANBAN BOARD (as of 2026-09-23)
 
 ### DOING (0)
 _None in flight._
@@ -1283,3 +1283,12 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
 - gh 2.101.0 installed (/opt/homebrew/bin/gh); auth = GH_TOKEN from macOS keychain (token lacks read:org → interactive gh auth login won't validate; repo-scoped ops fine). Recipe in docs/VERSIONING.md.
 - Handoff docs updated (CONTEXT.md / CONTEXT-RESUME.md): 151 done / 0 doing / 1 blocked (R-52, revisit ~mid-Oct) / 15 todo parked (R-62 family).
 - All pushed: main + context at origin. Board: 151 done.
+
+# STANDUP 2026-09-23 ~14:35Z (god)
+
+- **Floor & Fleet:** god (Michael) only active (`idle`, breaker: `healthy`, 0 tokens/0 USD). All workers archived in `registry.json`. No active temps or background processes.
+- **Board:** 170 cards total = **154 done / 0 doing / 1 blocked (R-52 parked to ~mid-Oct) / 15 todo (R-62 family, parked by user)**. Nothing in flight, nothing unowned, no stale/at-risk work.
+- **Repo:** context `a016dc8` == origin/context, main `b3c2a07` == origin/main. Tree clean (untracked `.claude/`, `worktrees/` expected).
+- **Spawn requests:** Clean (only `.done/` and `.failed/` present, no pending spawns).
+- **Inbox:** Handled standup messages `2026-09-22T17-06-46-384Z-a43038.json` and `2026-09-23T14-33-26-715Z-599f9f.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
+- **Status:** All systems green, clean, and synchronized. Standing by for instructions.
