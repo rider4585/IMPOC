@@ -1199,3 +1199,20 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - **Spawn requests:** Clean (only `.done/` and `.failed/` present, no pending spawns).
 - **Inbox:** Handled standup message `2026-09-23T17-33-26-963Z-f961f6.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
 - **In-flight work:** None. No stalled agents, no unowned tasks, no at-risk items. Floor is clean and synchronized.
+
+## [2026-09-23 ~18:15Z] Receipt Template Preview Modal Upgrade & Native Scroll Fix
+
+- **Context / User Request:** User noted that in the Receipt Template Builder, the preview modal was constrained and could not be scrolled down to the bottom of the receipt (missing item details, total in words, and signature line due to an iframe height calculation defect). Requested full-screen/large modal and fix for bottom scrolling.
+- **Root Cause:**
+  1. Iframe captured mouse wheel events; previous dynamic height calculation (`doc.body.scrollHeight` on `onLoad`) under-reported height before fonts/SVGs rendered, freezing iframe height around 850px and clipping the footer.
+  2. Outer modal overflow container could not scroll because pointer events over the iframe were trapped.
+- **Implementation (`frontend/src/components/TemplateBuilder.jsx`):**
+  - Upgraded `<Dialog>` with `fullScreen` prop and clear header lockup.
+  - Center-aligned preview document card (`max-w-[760px]`) containing an `h-full w-full` iframe.
+  - Injected scoped styles into the preview HTML (`padding: 16px 0 48px 0`, `min-height: 100%`, smooth scrolling) so the iframe's internal document window handles scrolling natively with comfortable clearance past the signature block.
+  - Added "Print preview" button in modal footer next to "Close preview".
+- **Verification:**
+  - Frontend Vitest: 51/51 test files (467 tests) passing.
+  - Backend Jest: 53/53 test suites (828 tests) passing.
+  - Production build: `vite build` completed cleanly.
+- **Deployment:** Shipped to `main` (`d51f08c`) and `context` (`5e44127`).

@@ -1,6 +1,6 @@
 # CONTEXT-RESUME.md — Handoff for Other AI Tools
 
-**Last updated:** 2026-09-21
+**Last updated:** 2026-09-23
 **Branch:** `context` (all planning docs live here; clean code goes to `main`)
 
 ---
@@ -15,9 +15,15 @@
 
 ---
 
-## What Happened in the Last Sessions (2026-09-20 / 2026-09-21)
+## What Happened in the Last Sessions (2026-09-20 / 2026-09-21 / 2026-09-23)
 
 ### Completed (user sign-off)
+- **Receipt Template Preview Modal Upgrade & Native Scroll Fix (2026-09-23)**:
+  - User requested: large / full-screen modal for receipt template preview in `TemplateBuilder.jsx`, and reported inability to scroll to the bottom of the receipt.
+  - Root cause: Dynamic `iframeHeight` calculation (`doc.body.scrollHeight` on `onLoad`) under-reported content height before fonts/assets rendered, freezing the iframe height to ~850px and clipping the footer. Mouse wheel events over the iframe were trapped by the iframe document and could not scroll the outer container.
+  - Fix: Upgraded preview `<Dialog>` to `fullScreen`, centered a document preview card (`max-w-[760px]`) containing an `h-full w-full` iframe, and injected scoped styling (`padding: 16px 0 48px 0`, `min-height: 100%`, smooth scrolling) so the iframe scrolls its own content natively down to the signature line with generous margin. Added a **Print preview** button in the modal footer.
+  - Verification: 51/51 Vitest suites (467 tests pass), 53/53 Jest suites (828 tests pass), Vite build clean.
+  - Deployed: `main` (`d51f08c`) and `context` (`5e44127`).
 - **R-69 DataGrid action column popover / overflow menu pattern (system-wide)**:
   - User requested: System-wide pattern for grids with action columns — if an action column has more than 1 action button, show the most-used action directly in the cell, and group all other options in a small popover/dropdown menu. If only 1 action, keep it as a standalone button.
   - Implemented reusable primitive `ActionMenu.jsx` (`frontend/src/components/ui/`):

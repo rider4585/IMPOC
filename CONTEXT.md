@@ -32,11 +32,12 @@ npm run dev                 # https://localhost:5173 (basic-ssl); dev:host for L
 ```
 
 - **Production (Windows shop laptop):** `deploy/windows/setup.cmd` (once, as admin) + `start.cmd` on login; backend under pm2 serves `frontend/dist` on one port. Guide: `docs/WINDOWS_PRODUCTION_SETUP.md`.
-- **Tests:** frontend `npx vitest run` (436 passing); backend `NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules npx jest --forceExit` (806 passing).
+- **Tests:** frontend `npx vitest run` (467 passing); backend `NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules npx jest --forceExit` (828 passing).
 - **Env:** `backend/.env` needs DB creds, `JWT_SECRET`, `SEED_ADMIN_PASSWORD`, `STORE_NAME/ADDRESS/PHONE`. `.env` files are gitignored — never commit them.
 
-## Current state (2026-09-21)
+## Current state (2026-09-23)
 
+- **Receipt Template Preview Modal Upgrade & Native Scroll Fix (2026-09-23)**: Upgraded template preview in `TemplateBuilder.jsx` to full-screen modal (`fullScreen`), eliminated premature `scrollHeight` calculation trap, containerized `h-full w-full` iframe in centered card with native scrolling and 48px bottom padding to reach the signature line smoothly. Added **Print preview** button. Tested 467/467 FE, 828/828 BE passing. Shipped on `main` (`d51f08c`) and `context` (`5e44127`).
 - **154 tickets done. Latest (2026-09-21, user sign-off): R-69** — DataGrid action column popover / overflow menu pattern (`ActionMenu` primitive with 1 vs 2+ action rule and portal popover across UsersScreen, RolesScreen, VendorsScreen, FlatPicklistManager, ExpensesScreen, StocksScreen, EnquiriesScreen) and **R-68** (Active Sessions & Device Management Panel in Admin under `/sessions`).
 - **v1.1.0 release (2026-09-20): R-67** — Wi-Fi / LAN Network Access Modal & Dynamic IP QR (code integrated, tagged v1.1.0, user verified & marked done): added `GET /api/system/network` (returns active IPv4 interfaces, server port, primary URL; CORS allows private LAN origins 192.168.*, 10.*, 172.16-31.*, localhost) and frontend `NetworkAccessModal` accessible via a `Wifi` icon button in both desktop & mobile headers in `AppShell.jsx`. Renders dynamic QR code (`qrcode.react`), monospace URL box, 1-click Copy button with toast, network interface picker, and 3-step connection guide. Verified: all 48 vitest files (447 tests) pass, vite build clean, all 52 backend jest test suites (817 tests) pass. Tagged `v1.1.0` on `main` `6fb1219` + context `836855c`.
 - **Previous (2026-09-18): R-66** (R-52 interim: hide Buying templates UI, FE only, reversible).

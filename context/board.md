@@ -1292,3 +1292,9 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
 - **Spawn requests:** Clean (only `.done/` and `.failed/` present, no pending spawns).
 - **Inbox:** Handled standup messages `2026-09-22T17-06-46-384Z-a43038.json` and `2026-09-23T14-33-26-715Z-599f9f.json` -> moved to `.done/`. No reply sent (scheduler bounce convention).
 - **Status:** All systems green, clean, and synchronized. Standing by for instructions.
+
+# SHIFT NOTE (2026-09-23) — Receipt Template Preview Modal & Native Scroll Fix
+- **Context / User Request:** User requested a large/full-screen modal for receipt template preview in `TemplateBuilder.jsx` and reported that the receipt was unable to scroll to the bottom.
+- **Root Cause & Fix:** The dynamic `iframeHeight` (`doc.body.scrollHeight` on `onLoad`) froze height at ~850px before assets loaded, and mouse wheel events over the iframe trapped scroll events. Upgraded modal to `fullScreen`, embedded an `h-full w-full` iframe in a centered `max-w-[760px]` card, and injected 48px bottom padding with smooth scrolling into the preview HTML so scrolling occurs natively and smoothly all the way down to the signature line. Added "Print preview" button to modal footer.
+- **Verification:** Vitest (51/51 files, 467 tests pass), Jest (53/53 suites, 828 tests pass), Vite build clean.
+- **Branches:** Shipped on `main` (`d51f08c`) and `context` (`5e44127`).
