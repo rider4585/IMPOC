@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, Dialog, useToast } from './ui';
 import { receiptTemplateApi } from '../services/receiptTemplateApi.js';
 
@@ -49,6 +49,7 @@ const IMAGE_SLOT_SNIPPET = `<!-- IMAGE SLOT: replace this whole div with your im
  */
 export function TemplateBuilder({ template, entityType, onSave, onCancel }) {
   const textareaRef = useRef(null);
+  const previewIframeRef = useRef(null);
   const toast = useToast();
 
   const [html, setHtml] = useState(template?.htmlContent || '');
@@ -59,6 +60,15 @@ export function TemplateBuilder({ template, entityType, onSave, onCancel }) {
   const [showPreview, setShowPreview] = useState(false);
   const [placeholderOpen, setPlaceholderOpen] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
+
+  const displayHtml = useMemo(() => {
+    if (!previewHtml) return '';
+    const styleSnippet = '<style>html { scroll-behavior: smooth; } body { padding: 16px 0 48px 0; min-height: 100%; box-sizing: border-box; } .page { box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 4px; }</style>';
+    if (previewHtml.includes('</head>')) {
+      return previewHtml.replace('</head>', `${styleSnippet}</head>`);
+    }
+    return `${styleSnippet}${previewHtml}`;
+  }, [previewHtml]);
 
   useEffect(() => {
     if (template) {
@@ -269,20 +279,39 @@ export function TemplateBuilder({ template, entityType, onSave, onCancel }) {
         <Dialog
           open={showPreview}
           onClose={() => setShowPreview(false)}
-          title="Template preview (sample data)"
+          title={`Template preview — ${entityType === 'RENTAL' ? 'Rental receipt' : 'Sale receipt'} (Sample data)`}
+          fullScreen
           footer={
-            <Button variant="outline" onClick={() => setShowPreview(false)}>
-              Close
-            </Button>
+            <div className="flex w-full flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-[var(--ink-muted)]">
+                Rendered with sample {entityType === 'RENTAL' ? 'rental' : 'sale'} data via the template engine.
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const win = previewIframeRef.current?.contentWindow;
+                    if (win) win.print();
+                  }}
+                >
+                  Print preview
+                </Button>
+                <Button onClick={() => setShowPreview(false)}>
+                  Close preview
+                </Button>
+              </div>
+            </div>
           }
         >
-          <div className="max-h-[60vh] overflow-auto">
-            <iframe
-              srcDoc={previewHtml}
-              title="Template preview"
-              className="w-full border-0"
-              style={{ minHeight: 400 }}
-            />
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[var(--surface-sunken)] p-2 sm:p-4">
+            <div className="flex h-full w-full max-w-[760px] flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[#F7F3EC] shadow-2xl">
+              <iframe
+                ref={previewIframeRef}
+                srcDoc={displayHtml}
+                title="Template preview"
+                className="h-full w-full border-0 bg-[#F7F3EC]"
+              />
+            </div>
           </div>
         </Dialog>
       )}
