@@ -1240,3 +1240,15 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - **Spawn requests:** Clean (only `.done/` and `.failed/` present, no pending spawns).
 - **Inbox:** Handled 19 queued standup messages (`2026-09-23T19-44-46-766Z-e7363b` through `2026-09-24T14-57-16-737Z-eb7821`) -> all moved to `.done/`. No replies sent (scheduler bounce convention). Inbox backlog drained to 0.
 - **In-flight work:** None. No stalled agents, no unowned tasks, no at-risk items. Floor is clean and synchronized.
+
+## [2026-09-24 ~16:00Z] Hourly ops standup (scheduler: Sep 24 15:57Z)
+
+- **Floor & Fleet:** god (Michael) only active (`idle`, breaker: `healthy`, 0 tokens/0 USD). All workers archived in `registry.json`. No active temps or background processes.
+- **Task board:** 170 cards total = **154 done / 0 doing / 1 blocked / 15 todo**.
+  - `DOING (0)`: Nothing in flight.
+  - `BLOCKED (1)`: `R-52` (Buying templates module — parked to ~2026-10-13 to decide Hide/Remove/Keep after production use; interim FE-only hide `R-66` completed).
+  - `TODO (15)`: `R-62` family (Customer Communication & Campaign platform — 15 sub-cards, parked by user, do not dispatch).
+  - `DONE (154)`: 16 Foundation, 28 Security, 7 Revamp, 25 UI/UX, 78 Feature cards.
+- **Spawn requests:** Clean (only `.done/` and `.failed/` present, no pending spawns).
+- **Inbox:** Handled standup message `2026-09-24T15-57-16-820Z-250b6d.json` -> moved to `.done/`. No reply sent (scheduler bounce convention). Inbox backlog 0.
+- **In-flight work:** None. No stalled agents, no unowned tasks, no at-risk items. Floor is clean and synchronized.
