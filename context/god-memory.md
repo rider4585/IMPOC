@@ -1300,3 +1300,13 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - **Spawn requests:** Clean (only `.done/` and `.failed/` present, no pending spawns).
 - **Inbox:** Handled 13 queued standup messages (`2026-09-24T20-08-57-093Z-3efd91` through `2026-09-27T17-45-57-152Z-9903b9`) -> all moved to `.done/`. No replies sent (scheduler bounce convention). Inbox backlog drained to 0.
 - **In-flight work:** None. No stalled agents, no unowned tasks, no at-risk items. Floor is clean and synchronized.
+
+## [2026-09-27 ~18:38Z] R-70 DISPATCHED — Mobile UI Accessibility & DataGrid min-height
+
+- **Floor & Fleet:** 2 agents active — god (Michael, orchestrator) + `worker-r70-mobile-grid-agy` (LIVE temp under Antigravity / Gemini CLI `agy`, breaker: `healthy`).
+- **Ticket:** `R-70` transitioned to `doing`, assigned to `worker-r70-mobile-grid-agy`.
+- **Scope Contract:**
+  1. Fix mobile viewport DataGrid height collapse: enforce responsive minimum height (`min-h-[360px]` / `min-h-[45vh]`) so small-height screens can view and scroll multiple rows easily.
+  2. Audit main screen containers using DataGrid (`UsersScreen`, `CustomersScreen`, `StocksScreen`, `ExpensesScreen`, `SalesListScreen`, `TripsScreen`, `EnquiriesScreen`, `SessionsScreen`, `RolesScreen`, `VendorsScreen`, `PicklistsScreen`).
+  3. Ensure 100% frontend vitest tests pass and vite build is clean.
+- **Task board:** 171 cards total = **154 done / 1 doing (R-70) / 1 blocked (R-52) / 15 todo (R-62 family)**.

@@ -2682,14 +2682,14 @@
     {
       "id": "R-70",
       "title": "Mobile UI accessibility & layout improvements (DataGrid min-height & responsive adjustments)",
-      "status": "todo",
+      "status": "doing",
       "priority": "medium",
-      "assignee": null,
+      "assignee": "worker-r70-mobile-grid-agy",
       "origin": "user (2026-09-28)",
       "deps": [],
       "createdAt": "2026-09-28T00:03:00.000Z",
-      "updatedAt": "2026-09-28T00:03:00.000Z",
-      "details": "User request: Small accessibility and UI changes for mobile devices only. Plan-only ticket while user provides tasks (do NOT spawn agent until explicitly instructed by user).\n\nTasks defined so far:\n1. Mobile DataGrid minimum height: For mobile devices, enforce a minimum height on all DataGrids so that on low screen-height devices, users do not get stuck seeing only one partial row. Because outer layouts may not be scrollable, provide an appropriate min-height (or responsive viewport-aware scroll container) so multiple rows are visible at once and the grid is comfortably scrollable on mobile.\n\nAgent provider target: Gemini CLI default model (provider: antigravity) once user gives the GO to spawn."
+      "updatedAt": "2026-09-28T00:08:00.000Z",
+      "details": "User request: Small accessibility and UI changes for mobile devices only.\n\nTask 1: Mobile DataGrid minimum height:\nFor mobile devices, enforce a minimum height on all DataGrids so that on low screen-height devices, users do not get stuck seeing only one partial row. Because outer layouts may not be scrollable, provide an appropriate min-height (or responsive viewport-aware scroll container) so multiple rows are visible at once and the grid is comfortably scrollable on mobile.\n\nDispatched to worker-r70-mobile-grid-agy (antigravity / Gemini CLI default model)."
     }
   ]
 }
