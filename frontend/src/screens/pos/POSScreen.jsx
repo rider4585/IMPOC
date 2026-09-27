@@ -20,6 +20,12 @@ import { createRental } from '../../services/rentalsApi.js';
 import { getPaymentMethods, getCustomerSources, getUpiAccounts, getReviewLinks } from '../../services/picklistsApi.js';
 import { publishPosDisplayState } from '../../services/posDisplayApi.js';
 import BarcodeScanner from '../../components/BarcodeScanner.jsx';
+import {
+  playValidScanSound,
+  playInvalidScanSound,
+  vibrateValidScan,
+  vibrateInvalidScan,
+} from '../../platform/scannerSound.js';
 import { formatPaise } from '../../platform/money.js';
 import { formatPaiseForInput, parseRupeesToPaise } from '../../platform/moneyInput.js';
 import { createRequestKey } from '../../platform/requestKey.js';
@@ -311,20 +317,28 @@ export function POSScreen() {
       try {
         const unit = await getUnitByBarcode(b);
         if (!unit) {
+          playInvalidScanSound();
+          vibrateInvalidScan();
           setLookupError(`No unit found with barcode "${b}".`);
           toast.error({ title: 'Not found', description: `No unit with barcode "${b}".` });
           return;
         }
         if (mode === 'sale') {
           if (unit.channel !== 'RETAIL') {
+            playInvalidScanSound();
+            vibrateInvalidScan();
             toast.error({ title: 'Not sellable', description: 'This unit is a rental item and cannot be sold.' });
             return;
           }
           if (unit.status !== 'in_stock') {
+            playInvalidScanSound();
+            vibrateInvalidScan();
             toast.error({ title: 'Not in stock', description: `Unit "${b}" is currently "${unit.status}".` });
             return;
           }
           if (cart.some((item) => item.uuid === unit.uuid)) {
+            playInvalidScanSound();
+            vibrateInvalidScan();
             toast.warning({ title: 'Already in cart' });
             return;
           }
@@ -342,14 +356,20 @@ export function POSScreen() {
           ]);
         } else {
           if (unit.channel !== 'RENTAL') {
+            playInvalidScanSound();
+            vibrateInvalidScan();
             toast.error({ title: 'Not rentable', description: 'This unit is a retail item and cannot be rented.' });
             return;
           }
           if (unit.status !== 'in_stock') {
+            playInvalidScanSound();
+            vibrateInvalidScan();
             toast.error({ title: 'Not in stock', description: `Unit "${b}" is currently "${unit.status}".` });
             return;
           }
           if (cart.some((item) => item.uuid === unit.uuid)) {
+            playInvalidScanSound();
+            vibrateInvalidScan();
             toast.warning({ title: 'Already in cart' });
             return;
           }
@@ -366,8 +386,12 @@ export function POSScreen() {
             },
           ]);
         }
+        playValidScanSound();
+        vibrateValidScan();
         toast.success({ title: `Added ${unit.stockName || `Item ${unit.barcode}`}` });
       } catch (err) {
+        playInvalidScanSound();
+        vibrateInvalidScan();
         setLookupError(err.message || 'Lookup failed');
         toast.error({ title: 'Lookup failed', description: err.message });
       } finally {
