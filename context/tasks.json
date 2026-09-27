@@ -2682,14 +2682,16 @@
     {
       "id": "R-70",
       "title": "Mobile UI accessibility & layout improvements (DataGrid min-height & responsive adjustments)",
-      "status": "doing",
+      "status": "done",
       "priority": "medium",
       "assignee": "worker-r70-mobile-grid-agy",
       "origin": "user (2026-09-28)",
       "deps": [],
       "createdAt": "2026-09-28T00:03:00.000Z",
-      "updatedAt": "2026-09-28T00:08:00.000Z",
-      "details": "User request: Small accessibility and UI changes for mobile devices only.\n\nTask 1: Mobile DataGrid minimum height:\nFor mobile devices, enforce a minimum height on all DataGrids so that on low screen-height devices, users do not get stuck seeing only one partial row. Because outer layouts may not be scrollable, provide an appropriate min-height (or responsive viewport-aware scroll container) so multiple rows are visible at once and the grid is comfortably scrollable on mobile.\n\nDispatched to worker-r70-mobile-grid-agy (antigravity / Gemini CLI default model)."
+      "updatedAt": "2026-09-27T18:50:00.000Z",
+      "details": "User request: Small accessibility and UI changes for mobile devices only.\n\nImplementation (2026-09-28):\n- In frontend/src/components/ui/DataGrid.jsx:\n  - Added .datagrid-root, .datagrid-wrapper, .datagrid-scroll-container with responsive mobile minimum height (max-md:min-h-[360px] max-md:min-h-[45vh]).\n  - Added smooth momentum touch scrolling (-webkit-overflow-scrolling: touch; overscroll-behavior: contain) with inline WebkitOverflowScrolling: 'touch' and overflow-auto.\n- In frontend/src/index.css:\n  - Added design token classes for .datagrid-scroll-container with momentum scrolling and max-width 767.98px media query enforcing min-height: max(360px, 45vh).\n- Audited and updated outer page wrappers across 16 screens (UsersScreen, CustomersScreen, StocksScreen, ExpensesScreen, SalesListScreen, TripsScreen, EnquiriesScreen, SessionsScreen, RolesScreen, VendorsScreen, PicklistManagementScreen, FlatPicklistManager, UnitsScreen, PermissionsScreen, TripDetailScreen, VendorDetail) replacing rigid h-full overflow-hidden with min-h-full md:h-full max-md:overflow-visible md:overflow-hidden and adding mobile min-height to intermediate grid wrappers.\n- Added frontend/src/components/__tests__/DataGrid.test.jsx (6/6 tests passing).\n- Tests & Verification: 52 vitest test suites (473/473 tests) passing; production Vite build clean.\n- Delivered by worker-r70-mobile-grid-agy; integrated into main (3312ad9) and context (4371252).",
+      "completedAt": "2026-09-27T18:50:00.000Z",
+      "doneBy": "worker-r70-mobile-grid-agy"
     }
   ]
 }

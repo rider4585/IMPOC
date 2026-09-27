@@ -1318,3 +1318,23 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
 - **Task board:** 171 cards total = **154 done / 1 doing (R-70) / 1 blocked (R-52) / 15 todo (R-62 family)**.
 - **Spawn requests:** Clean (only `.done/` and `.failed/` present, no pending spawns).
 - **Inbox:** Handled standup message `2026-09-27T18-45-57-154Z-a79a17.json` -> moved to `.done/`. No reply sent (scheduler bounce convention). Inbox backlog 0.
+
+## [2026-09-27 ~18:52Z] R-70 INTEGRATED & COMPLETED — Mobile DataGrid Accessibility & Min-Height
+
+- **Delivered by:** `worker-r70-mobile-grid-agy` (Antigravity / Gemini CLI `agy` temp). Reported done with commit `51bfe83`.
+- **Scope & Implementation:**
+  1. `frontend/src/components/ui/DataGrid.jsx`: Added `.datagrid-root`, `.datagrid-wrapper`, `.datagrid-scroll-container` with `max-md:min-h-[360px] max-md:min-h-[45vh]`, touch momentum scrolling (`-webkit-overflow-scrolling: touch; overscroll-behavior: contain`), and inline `WebkitOverflowScrolling: 'touch'`. Desktop layout untouched.
+  2. `frontend/src/index.css`: Added CSS rule enforcing `min-height: max(360px, 45vh)` for mobile viewports (`max-width: 767.98px`).
+  3. Screen-level container audits: Audited and updated 16 screens (`UsersScreen`, `CustomersScreen`, `StocksScreen`, `ExpensesScreen`, `SalesListScreen`, `TripsScreen`, `EnquiriesScreen`, `SessionsScreen`, `RolesScreen`, `VendorsScreen`, `PicklistManagementScreen`, `FlatPicklistManager`, `UnitsScreen`, `PermissionsScreen`, `TripDetailScreen`, `VendorDetail`) changing rigid `h-full overflow-hidden` to `min-h-full md:h-full max-md:overflow-visible md:overflow-hidden` and giving inner DataGrid wrappers `max-md:min-h-[360px] max-md:min-h-[45vh]`.
+  4. Added test suite: `frontend/src/components/__tests__/DataGrid.test.jsx` (6/6 tests passing).
+- **Verification (god sign-off):**
+  - Vitest: 52 test files, 473/473 passing (100% green).
+  - Vite build: clean production build in `frontend/dist` (522ms).
+- **Integration & Shipping:**
+  - Integrated into `main` (`3312ad9`) and pushed to `origin/main`.
+  - Integrated into `context` (`4371252`).
+  - Worker worktree `worktrees/worker-r70-mobile-grid-agy` removed and branch `agent/worker-r70-mobile-grid-agy` deleted.
+- **Card & Board Status:**
+  - `R-70` marked `done` in `tasks.json` (`doneBy: worker-r70-mobile-grid-agy`).
+  - `board.md`: 171 cards total = **155 done / 0 doing / 1 blocked (R-52) / 15 todo (R-62 family)**.
+- **Inbox:** Handled worker done message and worktree preservation notice -> moved to `inbox/.done/`. God backlog: 0.
