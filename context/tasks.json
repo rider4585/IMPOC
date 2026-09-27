@@ -2678,6 +2678,18 @@
       "completedAt": "2026-09-21T17:25:00.000Z",
       "doneBy": "worker-r69-actionmenu-agy",
       "details": "User request: System wide change for grid with action column, that if the action column has more than one action button then show it under a dropdown or a small popover menu. In the action column the most used can be shown separately and then we will group all other options in the popover.\n\nImplementation (2026-09-21):\n- Built reusable ActionMenu component in frontend/src/components/ui/ActionMenu.jsx with portal popover, keyboard navigation, click-outside, and theme tokens.\n- Enforced single-action vs multi-action rules:\n  - Exactly 1 action: standalone Button.\n  - 2+ actions: primary action as standalone Button + '⋯' overflow menu trigger.\n- Converted screens with multi-action columns:\n  - UsersScreen (Primary: Edit; Overflow: Roles, Deactivate/Activate, Delete)\n  - RolesScreen (Primary: Permissions; Overflow: Edit, Delete)\n  - VendorsScreen (Primary: Edit; Overflow: History, Deactivate/Activate)\n  - FlatPicklistManager (Primary: Edit; Overflow: Deactivate/Activate)\n  - ExpensesScreen (Primary: Edit; Overflow: Cancel)\n  - StocksScreen (Primary: Units; Overflow: Scan)\n  - EnquiriesScreen (Primary: Edit; Overflow: Close; Reopen when closed)\n- Verified 1-action screens keep standalone buttons (CustomersScreen, SessionsScreen, SalesListScreen, TripsScreen, TripDetailScreen, VendorDetail).\n- Verification: 8/8 ActionMenu tests, 51/51 frontend test files (467/467 tests), vite build clean, 53/53 backend test suites (828/828 tests).\n- Tested and signed off by user: 2026-09-21."
+    },
+    {
+      "id": "R-70",
+      "title": "Mobile UI accessibility & layout improvements (DataGrid min-height & responsive adjustments)",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "origin": "user (2026-09-28)",
+      "deps": [],
+      "createdAt": "2026-09-28T00:03:00.000Z",
+      "updatedAt": "2026-09-28T00:03:00.000Z",
+      "details": "User request: Small accessibility and UI changes for mobile devices only. Plan-only ticket while user provides tasks (do NOT spawn agent until explicitly instructed by user).\n\nTasks defined so far:\n1. Mobile DataGrid minimum height: For mobile devices, enforce a minimum height on all DataGrids so that on low screen-height devices, users do not get stuck seeing only one partial row. Because outer layouts may not be scrollable, provide an appropriate min-height (or responsive viewport-aware scroll container) so multiple rows are visible at once and the grid is comfortably scrollable on mobile.\n\nAgent provider target: Gemini CLI default model (provider: antigravity) once user gives the GO to spawn."
     }
   ]
 }

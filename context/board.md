@@ -22,7 +22,8 @@ _None in flight._
 ### BLOCKED (1)
 - **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use. Interim: templates UI hidden FE-only + reversible (R-66, done 2026-09-18).
 
-### TODO (15)
+### TODO (16)
+- **R-70** — Mobile UI accessibility & layout improvements (DataGrid min-height & responsive adjustments). Awaiting full task checklist from user before spawning temp agent.
 - **R-62** — Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later). 15 sub-cards below.
   - **R-62a** — Comm foundation: migrations (comm_templates, delivery_logs extension, customers preferences)
   - **R-62b** — Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}})
