@@ -203,7 +203,7 @@ export function VendorsScreen() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5 p-6 overflow-hidden">
+    <div className="flex min-h-full md:h-full min-h-0 flex-col gap-5 p-6 max-md:overflow-visible md:overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="typography-heading mb-1">Vendors</h1>
@@ -221,7 +221,7 @@ export function VendorsScreen() {
       {error && <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]" role="alert">{error}</div>}
 
       {can(PERMISSIONS.INVENTORY.VIEW) && (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)] max-md:min-h-[360px] max-md:min-h-[45vh]">
           <DataGrid
             data={vendors}
             columns={columns}

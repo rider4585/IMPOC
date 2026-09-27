@@ -425,8 +425,8 @@ export function SessionsScreen() {
       )}
 
       {/* Sessions DataGrid */}
-      <Card>
-        <CardContent className="p-0">
+      <Card className="max-md:min-h-[360px] max-md:min-h-[45vh]">
+        <CardContent className="p-0 max-md:min-h-[360px] max-md:min-h-[45vh]">
           <DataGrid
             data={filteredSessions}
             columns={columns}

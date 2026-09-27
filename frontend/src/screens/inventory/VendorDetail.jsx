@@ -231,7 +231,7 @@ export function VendorDetail() {
           <p className="text-sm text-[var(--ink-muted)]">Empty — no trips recorded for this vendor yet.</p>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)] max-md:min-h-[360px] max-md:min-h-[45vh]">
           <DataGrid
             data={trips}
             columns={columns}

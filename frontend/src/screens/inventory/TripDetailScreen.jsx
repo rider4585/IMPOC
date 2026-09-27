@@ -432,7 +432,7 @@ export function TripDetailScreen() {
       </div>
 
       {/* Per-vendor bills */}
-      <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)]">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-raised)] max-md:min-h-[360px] max-md:min-h-[45vh]">
         <div className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-3">
           <h2 className="text-sm font-semibold text-[var(--ink)]">Vendors ({tripVendors.length})</h2>
         </div>

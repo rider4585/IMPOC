@@ -83,7 +83,7 @@ export function PicklistManagementScreen() {
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1100px] flex-col gap-5 p-6 overflow-hidden">
+    <div className="mx-auto flex min-h-full md:h-full min-h-0 w-full max-w-[1100px] flex-col gap-5 p-6 max-md:overflow-visible md:overflow-hidden">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="typography-heading mb-1">Picklists</h1>
