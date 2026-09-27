@@ -39,7 +39,7 @@ _None in flight._
   - **R-62m** — LATER: PDF receipt attachment on invoice email (pdfkit already a dependency)
   - **R-62n** — LATER: public receipt page /r/:token + Cloudflare tunnel from the shop laptop
 
-### DONE (155)
+### DONE (157)
 **Foundation (T-series, 16):** T-00 Auth fix, T-01 Gitignore, T-02 Seed, T-03 Admin UI, T-05 Ops UI, T-06 Units backend, T-07 Service UI, T-08 Sales backend, T-09 Dashboard UI, T-10 Rentals backend, T-11 Receipt UI, T-12 Expenses backend, T-13 Reports backend, T-15 Dashboard frontend, T-16 Final QA.
 
 **Security (SEC-*, 28):** SEC-CR-1..3 (money TOCTOU/role privesc/JWT forgery), SEC-H-1..10 (rate-limit/PII/IDOR/localStorage), SEC-M-3..9 (idempotency/scoping/validation/delivery), SEC-L-1..8 (timing/creds/error-masking).
@@ -48,8 +48,8 @@ _None in flight._
 
 **UI/UX (R-26, 25 cards):** UX-CR-1..3, UX-H-1..8, UX-M-1..10, UX-L-1..4.
 
-**Feature cards (R-24, R-30..R-48, R-51, R-53..R-70, 80):**
-R-24 Security umbrella, R-30 POS price edit, R-32 DB views/matviews, R-31 requestUuid frontend, R-33 Expense picklist, R-34 Collapsible nav, R-35 UPI QR + R-35a..f, R-36 Modal polish, R-37 DataGrid, R-38 Scrollbar, R-39 Sidebar rail, R-40 Nav rail toggle, R-41 Barcode scanner, R-42 Display polish + R-42a..d, R-43 Intake scan, R-44 Mobile responsiveness, R-45 Receipt redesign, R-47 Receipt template versioning + builder (R-47 rework, 2026-09-16), R-48 Barcode SHREE prefix, R-49 Print labels toast, R-50 Label configurator, R-51 GST on purchases, R-53 Digital pet, R-54 Review QR, R-55 Vendor bill photo, R-56 Sheet configurator, R-57 Inline colour/size, R-58 Theme drawer, R-59 Units scan, R-61 Scanner zoom, R-63 Customer enquiries, R-64 Barcode PDF always fresh (2026-09-16/17), R-65 Enquiry close — WhatsApp-only composer + delivery_logs ENQUIRY CHECK fix (2026-09-17, god), R-66 Hide buying templates UI, FE only + reversible (2026-09-18), R-67 Wi-Fi / LAN Network Access Modal & Dynamic IP QR (2026-09-20, v1.1.0), R-68 Active Sessions & Device Management Panel in Admin (2026-09-21, worker-r68-sessions-agy), R-69 DataGrid action column popover / overflow menu pattern (2026-09-21, worker-r69-actionmenu-agy), R-70 Mobile UI accessibility & layout improvements: DataGrid min-height & responsive adjustments (2026-09-28, worker-r70-mobile-grid-agy).
+**Feature cards (R-24, R-30..R-48, R-51, R-53..R-72, 82):**
+R-24 Security umbrella, R-30 POS price edit, R-32 DB views/matviews, R-31 requestUuid frontend, R-33 Expense picklist, R-34 Collapsible nav, R-35 UPI QR + R-35a..f, R-36 Modal polish, R-37 DataGrid, R-38 Scrollbar, R-39 Sidebar rail, R-40 Nav rail toggle, R-41 Barcode scanner, R-42 Display polish + R-42a..d, R-43 Intake scan, R-44 Mobile responsiveness, R-45 Receipt redesign, R-47 Receipt template versioning + builder (R-47 rework, 2026-09-16), R-48 Barcode SHREE prefix, R-49 Print labels toast, R-50 Label configurator, R-51 GST on purchases, R-53 Digital pet, R-54 Review QR, R-55 Vendor bill photo, R-56 Sheet configurator, R-57 Inline colour/size, R-58 Theme drawer, R-59 Units scan, R-61 Scanner zoom, R-63 Customer enquiries, R-64 Barcode PDF always fresh (2026-09-16/17), R-65 Enquiry close — WhatsApp-only composer + delivery_logs ENQUIRY CHECK fix (2026-09-17, god), R-66 Hide buying templates UI, FE only + reversible (2026-09-18), R-67 Wi-Fi / LAN Network Access Modal & Dynamic IP QR (2026-09-20, v1.1.0), R-68 Active Sessions & Device Management Panel in Admin (2026-09-21, worker-r68-sessions-agy), R-69 DataGrid action column popover / overflow menu pattern (2026-09-21, worker-r69-actionmenu-agy), R-70 Mobile UI accessibility & layout improvements: DataGrid min-height & responsive adjustments (2026-09-28, worker-r70-mobile-grid-agy), R-71 Barcode scanner custom audio & haptic feedback for valid/invalid scans (2026-09-28, god), R-72 Stock intake back button desktop left nav & mobile header positioning fix (2026-09-28, god).
 
 ---
 
@@ -1298,3 +1298,19 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
 - **Root Cause & Fix:** The dynamic `iframeHeight` (`doc.body.scrollHeight` on `onLoad`) froze height at ~850px before assets loaded, and mouse wheel events over the iframe trapped scroll events. Upgraded modal to `fullScreen`, embedded an `h-full w-full` iframe in a centered `max-w-[760px]` card, and injected 48px bottom padding with smooth scrolling into the preview HTML so scrolling occurs natively and smoothly all the way down to the signature line. Added "Print preview" button to modal footer.
 - **Verification:** Vitest (51/51 files, 467 tests pass), Jest (53/53 suites, 828 tests pass), Vite build clean.
 - **Branches:** Shipped on `main` (`d51f08c`) and `context` (`5e44127`).
+
+# SHIFT NOTE (2026-09-28) — Barcode Scanner Audio Feedback (R-71) & Stock Intake Back Button Positioning (R-72)
+- **R-71 (Barcode scanner custom valid/invalid audio & haptics)**:
+  - User supplied custom audio files: `frontend/public/sounds/valid-scan.mp3` and `frontend/public/sounds/invalid-scan.mp3`.
+  - Created `frontend/src/platform/scannerSound.js` pre-loading and caching HTML5 Audio instances, resetting `currentTime = 0` for instantaneous repeated playback, synthesized Web Audio API oscillator fallback tones (rising chime for valid, error buzz for invalid) if blocked by browser autoplay policies or audio files fail, and paired vibration haptics.
+  - Integrated across: `BarcodeScanner.jsx` (camera scan decode / camera errors), `POSScreen.jsx` (hardware barcode reader & camera additions to cart / lookup errors / duplicate / out-of-stock), and `StockIntake.jsx` (unit intake save / refusal / 404 / timeouts).
+  - Test suite `frontend/src/platform/__tests__/scannerSound.test.js` (6/6 passing).
+  - Shipped on `main` (`32145e1`) and `context` (`19de0fb`).
+- **R-72 (Stock intake back button desktop left nav & mobile header positioning fix)**:
+  - User reported: in stocks intake screen the Back button was overlapping with the left nav bar on desktop and with the header on mobile.
+  - Root cause: `StockIntake.jsx` lacked `position: relative` on its container, causing `absolute left-4 top-4 z-30` to position relative to the viewport at (16, 16) — directly on top of desktop left sidebar nav (0-240px) and mobile brand header (0-56px, z-20).
+  - Fix: Added `relative min-h-full flex-1 sm:rounded-xl` to the root container and moved the Back button into an in-flow action bar (`flex items-center justify-between px-4 pt-4 pb-2`). Adjusted intake counter spacing (`pb-4`) to eliminate collision risks.
+  - Added unit test in `stockIntake.test.jsx` verifying in-flow rendering and navigation to `/trips/:tripUuid`.
+  - Shipped on `main` (`d53295f`) and `context` (`4ad4585`).
+- **Board:** 173 cards total = **157 done / 0 doing / 1 blocked (R-52) / 15 todo (R-62 family)**. Tests: 53 vitest files (480/480 passing), build clean.
+

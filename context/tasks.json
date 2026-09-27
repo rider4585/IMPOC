@@ -2692,6 +2692,34 @@
       "details": "User request: Small accessibility and UI changes for mobile devices only.\n\nImplementation (2026-09-28):\n- In frontend/src/components/ui/DataGrid.jsx:\n  - Added .datagrid-root, .datagrid-wrapper, .datagrid-scroll-container with responsive mobile minimum height (max-md:min-h-[360px] max-md:min-h-[45vh]).\n  - Added smooth momentum touch scrolling (-webkit-overflow-scrolling: touch; overscroll-behavior: contain) with inline WebkitOverflowScrolling: 'touch' and overflow-auto.\n- In frontend/src/index.css:\n  - Added design token classes for .datagrid-scroll-container with momentum scrolling and max-width 767.98px media query enforcing min-height: max(360px, 45vh).\n- Audited and updated outer page wrappers across 16 screens (UsersScreen, CustomersScreen, StocksScreen, ExpensesScreen, SalesListScreen, TripsScreen, EnquiriesScreen, SessionsScreen, RolesScreen, VendorsScreen, PicklistManagementScreen, FlatPicklistManager, UnitsScreen, PermissionsScreen, TripDetailScreen, VendorDetail) replacing rigid h-full overflow-hidden with min-h-full md:h-full max-md:overflow-visible md:overflow-hidden and adding mobile min-height to intermediate grid wrappers.\n- Added frontend/src/components/__tests__/DataGrid.test.jsx (6/6 tests passing).\n- Tests & Verification: 52 vitest test suites (473/473 tests) passing; production Vite build clean.\n- Delivered by worker-r70-mobile-grid-agy; integrated into main (3312ad9) and context (4371252).",
       "completedAt": "2026-09-27T18:50:00.000Z",
       "doneBy": "worker-r70-mobile-grid-agy"
+    },
+    {
+      "id": "R-71",
+      "title": "Custom audio and haptic feedback for valid and invalid barcode scans",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "god",
+      "origin": "user (2026-09-28)",
+      "deps": [],
+      "createdAt": "2026-09-27T19:00:00.000Z",
+      "updatedAt": "2026-09-27T19:12:00.000Z",
+      "completedAt": "2026-09-27T19:12:00.000Z",
+      "doneBy": "god",
+      "details": "User request: Integrate user-provided custom sounds (valid-scan.mp3 and invalid-scan.mp3) into the barcode scanning module.\n\nImplementation (2026-09-28):\n- Placed audio assets in frontend/public/sounds/valid-scan.mp3 and frontend/public/sounds/invalid-scan.mp3.\n- Created frontend/src/platform/scannerSound.js with pre-cached Audio instances, currentTime = 0 reset for zero-latency back-to-back triggers, graceful Web Audio API oscillator tone fallbacks (rising chime 1000Hz->1400Hz for valid, error buzz 320Hz->180Hz for invalid) if audio files fail or browser autoplay policies block playback, and dual haptic feedback (100ms pulse for valid, [100, 50, 100] for invalid).\n- Wired BarcodeScanner.jsx to playValidScanSound() and vibrateValidScan() on decode, and playInvalidScanSound() on scanner/stream errors.\n- Wired POSScreen.jsx to trigger valid scan audio/haptics when an item is added to cart, and invalid scan audio/haptics on lookup errors, item not found, out-of-stock items, channel mismatches, and duplicate cart additions (both hardware scanner and camera).\n- Wired StockIntake.jsx to trigger valid scan feedback on successful unit intake save, and invalid scan feedback on barcode refusal (duplicate), 404, or save timeouts.\n- Added frontend/src/platform/__tests__/scannerSound.test.js (6/6 tests passing).\n- Tests: 53 vitest files (479 tests) passing; production Vite build clean.\n- Shipped on main (32145e1) and context (19de0fb)."
+    },
+    {
+      "id": "R-72",
+      "title": "Stock intake screen back button layout & positioning fix",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "god",
+      "origin": "user (2026-09-28)",
+      "deps": [],
+      "createdAt": "2026-09-27T19:15:00.000Z",
+      "updatedAt": "2026-09-27T19:20:00.000Z",
+      "completedAt": "2026-09-27T19:20:00.000Z",
+      "doneBy": "god",
+      "details": "User request: Fix back button in stocks intake screen overlapping with the left nav bar on desktop devices and overlapping with the header on mobile devices.\n\nRoot Cause:\nStockIntake root container lacked position: relative, causing absolute left-4 top-4 z-30 on the Back button to evaluate against the browser viewport (initial containing block) at (16, 16). On desktop, this placed the button directly over the left sidebar navigation (0-240px). On mobile, this placed the button directly over the sticky brand header (0-56px, z-20).\n\nImplementation (2026-09-28):\n- In frontend/src/screens/inventory/StockIntake.jsx:\n  - Replaced min-h-dvh with relative min-h-full flex-1 sm:rounded-xl on the root container so child overlays remain bounded to main.\n  - Replaced absolute left-4 top-4 with an in-flow action bar (flex items-center justify-between px-4 pt-4 pb-2) containing the Back button.\n  - Adjusted the intake counter spacing (pb-4) so the counter remains horizontally centered and visually balanced without risking collisions on narrow viewports or long stock titles.\n- Added unit test in frontend/src/screens/__tests__/stockIntake.test.jsx verifying Back button renders in flow and navigates to the associated trip detail screen on click.\n- Tests & Verification: 53 vitest files (480/480 tests) passing; production Vite build clean.\n- Shipped on main (d53295f) and context (4ad4585)."
     }
   ]
 }

@@ -1338,3 +1338,26 @@ Pulled from origin/main (9f9c7cb..8fa271a) — 164 files changed, 10677 insertio
   - `R-70` marked `done` in `tasks.json` (`doneBy: worker-r70-mobile-grid-agy`).
   - `board.md`: 171 cards total = **155 done / 0 doing / 1 blocked (R-52) / 15 todo (R-62 family)**.
 - **Inbox:** Handled worker done message and worktree preservation notice -> moved to `inbox/.done/`. God backlog: 0.
+
+## [2026-09-27 ~19:12Z] R-71 INTEGRATED & COMPLETED — Barcode Scanner Custom Audio & Haptic Feedback
+- **Delivered by:** god (Michael, orchestrator) upon user request with custom assets (`frontend/public/sounds/valid-scan.mp3` and `invalid-scan.mp3`).
+- **Scope & Implementation:**
+  1. `frontend/src/platform/scannerSound.js`: Created audio helper caching HTML5 `Audio` objects with `currentTime = 0` reset for instant consecutive triggers; graceful Web Audio API oscillator synthesis fallback (rising chime 1000Hz->1400Hz for valid, error buzz 320Hz->180Hz for invalid) if audio files fail or browser autoplay policies block playback; vibration haptics (`vibrateValidScan`, `vibrateInvalidScan`).
+  2. `frontend/src/components/BarcodeScanner.jsx`: Replaced legacy Web Audio beeps with `playValidScanSound()` and `vibrateValidScan()`; wired `playInvalidScanSound()` and `vibrateInvalidScan()` on camera/stream errors.
+  3. `frontend/src/screens/pos/POSScreen.jsx`: Wired `playValidScanSound()` / `vibrateValidScan()` when item is successfully matched and added to cart; wired `playInvalidScanSound()` / `vibrateInvalidScan()` on not found, out-of-stock, unrentable/unsellable, duplicate cart item, or lookup exceptions.
+  4. `frontend/src/screens/inventory/StockIntake.jsx`: Wired `playValidScanSound()` / `vibrateValidScan()` on unit save success; wired `playInvalidScanSound()` / `vibrateInvalidScan()` on duplicate barcode refusal, 404, or save timeout.
+  5. Added test suite: `frontend/src/platform/__tests__/scannerSound.test.js` (6/6 tests passing).
+- **Verification:** Vitest: 53 test files, 479/479 passing; Vite build clean.
+- **Shipping:** Integrated into `main` (`32145e1`) and `context` (`19de0fb`).
+- **Card & Board Status:** `R-71` marked `done` in `tasks.json`. Board: 172 cards = **156 done / 0 doing / 1 blocked (R-52) / 15 todo (R-62 family)**.
+
+## [2026-09-27 ~19:20Z] R-72 INTEGRATED & COMPLETED — Stock Intake Screen Back Button Layout & Positioning Fix
+- **Delivered by:** god (Michael, orchestrator) upon user report that Back button in stock intake was overlapping the left nav bar on desktop and the header on mobile.
+- **Root Cause:** `StockIntake.jsx` container `<div className="flex min-h-dvh flex-col bg-[var(--surface-scan)]">` lacked `position: relative`. The child Back button `<div className="absolute left-4 top-4 z-30">` evaluated against the viewport at (16, 16). On desktop, this placed the button over the left sidebar nav (0-240px). On mobile, this placed the button over the sticky brand header (0-56px, z-20).
+- **Scope & Implementation:**
+  1. `frontend/src/screens/inventory/StockIntake.jsx`: Replaced `min-h-dvh` with `relative min-h-full flex-1 sm:rounded-xl` on container; replaced absolute button with an in-flow action bar (`flex items-center justify-between px-4 pt-4 pb-2`) containing `<Button ... data-testid="intake-back">← Back</Button>`. Adjusted intake counter spacing to `pb-4` to prevent collisions.
+  2. Added test in `frontend/src/screens/__tests__/stockIntake.test.jsx` verifying in-flow rendering and navigation to `/trips/:tripUuid` on click.
+- **Verification:** Vitest: 53 test files, 480/480 passing; Vite build clean.
+- **Shipping:** Integrated into `main` (`d53295f`) and `context` (`4ad4585`).
+- **Card & Board Status:** `R-72` marked `done` in `tasks.json`. Board: 173 cards = **157 done / 0 doing / 1 blocked (R-52) / 15 todo (R-62 family)**.
+
