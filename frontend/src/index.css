@@ -1,4 +1,4 @@
-﻿/* =============================================================================
+/* =============================================================================
    IMPOC Design System - Tailwind v4 + minimals.cc language (DARK-PRIMARY)
 
    Single source of truth for the design system.
@@ -555,5 +555,22 @@ html {
   .qr-border--pulse,
   .qr-border--marching::before {
     animation: none;
+  }
+}
+
+/* =============================================================================
+   Mobile DataGrid responsive minimum height & smooth momentum scrolling (R-70)
+   ========================================================================== */
+
+.datagrid-scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 767.98px) {
+  .datagrid-root,
+  .datagrid-wrapper,
+  .datagrid-scroll-container {
+    min-height: max(360px, 45vh);
   }
 }

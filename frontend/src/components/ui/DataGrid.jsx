@@ -168,10 +168,13 @@ export function DataGrid({
   const displayedRowModel = table.getRowModel();
 
   return (
-    <div className={`flex min-h-0 flex-col gap-3 ${className}`}>
+    <div className={`datagrid-root flex min-h-0 flex-col gap-3 max-md:min-h-[360px] max-md:min-h-[45vh] ${className}`}>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)]">
-        <div className="min-h-0 flex-1 overflow-auto">
+      <div className="datagrid-wrapper flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] max-md:min-h-[360px] max-md:min-h-[45vh]">
+        <div
+          className="datagrid-scroll-container min-h-0 flex-1 overflow-auto max-md:min-h-[360px] max-md:min-h-[45vh] overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           <table
             className="w-full border-collapse text-sm"
             style={{ minWidth: `${table.getTotalSize()}px` }}
