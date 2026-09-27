@@ -225,4 +225,23 @@ describe('StockIntake — Scan Primitive (Schema V2)', () => {
       expect(await screen.findByRole('option', { name: 'Blue' })).toBeInTheDocument();
     });
   });
+
+  it('renders the back button and navigates to the trip on click', async () => {
+    setup();
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/trips/t1/stocks/S1/scan']}>
+          <Routes>
+            <Route path="/trips/:tripUuid/stocks/:stockUuid/scan" element={<StockIntake />} />
+            <Route path="/trips/:tripUuid" element={<div data-testid="trip-detail-screen">Trip Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+    await waitFor(() => expect(screen.getByText(/0 of 3/)).toBeInTheDocument());
+    const backBtn = screen.getByTestId('intake-back');
+    expect(backBtn).toBeInTheDocument();
+    fireEvent.click(backBtn);
+    await waitFor(() => expect(screen.getByTestId('trip-detail-screen')).toBeInTheDocument());
+  });
 });
