@@ -9,6 +9,12 @@ import { formatPaise } from '../../platform/money.js';
 import { wakingRequest } from '../../platform/wakingRequest.js';
 import { createRequestKey } from '../../platform/requestKey.js';
 import BarcodeScanner from '../../components/BarcodeScanner.jsx';
+import {
+  playValidScanSound,
+  playInvalidScanSound,
+  vibrateValidScan,
+  vibrateInvalidScan,
+} from '../../platform/scannerSound.js';
 import { BARCODE_MAX_LENGTH } from '../../constants/barcode.js';
 
 const STATES = { IDLE: 'idle', ARMED: 'armed', DECODED: 'decoded', SAVING: 'saving', STOCK_FULL: 'stock_full' };
@@ -272,10 +278,11 @@ export function StockIntake() {
       // 90s timeout — we can't tell whether the unit was saved, so keep the
       // decoded barcode + picks and let the operator verify/retry.
       if (result?.status === 'failed') {
+        playInvalidScanSound();
+        vibrateInvalidScan();
         setSaveError('The request timed out. The unit may have been saved — check the count and retry if needed.');
         setState(STATES.DECODED);
         setWaking(false);
-        try { navigator.vibrate?.([100, 50, 100]); } catch {}
         return;
       }
       // Refresh stock data to get updated count
@@ -290,8 +297,9 @@ export function StockIntake() {
         setSizeRunIndex((i) => (i + 1) % sizeRunSequence.length);
       }
 
+      playValidScanSound();
+      vibrateValidScan();
       toast.success({ title: 'Unit saved' });
-      try { navigator.vibrate?.(100); } catch {}
       setWaking(false);
 
       // UX-H5: auto re-arm the camera for the next unit — no "Scan next unit"
@@ -303,21 +311,20 @@ export function StockIntake() {
         setState(STATES.ARMED);
       }
     } catch (err) {
+      playInvalidScanSound();
+      vibrateInvalidScan();
       const msg = err.message || 'Scan failed';
       if (msg.includes('already') || msg.includes('used') || msg.includes('barcode')) {
         setRefusalInfo({ barcode: scannedBarcode, message: msg });
         setState(STATES.DECODED);
-        try { navigator.vibrate?.([100, 50, 100]); } catch {}
       } else if (err.statusCode === 404) {
         setRefusalInfo({ barcode: scannedBarcode, message: msg });
         setState(STATES.DECODED);
-        try { navigator.vibrate?.([100, 50, 100]); } catch {}
       } else {
         // UX-M1: keep the decoded barcode + colour/size picks with an inline
         // retry instead of dumping the worker back to IDLE.
         setSaveError(msg);
         setState(STATES.DECODED);
-        try { navigator.vibrate?.([100, 50, 100]); } catch {}
       }
       setWaking(false);
     } finally {

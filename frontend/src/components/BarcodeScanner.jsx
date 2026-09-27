@@ -22,6 +22,12 @@ import {
     loadScannerZoom,
     saveScannerZoom,
 } from '../platform/scannerZoom.js';
+import {
+    playValidScanSound,
+    playInvalidScanSound,
+    vibrateValidScan,
+    vibrateInvalidScan,
+} from '../platform/scannerSound.js';
 
 const SCAN_PAUSE_DURATION = 5;
 
@@ -177,95 +183,24 @@ function BarcodeScanner({ onDetected, onError, zoom: requestedZoom }) {
 
     /*
      * ---------------------------------------------------------
-     * Success sound
+     * Sound & Haptic Feedback
      * ---------------------------------------------------------
      */
 
     const playSuccessSound = () => {
-        try {
-            const AudioContext =
-                window.AudioContext ||
-                window.webkitAudioContext;
-
-            if (!AudioContext) {
-                return;
-            }
-
-            if (!audioContextRef.current) {
-                audioContextRef.current =
-                    new AudioContext();
-            }
-
-            const audioContext =
-                audioContextRef.current;
-
-            if (
-                audioContext.state ===
-                'suspended'
-            ) {
-                audioContext.resume();
-            }
-
-            const oscillator =
-                audioContext.createOscillator();
-
-            const gain =
-                audioContext.createGain();
-
-            oscillator.type = 'sine';
-
-            oscillator.frequency.setValueAtTime(
-                1000,
-                audioContext.currentTime
-            );
-
-            oscillator.frequency.setValueAtTime(
-                1400,
-                audioContext.currentTime + 0.08
-            );
-
-            gain.gain.setValueAtTime(
-                0.0001,
-                audioContext.currentTime
-            );
-
-            gain.gain.exponentialRampToValueAtTime(
-                0.25,
-                audioContext.currentTime + 0.01
-            );
-
-            gain.gain.exponentialRampToValueAtTime(
-                0.0001,
-                audioContext.currentTime + 0.15
-            );
-
-            oscillator.connect(gain);
-            gain.connect(
-                audioContext.destination
-            );
-
-            oscillator.start();
-
-            oscillator.stop(
-                audioContext.currentTime + 0.15
-            );
-        } catch {
-            /*
-             * Sound is optional.
-             */
-        }
+        playValidScanSound();
     };
 
-    /*
-     * ---------------------------------------------------------
-     * Vibration
-     * ---------------------------------------------------------
-     */
+    const playErrorSound = () => {
+        playInvalidScanSound();
+    };
 
     const vibrateOnSuccess = () => {
-        if ('vibrate' in navigator) {
-            navigator.vibrate(100);
-        }
+        vibrateValidScan();
+    };
+
+    const vibrateOnError = () => {
+        vibrateInvalidScan();
     };
 
     /*
@@ -705,6 +640,8 @@ function BarcodeScanner({ onDetected, onError, zoom: requestedZoom }) {
                 );
             }
 
+            playErrorSound();
+            vibrateOnError();
             if (typeof onError === 'function') {
                 onError();
             }
@@ -1241,4 +1178,10 @@ function BarcodeScanner({ onDetected, onError, zoom: requestedZoom }) {
     );
 }
 
+export {
+    playValidScanSound,
+    playInvalidScanSound,
+    vibrateValidScan,
+    vibrateInvalidScan,
+};
 export default BarcodeScanner;
