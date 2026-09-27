@@ -391,16 +391,22 @@ export function StockIntake() {
     || '';
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--surface-scan)]">
-      {/* Back button */}
-      <div className="absolute left-4 top-4 z-30">
-        <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={() => navigate(`/trips/${tripUuid}`)}>
+    <div className="relative flex min-h-full flex-1 flex-col bg-[var(--surface-scan)] sm:rounded-xl">
+      {/* Top action bar with back button */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-white hover:bg-white/10 focus-visible:ring-white"
+          onClick={() => navigate(`/trips/${tripUuid}`)}
+          data-testid="intake-back"
+        >
           &larr; Back
         </Button>
       </div>
 
       {/* Intake counter */}
-      <div className="flex items-center justify-center pt-14 pb-4">
+      <div className="flex items-center justify-center pb-4">
         <div className="text-center">
           <div
             className="text-5xl font-bold tabular-nums text-white"
