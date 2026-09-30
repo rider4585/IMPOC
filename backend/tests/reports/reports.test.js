@@ -1,5 +1,6 @@
 import express from 'express';
 import request from 'supertest';
+import { v4 as uuidv4 } from 'uuid';
 import * as db from '../../database/models/index.js';
 import { initializeTestDatabase, generateTestUser, closeDatabase, createTripWithVendor, createTestStock } from '../utils/test-setup.js';
 import argon2 from 'argon2';
@@ -424,6 +425,96 @@ describe('Reports module (T-14)', () => {
                 unitsSold: 0,
                 salesWithMultipleTags: 0,
             });
+        });
+
+        it('an empty tagUuids param is byte-identical to omitting it', async () => {
+            const without = await request(testApp)
+                .get(`/api/reports/sales-by-tag?from=${FROM}&to=${TO}`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+
+            const withEmpty = await request(testApp)
+                .get(`/api/reports/sales-by-tag?from=${FROM}&to=${TO}&tagUuids=`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+
+            // The filter is purely additive: no param and an empty param must
+            // produce exactly the same payload (Untagged row included).
+            expect(withEmpty.body.data).toEqual(without.body.data);
+            expect(untagged(withEmpty.body.data.rows)).toBeTruthy();
+        });
+
+        it('filters rows by tagUuids with OR semantics and drops the Untagged row', async () => {
+            const res = await request(testApp)
+                .get(`/api/reports/sales-by-tag?from=${FROM}&to=${TO}&tagUuids=${tagExpoA.uuid},${tagExpoB.uuid}`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+
+            const { rows, totals } = res.body.data;
+            expect(byUuid(rows, tagExpoA.uuid)).toMatchObject({ count: 2, grossPaise: '500000' });
+            expect(byUuid(rows, tagExpoB.uuid)).toMatchObject({ count: 1, grossPaise: '200000' });
+            // A sale with no tags carries none of the requested tags, so the
+            // Untagged row must NOT survive a tag filter.
+            expect(untagged(rows)).toBeUndefined();
+            expect(rows.every((r) => r.tagUuid !== null)).toBe(true);
+
+            // sale1 (2 tags) + sale2 (1 tag); the untagged sale3 is excluded.
+            expect(totals).toMatchObject({
+                count: 2,
+                grossPaise: '500000',
+                refundedPaise: '0',
+                netPaise: '500000',
+                unitsSold: 2,
+                salesWithMultipleTags: 1,
+            });
+        });
+
+        it('narrows to a single tag without resurrecting the sale`s other tags', async () => {
+            const res = await request(testApp)
+                .get(`/api/reports/sales-by-tag?from=${FROM}&to=${TO}&tagUuids=${tagExpoB.uuid}`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+
+            // sale1 carries Expo A + Expo B. Filtering on Expo B keeps the sale
+            // but must not emit its Expo A row (god's steer: rows are filtered,
+            // not just sales) - this is what the Dashboard did client-side.
+            expect(res.body.data.rows).toHaveLength(1);
+            expect(res.body.data.rows[0]).toMatchObject({
+                tagUuid: tagExpoB.uuid,
+                tagName: 'Expo B',
+                count: 1,
+                grossPaise: '200000',
+            });
+            expect(byUuid(res.body.data.rows, tagExpoA.uuid)).toBeUndefined();
+            expect(res.body.data.totals).toMatchObject({
+                count: 1,
+                grossPaise: '200000',
+                unitsSold: 1,
+                salesWithMultipleTags: 0,
+            });
+        });
+
+        it('returns an empty (but well-formed) result when every tagUuid is unknown', async () => {
+            const res = await request(testApp)
+                .get(`/api/reports/sales-by-tag?from=${FROM}&to=${TO}&tagUuids=${uuidv4()},${uuidv4()}`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+
+            expect(res.body.data.period).toEqual({ from: FROM, to: TO });
+            expect(res.body.data.rows).toEqual([]);
+            expect(res.body.data.totals).toMatchObject({
+                count: 0,
+                grossPaise: '0',
+                unitsSold: 0,
+                salesWithMultipleTags: 0,
+            });
+        });
+
+        it('rejects a malformed tagUuids filter', async () => {
+            await request(testApp)
+                .get(`/api/reports/sales-by-tag?from=${FROM}&to=${TO}&tagUuids=not-a-uuid`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(400);
         });
 
         it('still resolves a soft-deleted tag name on its historical sales', async () => {

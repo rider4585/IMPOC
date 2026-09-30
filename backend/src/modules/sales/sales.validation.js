@@ -43,11 +43,14 @@ export const createSaleBodySchema = z.object({
 });
 
 /**
- * R-73: GET /api/sales?tagUuids=uuid1,uuid2 - comma-separated transaction_tags
- * uuids. Semantics are OR: a sale is returned when it carries AT LEAST ONE of
- * them. Omit the param (or send it empty) for no tag filtering.
+ * R-73: `tagUuids=uuid1,uuid2` - comma-separated transaction_tags uuids.
+ * Semantics are OR: a sale is returned when it carries AT LEAST ONE of them.
+ * Omit the param (or send it empty) for no tag filtering.
+ *
+ * Exported because GET /api/reports/sales-by-tag reuses the SAME param and the
+ * SAME semantics - one definition, two endpoints.
  */
-const tagUuidsListSchema = z
+export const tagUuidsListSchema = z
     .preprocess(
         (value) => {
             if (typeof value !== 'string') {

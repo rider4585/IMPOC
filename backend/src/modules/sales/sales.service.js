@@ -1,8 +1,8 @@
-import { Sale, SaleLine, SaleReversal, SaleTag, Unit, Customer, TransactionTag, Sequelize, sequelize } from '../../../database/models/index.js';
+import { Sale, SaleLine, SaleReversal, SaleTag, Unit, Customer, sequelize } from '../../../database/models/index.js';
 import { transitionUnit } from '../units/units.service.js';
 import { assertPaymentMethodInPicklist } from '../payment-methods/payment-method.service.js';
 import { assertCustomerSourceInPicklist } from '../customer-sources/customer-source.service.js';
-import { assertTransactionTagsInPicklist } from '../transaction-tags/transaction-tag.service.js';
+import { assertTransactionTagsInPicklist, resolveTransactionTagIds, saleTagsExistsSql } from '../transaction-tags/transaction-tag.service.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { record as recordRequestKey } from '../idempotency/idempotency.service.js';
 import { GESTURE_TYPES } from '../../constants/gesture-type.js';
@@ -340,21 +340,12 @@ export const createSale = async (params) => {
  * @param {Object} [options] - { actorUserId, viewAll, limit, offset, tagUuids }
  */
 export const listSales = async ({ actorUserId, viewAll, limit, offset, tagUuids } = {}) => {
-    // Resolve the requested tags first: an unknown/soft-deleted uuid simply
-    // matches nothing (an empty `IN ()` is not valid SQL).
-    const requestedTagUuids = Array.from(new Set((tagUuids || []).filter(Boolean)));
-    let tagIds = [];
-    if (requestedTagUuids.length > 0) {
-        // paranoid:false - a deactivated tag still filters its historical sales.
-        const tagRows = await TransactionTag.findAll({
-            where: { uuid: { [Sequelize.Op.in]: requestedTagUuids } },
-            attributes: ['id'],
-            paranoid: false,
-        });
-        tagIds = tagRows.map((tag) => tag.id);
-        if (tagIds.length === 0) {
-            return [];
-        }
+    // Resolve the requested tags first (shared with the sales-by-tag report):
+    // an unknown/soft-deleted uuid simply matches nothing, and an all-unknown
+    // set returns an empty page rather than invalid `IN ()` SQL.
+    const { requested: requestedTagUuids, tagIds } = await resolveTransactionTagIds(tagUuids);
+    if (requestedTagUuids.length > 0 && tagIds.length === 0) {
+        return [];
     }
 
     // v_sales_grid already excludes soft-deleted sales, so no outer
@@ -366,11 +357,7 @@ export const listSales = async ({ actorUserId, viewAll, limit, offset, tagUuids 
         replacements.createdBy = actorUserId;
     }
     if (tagIds.length > 0) {
-        filters.push(`EXISTS (
-            SELECT 1
-            FROM sale_tags st
-            WHERE st.sale_id = s.id AND st.transaction_tag_id IN (:tagIds)
-        )`);
+        filters.push(saleTagsExistsSql('s'));
         replacements.tagIds = tagIds;
     }
 
