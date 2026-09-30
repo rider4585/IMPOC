@@ -11,11 +11,25 @@ import buildError from '../platform/buildError.js';
 
 /**
  * GET /sales
- * @returns {Promise<Array>} list of sale DTOs, newest first
+ *
+ * Server-side filters (R-73). Only the tag filter lives on the server today; the
+ * Sales list screen still does all of its other filtering client-side in the
+ * DataGrid, so those never reach here.
+ *
+ * @param {{tagUuids?: string[]}} [params]
+ *   tagUuids - comma-separated UUIDs, OR semantics: a sale comes back when it
+ *   carries AT LEAST ONE of them. Empty/omitted = no tag filter at all (the
+ *   query string is left untouched so the URL stays exactly `/sales`).
+ * @returns {Promise<Array>} list of sale DTOs, newest first; each DTO carries
+ *   `tags: [{ uuid, name }]` (may be [])
  */
-export async function listSales() {
+export async function listSales(params = {}) {
+  const query = new URLSearchParams();
+  const tagUuids = Array.isArray(params?.tagUuids) ? params.tagUuids.filter(Boolean) : [];
+  if (tagUuids.length > 0) query.set('tagUuids', tagUuids.join(','));
+  const suffix = query.toString() ? `?${query.toString()}` : '';
   try {
-    const response = await apiClient.get(SALES_ROUTES.LIST);
+    const response = await apiClient.get(`${SALES_ROUTES.LIST}${suffix}`);
     if (response.data?.success) {
       return response.data.data;
     }
