@@ -41,6 +41,9 @@ vi.mock('../../services/picklistsApi.js', () => ({
     { uuid: 'rl-0', label: 'Old', url: 'https://example.com/old', isActive: false },
     { uuid: 'rl-1', label: 'Google Maps', url: 'https://search.google.com/local/writereview?placeid=ChIJabc', isActive: true },
   ]),
+  // R-73: no tags by default here — the tag selector behaviour has its own suite
+  // in posTags.test.jsx so these tests keep asserting the untagged payload.
+  getTransactionTags: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../services/posDisplayApi.js', () => ({

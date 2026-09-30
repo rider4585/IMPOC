@@ -25,7 +25,9 @@ import { createPicklistItem, updatePicklistItem } from '../../services/picklists
  * @param {string} props.singular - human-readable singular label (e.g. "colour")
  * @param {Array<{list}>} props.source - load function returning the list
  * @param {Array<{key, label, type?, options?, required?}>} props.columns - table display columns
+ *   (`type: 'boolean'` renders a Yes/No badge instead of the raw value)
  * @param {Array<{key, label, type?, options?, required?, min?}>} props.fields - create/edit form fields
+ *   (`type: 'checkbox'` is a boolean toggle; it always sends true/false)
  */
 export function FlatPicklistManager({
   resource,
@@ -101,7 +103,16 @@ export function FlatPicklistManager({
       header: c.label,
       size: 150,
       filter: { type: 'text' },
-      cell: (info) => info.getValue() != null ? String(info.getValue()) : '—',
+      cell: (info) => {
+        if (c.type === 'boolean') {
+          return (
+            <Badge variant={info.getValue() ? 'success' : 'neutral'}>
+              {info.getValue() ? 'Yes' : 'No'}
+            </Badge>
+          );
+        }
+        return info.getValue() != null ? String(info.getValue()) : '—';
+      },
     }));
     cols.push({
       accessorKey: 'isActive',
@@ -202,6 +213,10 @@ function FlatPicklistFormDialog({ open, onClose, onSave, saving, item, singular,
   const [form, setForm] = useState(() => {
     const initial = {};
     fields.forEach((f) => {
+      if (f.type === 'checkbox') {
+        initial[f.key] = toBool(item ? item[f.key] : undefined, f.defaultValue);
+        return;
+      }
       initial[f.key] = item && item[f.key] != null ? String(item[f.key]) : (f.defaultValue || '');
     });
     return initial;
@@ -211,6 +226,9 @@ function FlatPicklistFormDialog({ open, onClose, onSave, saving, item, singular,
   const set = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e && e.target ? e.target.value : e }));
 
+  const setChecked = (key) => (e) =>
+    setForm((f) => ({ ...f, [key]: Boolean(e && e.target && e.target.checked) }));
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
@@ -218,6 +236,11 @@ function FlatPicklistFormDialog({ open, onClose, onSave, saving, item, singular,
     const payload = {};
     for (const f of fields) {
       const raw = form[f.key];
+      if (f.type === 'checkbox') {
+        // A checkbox is a real boolean flag: always sent, even when false.
+        payload[f.key] = toBool(raw, f.defaultValue);
+        continue;
+      }
       if (f.type === 'number') {
         if (raw === '') {
           if (f.required) {
@@ -246,6 +269,24 @@ function FlatPicklistFormDialog({ open, onClose, onSave, saving, item, singular,
   };
 
   const renderControl = (f) => {
+    if (f.type === 'checkbox') {
+      return (
+        <label
+          key={f.key}
+          className="flex cursor-pointer items-center gap-3 rounded-md border border-[var(--border)] px-3 py-2"
+        >
+          <input
+            type="checkbox"
+            checked={toBool(form[f.key], f.defaultValue)}
+            onChange={setChecked(f.key)}
+            data-testid={`flat-field-${f.key}`}
+            className="h-4 w-4 accent-[var(--primary)]"
+          />
+          <span className="text-sm font-medium text-[var(--ink)]">{f.label}</span>
+          {f.hint && <span className="text-xs text-[var(--ink-muted)]">{f.hint}</span>}
+        </label>
+      );
+    }
     if (f.type === 'number') {
       return (
         <Input
@@ -309,6 +350,18 @@ function FlatPicklistFormDialog({ open, onClose, onSave, saving, item, singular,
 
 function resourceName(singular) {
   return singular.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
+/**
+ * Coerce a checkbox field value to a real boolean. The API sends booleans, but a
+ * form default or a hand-edited payload can arrive as the string "true"/"false",
+ * and a bare "" must fall back to the field default rather than false-y noise.
+ */
+function toBool(value, fallback) {
+  if (value === undefined || value === null || value === '') return Boolean(fallback);
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.toLowerCase() === 'true';
+  return Boolean(value);
 }
 
 export default FlatPicklistManager;

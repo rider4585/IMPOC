@@ -18,6 +18,8 @@ const RESOURCE_BASE = {
   expenseTypes: '/picklists/expense-types',
   upiAccounts: '/picklists/upi-accounts',
   reviewLinks: '/picklists/review-links',
+  // R-73: exhibition/expo labels a sale can carry (multiple per sale).
+  transactionTags: '/picklists/transaction-tags',
 };
 
 /**
@@ -187,8 +189,26 @@ export async function getReviewLinks() {
 }
 
 /**
+ * GET /transaction-tags (R-73)
+ * -> [{uuid, name, isActive, showOnPos, isDefault}]
+ * A sale can carry several of these (exhibition/expo labels). POS only offers
+ * the active ones flagged showOnPos and pre-ticks every isDefault one.
+ */
+export async function getTransactionTags() {
+  try {
+    const response = await apiClient.get(RESOURCE_BASE.transactionTags);
+    if (response.data?.success && response.data?.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Failed to fetch transaction tags');
+  } catch (error) {
+    throw buildError(error, 'Failed to fetch transaction tags');
+  }
+}
+
+/**
  * Generic create for flat picklists.
- * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'|'upiAccounts'|'reviewLinks'} resource
+ * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'|'upiAccounts'|'reviewLinks'|'transactionTags'} resource
  * @param {Object} payload
  */
 export async function createPicklistItem(resource, payload) {
@@ -205,7 +225,7 @@ export async function createPicklistItem(resource, payload) {
 
 /**
  * Generic update for flat picklists.
- * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'} resource
+ * @param {'colours'|'sizes'|'damageGrades'|'paymentMethods'|'customerSources'|'expenseTypes'|'upiAccounts'|'reviewLinks'|'transactionTags'} resource
  * @param {string} uuid
  * @param {Object} payload - {name?, isActive?, ...}
  */

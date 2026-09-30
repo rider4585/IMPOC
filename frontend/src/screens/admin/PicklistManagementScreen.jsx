@@ -6,7 +6,7 @@ import { ProductTypesManager } from './ProductTypesManager.jsx';
 import {
   FlatPicklistManager,
 } from './FlatPicklistManager.jsx';
-import { getColours, getSizes, getDamageGrades, getPaymentMethods, getCustomerSources, getExpenseTypes, getUpiAccounts, getReviewLinks } from '../../services/picklistsApi.js';
+import { getColours, getSizes, getDamageGrades, getPaymentMethods, getCustomerSources, getExpenseTypes, getUpiAccounts, getReviewLinks, getTransactionTags } from '../../services/picklistsApi.js';
 import { DAMAGE_GRADE_OUTCOMES } from '../../constants/damageGrades.js';
 
 const TABS = [
@@ -19,6 +19,7 @@ const TABS = [
   { key: 'expense-types', label: 'Expense types' },
   { key: 'upi-accounts', label: 'UPI accounts' },
   { key: 'review-links', label: 'Review links' },
+  { key: 'transaction-tags', label: 'Transaction tags' },
 ];
 
 const COLOUR_COLUMNS = [{ key: 'name', label: 'Name' }];
@@ -67,6 +68,31 @@ const REVIEW_LINK_COLUMNS = [
 const REVIEW_LINK_FIELDS = [
   { key: 'label', label: 'Label, e.g. Google Maps', required: true },
   { key: 'url', label: 'Link, e.g. https://search.google.com/local/writereview?placeid=…', required: true },
+];
+
+// R-73: exhibition/expo labels a sale can carry. A sale may carry SEVERAL tags,
+// so POS offers them as a multi-select; "show on POS" decides whether the tag is
+// offered at the till at all and "select by default" pre-ticks it (every default
+// tag is pre-ticked, not just the first).
+const TRANSACTION_TAG_COLUMNS = [
+  { key: 'name', label: 'Name' },
+  { key: 'showOnPos', label: 'Show on POS', type: 'boolean' },
+  { key: 'isDefault', label: 'Select by default', type: 'boolean' },
+];
+const TRANSACTION_TAG_FIELDS = [
+  { key: 'name', label: 'Name, e.g. Bengaluru Expo', required: true },
+  {
+    key: 'showOnPos',
+    label: 'Show on POS',
+    type: 'checkbox',
+    hint: 'Offer this tag at the till',
+  },
+  {
+    key: 'isDefault',
+    label: 'Select by default',
+    type: 'checkbox',
+    hint: 'Pre-ticked on every new sale',
+  },
 ];
 
 export function PicklistManagementScreen() {
@@ -180,6 +206,15 @@ export function PicklistManagementScreen() {
           source={getReviewLinks}
           columns={REVIEW_LINK_COLUMNS}
           fields={REVIEW_LINK_FIELDS}
+        />
+      )}
+      {active === 'transaction-tags' && (
+        <FlatPicklistManager
+          resource="transactionTags"
+          singular="Transaction tag"
+          source={getTransactionTags}
+          columns={TRANSACTION_TAG_COLUMNS}
+          fields={TRANSACTION_TAG_FIELDS}
         />
       )}
       </div>
