@@ -28,6 +28,7 @@ const sellableUnitItemSchema = z
  * Validation schema for POST /api/sales (checkout)
  * requestUuid: idempotency key (SEC-M-3) - a replayed request is not double-applied.
  * items: one or more units to be sold (by barcode or unitUuid)
+ * tagUuids (R-73): exhibition/expo labels from the transaction_tags picklist.
  */
 export const createSaleBodySchema = z.object({
     requestUuid: requestUuidSchema.shape.requestUuid,
@@ -37,7 +38,35 @@ export const createSaleBodySchema = z.object({
     paymentMethod: z.string().trim().max(50).optional().default(undefined),
     customerSource: z.string().trim().max(50).optional().default(undefined),
     notes: z.string().trim().max(2000).optional().default(undefined),
+    tagUuids: z.array(uuidSchema).max(20, 'At most 20 tags per sale').optional().default([]),
     items: z.array(sellableUnitItemSchema).min(1, 'At least one item is required'),
+});
+
+/**
+ * R-73: `tagUuids=uuid1,uuid2` - comma-separated transaction_tags uuids.
+ * Semantics are OR: a sale is returned when it carries AT LEAST ONE of them.
+ * Omit the param (or send it empty) for no tag filtering.
+ *
+ * Exported because GET /api/reports/sales-by-tag reuses the SAME param and the
+ * SAME semantics - one definition, two endpoints.
+ */
+export const tagUuidsListSchema = z
+    .preprocess(
+        (value) => {
+            if (typeof value !== 'string') {
+                return value;
+            }
+            const parts = value
+                .split(',')
+                .map((part) => part.trim())
+                .filter((part) => part.length > 0);
+            return parts.length > 0 ? parts : undefined;
+        },
+        z.array(uuidSchema).max(20, 'At most 20 tag uuids may be filtered on').optional()
+    );
+
+export const listSalesQuerySchema = z.object({
+    tagUuids: tagUuidsListSchema,
 });
 
 /**

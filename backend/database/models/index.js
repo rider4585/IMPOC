@@ -66,6 +66,8 @@ import CustomerEnquiryModel from './CustomerEnquiry.js';
 import DeliveryLogModel from './DeliveryLog.js';
 import ReceiptTemplateModel from './ReceiptTemplate.js';
 import ReceiptSnapshotModel from './ReceiptSnapshot.js';
+import TransactionTagModel from './TransactionTag.js';
+import SaleTagModel from './SaleTag.js';
 
 const User = UserModel(sequelize);
 const Role = RoleModel(sequelize);
@@ -107,6 +109,8 @@ const CustomerEnquiry = CustomerEnquiryModel(sequelize);
 const DeliveryLog = DeliveryLogModel(sequelize);
 const ReceiptTemplate = ReceiptTemplateModel(sequelize);
 const ReceiptSnapshot = ReceiptSnapshotModel(sequelize);
+const TransactionTag = TransactionTagModel(sequelize);
+const SaleTag = SaleTagModel(sequelize);
 
 /*
  * User ↔ Role
@@ -549,6 +553,45 @@ ReceiptTemplate.belongsTo(User, { foreignKey: 'createdBy', as: 'createdByUser' }
  * entity_id stores the target entity's uuid, not a relational id)
  */
 
+/*
+ * R-73: Sale ↔ TransactionTag (via SaleTag junction) - exhibition/expo labels.
+ * Reads of historical sales join the tag side with paranoid:false so a
+ * soft-deleted tag still resolves its name on old sales.
+ */
+Sale.belongsToMany(TransactionTag, {
+    through: SaleTag,
+    foreignKey: 'saleId',
+    otherKey: 'transactionTagId',
+    as: 'tags',
+});
+
+TransactionTag.belongsToMany(Sale, {
+    through: SaleTag,
+    foreignKey: 'transactionTagId',
+    otherKey: 'saleId',
+    as: 'sales',
+});
+
+Sale.hasMany(SaleTag, {
+    foreignKey: 'saleId',
+    as: 'saleTags',
+});
+
+SaleTag.belongsTo(Sale, {
+    foreignKey: 'saleId',
+    as: 'sale',
+});
+
+TransactionTag.hasMany(SaleTag, {
+    foreignKey: 'transactionTagId',
+    as: 'saleTags',
+});
+
+SaleTag.belongsTo(TransactionTag, {
+    foreignKey: 'transactionTagId',
+    as: 'transactionTag',
+});
+
 export {
     sequelize,
     Sequelize,
@@ -592,4 +635,6 @@ export {
     DeliveryLog,
     ReceiptTemplate,
     ReceiptSnapshot,
+    TransactionTag,
+    SaleTag,
 };

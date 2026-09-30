@@ -1,7 +1,8 @@
-import { periodQuerySchema, expensesQuerySchema, stockLevelsQuerySchema } from './reports.validation.js';
+import { periodQuerySchema, expensesQuerySchema, stockLevelsQuerySchema, salesByTagQuerySchema } from './reports.validation.js';
 import {
     getDashboard as getDashboardService,
     getSalesReport as getSalesReportService,
+    getSalesByTagReport as getSalesByTagReportService,
     getRentalsReport as getRentalsReportService,
     getExpensesReport as getExpensesReportService,
     getInventoryReport as getInventoryReportService,
@@ -31,6 +32,25 @@ export const getSalesReport = async (req, res, next) => {
     try {
         const query = periodQuerySchema.parse(req.query);
         const data = await getSalesReportService({ from: query.from, to: query.to });
+        return res.status(200).json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/reports/sales-by-tag - Retail sales grouped by transaction tag.
+ * Accepts the shared optional ?tagUuids= filter (same OR semantics as
+ * GET /api/sales); omitted/empty returns every tag row for the period.
+ */
+export const getSalesByTagReport = async (req, res, next) => {
+    try {
+        const query = salesByTagQuerySchema.parse(req.query);
+        const data = await getSalesByTagReportService({
+            from: query.from,
+            to: query.to,
+            tagUuids: query.tagUuids,
+        });
         return res.status(200).json({ success: true, data });
     } catch (error) {
         next(error);

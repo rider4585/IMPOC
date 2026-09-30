@@ -80,6 +80,9 @@ const SAFE_4XX_MESSAGES = Object.freeze([
     'At least one item',
     'not in the payment methods picklist',
     'not in the customer sources picklist',
+    // R-73 transaction tags
+    'not in the transaction tags picklist',
+    'Transaction tag not found',
     'references unknown',
     'is not in the picklist',
     // Grid pagination (R-32 Phase A)

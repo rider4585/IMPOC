@@ -12,6 +12,7 @@ import {
     Sequelize,
     sequelize,
 } from '../../../database/models/index.js';
+import { resolveTransactionTagIds, saleTagsExistsSql } from '../transaction-tags/transaction-tag.service.js';
 
 /*
  * R-32 Phase B: dashboard KPIs and the inventory snapshot read from the
@@ -271,6 +272,165 @@ export const getSalesReport = async ({ from, to }) => {
             rows.reduce((sum, r) => sum + BigInt(r.totalPaise) - BigInt(r.refundedPaise), 0n)
         ),
         unitsSold: rows.reduce((sum, r) => sum + r.units, 0),
+    };
+
+    return { period: { from: f, to: t }, rows, totals };
+};
+
+/* ------------------------------------------------------------------ *
+ * Sales-by-tag report (R-73)
+ *
+ * Groups sales by the transaction_tags picklist (exhibition/expo). A sale
+ * carrying N tags contributes its FULL totals to EACH of its N tag rows, so
+ * rows[] deliberately sums to MORE than totals; totals.salesWithMultipleTags is
+ * reported so the UI can show that caveat honestly. An "Untagged" row
+ * (tagUuid: null) keeps every untagged sale visible.
+ *
+ * Optional tagUuids filter (added on god's steer, same OR semantics and the
+ * same shared helper as GET /api/sales?tagUuids=). When it is present the
+ * EXISTS subquery drops every sale that carries none of the tags, untagged
+ * sales included, so no Untagged row can survive a tag filter. Each surviving
+ * sale is then bucketed ONLY under the requested tags, so filtering on one tag
+ * never surfaces a row for a tag you did not ask for (this is what R-73c's
+ * Dashboard already does client-side). Absent/empty is exactly the unfiltered
+ * response.
+ * ------------------------------------------------------------------ */
+export const getSalesByTagReport = async ({ from, to, tagUuids } = {}) => {
+    const { from: f, to: t } = normalizeRange(from, to);
+
+    // Shared with listSales: deactivated/soft-deleted tags still select their
+    // historical sales, and an all-unknown set yields an empty report.
+    const { requested: requestedTagUuids, uuids: resolvedTagUuids, tagIds } =
+        await resolveTransactionTagIds(tagUuids);
+    const tagFilterActive = requestedTagUuids.length > 0;
+    const requestedUuidSet = new Set(resolvedTagUuids);
+    if (tagFilterActive && tagIds.length === 0) {
+        return {
+            period: { from: f, to: t },
+            rows: [],
+            totals: {
+                count: 0,
+                grossPaise: '0',
+                refundedPaise: '0',
+                netPaise: '0',
+                unitsSold: 0,
+                salesWithMultipleTags: 0,
+            },
+        };
+    }
+
+    const where = { deletedAt: null, ...dateWhere('soldAt', f, t) };
+    const replacements = {};
+    if (tagFilterActive) {
+        // "Sale" is sequelize's default alias for the Sale model in a plain
+        // findAll (the sales list uses `s` because it queries v_sales_grid).
+        where[Sequelize.Op.and] = Sequelize.literal(saleTagsExistsSql('"Sale"'));
+        replacements.tagIds = tagIds;
+    }
+
+    const sales = await Sale.findAll({
+        where,
+        replacements,
+        order: [['soldAt', 'DESC']],
+        include: [
+            { association: 'lines', attributes: ['id'] },
+            { association: 'reversals', attributes: ['reversalType', 'amountPaise'] },
+            // paranoid:false - a soft-deleted tag still names its historical sales.
+            { association: 'tags', attributes: ['uuid', 'name'], through: { attributes: [] }, paranoid: false },
+        ],
+    });
+
+    const emptyBucket = () => ({ count: 0, grossPaise: 0n, refundedPaise: 0n, unitsSold: 0 });
+    const buckets = new Map();
+    const untagged = emptyBucket();
+
+    let salesWithMultipleTags = 0;
+    let totalCount = 0;
+    let totalGrossPaise = 0n;
+    let totalRefundedPaise = 0n;
+    let totalUnitsSold = 0;
+
+    for (const sale of sales) {
+        const grossPaise = BigInt(sale.totalPaise);
+        const refundedPaise = (sale.reversals || [])
+            .filter((r) => r.reversalType === 'REFUND')
+            .reduce((sum, r) => sum + BigInt(r.amountPaise), 0n);
+        const unitsSold = (sale.lines || []).length;
+        const allTags = sale.tags || [];
+        // Under a tag filter, bucket only the requested tags (a sale carrying
+        // Expo A + Expo B filtered on Expo A must not resurrect the Expo A row).
+        const tags = tagFilterActive ? allTags.filter((tag) => requestedUuidSet.has(tag.uuid)) : allTags;
+
+        totalCount += 1;
+        totalGrossPaise += grossPaise;
+        totalRefundedPaise += refundedPaise;
+        totalUnitsSold += unitsSold;
+        // Counts against the REQUESTED tags when a filter is active, so the
+        // caveat the UI shows ("N sales carry more than one of these tags")
+        // stays true for the view on screen.
+        if (tags.length > 1) {
+            salesWithMultipleTags += 1;
+        }
+
+        const targets = tags.length > 0 ? tags.map((tag) => tag.uuid) : [null];
+        for (const tagUuid of targets) {
+            const bucket = tagUuid === null ? untagged : (buckets.get(tagUuid) || {
+                tagUuid,
+                tagName: tags.find((tag) => tag.uuid === tagUuid).name,
+                ...emptyBucket(),
+            });
+            bucket.count += 1;
+            bucket.grossPaise += grossPaise;
+            bucket.refundedPaise += refundedPaise;
+            bucket.unitsSold += unitsSold;
+            if (tagUuid !== null) {
+                buckets.set(tagUuid, bucket);
+            }
+        }
+    }
+
+    const taggedRows = Array.from(buckets.values())
+        .map((bucket) => ({
+            tagUuid: bucket.tagUuid,
+            tagName: bucket.tagName,
+            count: bucket.count,
+            grossPaise: String(bucket.grossPaise),
+            refundedPaise: String(bucket.refundedPaise),
+            netPaise: String(bucket.grossPaise - bucket.refundedPaise),
+            unitsSold: bucket.unitsSold,
+        }))
+        .sort((a, b) => {
+            if (a.grossPaise !== b.grossPaise) {
+                return BigInt(b.grossPaise) > BigInt(a.grossPaise) ? 1 : -1;
+            }
+            return a.tagName.localeCompare(b.tagName);
+        });
+
+    // The Untagged row is always last so it never reads as a tag. It is built
+    // only from sales the tag filter let through, and a sale with no tags can
+    // never carry a requested tag, so a filtered report never has one.
+    const rows = untagged.count > 0
+        ? [
+            ...taggedRows,
+            {
+                tagUuid: null,
+                tagName: 'Untagged',
+                count: untagged.count,
+                grossPaise: String(untagged.grossPaise),
+                refundedPaise: String(untagged.refundedPaise),
+                netPaise: String(untagged.grossPaise - untagged.refundedPaise),
+                unitsSold: untagged.unitsSold,
+            },
+        ]
+        : taggedRows;
+
+    const totals = {
+        count: totalCount,
+        grossPaise: String(totalGrossPaise),
+        refundedPaise: String(totalRefundedPaise),
+        netPaise: String(totalGrossPaise - totalRefundedPaise),
+        unitsSold: totalUnitsSold,
+        salesWithMultipleTags,
     };
 
     return { period: { from: f, to: t }, rows, totals };
