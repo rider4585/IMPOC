@@ -44,6 +44,12 @@ export async function initializeTestDatabase() {
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_units_barcode_unique ON units (barcode) WHERE deleted_at IS NULL'
       );
 
+      // R-73: one live active transaction_tags name per picklist entry
+      // (from migration 20261001000001)
+      await db.sequelize.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_transaction_tags_name ON transaction_tags (name) WHERE deleted_at IS NULL AND is_active = true'
+      );
+
       // Money-out race backstops (from migration 20260908000001): prevent
       // double-issue of refunds/cancels/returns for the same live parent.
       await db.sequelize.query(

@@ -2,6 +2,7 @@ import { periodQuerySchema, expensesQuerySchema, stockLevelsQuerySchema } from '
 import {
     getDashboard as getDashboardService,
     getSalesReport as getSalesReportService,
+    getSalesByTagReport as getSalesByTagReportService,
     getRentalsReport as getRentalsReportService,
     getExpensesReport as getExpensesReportService,
     getInventoryReport as getInventoryReportService,
@@ -31,6 +32,19 @@ export const getSalesReport = async (req, res, next) => {
     try {
         const query = periodQuerySchema.parse(req.query);
         const data = await getSalesReportService({ from: query.from, to: query.to });
+        return res.status(200).json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/reports/sales-by-tag - Retail sales grouped by transaction tag.
+ */
+export const getSalesByTagReport = async (req, res, next) => {
+    try {
+        const query = periodQuerySchema.parse(req.query);
+        const data = await getSalesByTagReportService({ from: query.from, to: query.to });
         return res.status(200).json({ success: true, data });
     } catch (error) {
         next(error);

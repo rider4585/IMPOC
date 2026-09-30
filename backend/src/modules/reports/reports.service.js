@@ -277,6 +277,117 @@ export const getSalesReport = async ({ from, to }) => {
 };
 
 /* ------------------------------------------------------------------ *
+ * Sales-by-tag report (R-73)
+ *
+ * Groups sales by the transaction_tags picklist (exhibition/expo). A sale
+ * carrying N tags contributes its FULL totals to EACH of its N tag rows, so
+ * rows[] deliberately sums to MORE than totals; totals.salesWithMultipleTags is
+ * reported so the UI can show that caveat honestly. An "Untagged" row
+ * (tagUuid: null) keeps every untagged sale visible.
+ * ------------------------------------------------------------------ */
+export const getSalesByTagReport = async ({ from, to }) => {
+    const { from: f, to: t } = normalizeRange(from, to);
+
+    const sales = await Sale.findAll({
+        where: { deletedAt: null, ...dateWhere('soldAt', f, t) },
+        order: [['soldAt', 'DESC']],
+        include: [
+            { association: 'lines', attributes: ['id'] },
+            { association: 'reversals', attributes: ['reversalType', 'amountPaise'] },
+            // paranoid:false - a soft-deleted tag still names its historical sales.
+            { association: 'tags', attributes: ['uuid', 'name'], through: { attributes: [] }, paranoid: false },
+        ],
+    });
+
+    const emptyBucket = () => ({ count: 0, grossPaise: 0n, refundedPaise: 0n, unitsSold: 0 });
+    const buckets = new Map();
+    const untagged = emptyBucket();
+
+    let salesWithMultipleTags = 0;
+    let totalCount = 0;
+    let totalGrossPaise = 0n;
+    let totalRefundedPaise = 0n;
+    let totalUnitsSold = 0;
+
+    for (const sale of sales) {
+        const grossPaise = BigInt(sale.totalPaise);
+        const refundedPaise = (sale.reversals || [])
+            .filter((r) => r.reversalType === 'REFUND')
+            .reduce((sum, r) => sum + BigInt(r.amountPaise), 0n);
+        const unitsSold = (sale.lines || []).length;
+        const tags = sale.tags || [];
+
+        totalCount += 1;
+        totalGrossPaise += grossPaise;
+        totalRefundedPaise += refundedPaise;
+        totalUnitsSold += unitsSold;
+        if (tags.length > 1) {
+            salesWithMultipleTags += 1;
+        }
+
+        const targets = tags.length > 0 ? tags.map((tag) => tag.uuid) : [null];
+        for (const tagUuid of targets) {
+            const bucket = tagUuid === null ? untagged : (buckets.get(tagUuid) || {
+                tagUuid,
+                tagName: tags.find((tag) => tag.uuid === tagUuid).name,
+                ...emptyBucket(),
+            });
+            bucket.count += 1;
+            bucket.grossPaise += grossPaise;
+            bucket.refundedPaise += refundedPaise;
+            bucket.unitsSold += unitsSold;
+            if (tagUuid !== null) {
+                buckets.set(tagUuid, bucket);
+            }
+        }
+    }
+
+    const taggedRows = Array.from(buckets.values())
+        .map((bucket) => ({
+            tagUuid: bucket.tagUuid,
+            tagName: bucket.tagName,
+            count: bucket.count,
+            grossPaise: String(bucket.grossPaise),
+            refundedPaise: String(bucket.refundedPaise),
+            netPaise: String(bucket.grossPaise - bucket.refundedPaise),
+            unitsSold: bucket.unitsSold,
+        }))
+        .sort((a, b) => {
+            if (a.grossPaise !== b.grossPaise) {
+                return BigInt(b.grossPaise) > BigInt(a.grossPaise) ? 1 : -1;
+            }
+            return a.tagName.localeCompare(b.tagName);
+        });
+
+    // The Untagged row is always last so it never reads as a tag.
+    const rows = untagged.count > 0
+        ? [
+            ...taggedRows,
+            {
+                tagUuid: null,
+                tagName: 'Untagged',
+                count: untagged.count,
+                grossPaise: String(untagged.grossPaise),
+                refundedPaise: String(untagged.refundedPaise),
+                netPaise: String(untagged.grossPaise - untagged.refundedPaise),
+                unitsSold: untagged.unitsSold,
+            },
+        ]
+        : taggedRows;
+
+    const totals = {
+        count: totalCount,
+        grossPaise: String(totalGrossPaise),
+        refundedPaise: String(totalRefundedPaise),
+        netPaise: String(totalGrossPaise - totalRefundedPaise),
+        unitsSold: totalUnitsSold,
+        salesWithMultipleTags,
+    };
+
+    return { period: { from: f, to: t }, rows, totals };
+};
+
+/* ------------------------------------------------------------------ *
  * Rentals report
  * ------------------------------------------------------------------ */
 export const getRentalsReport = async ({ from, to }) => {

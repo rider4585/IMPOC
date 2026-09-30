@@ -1,10 +1,24 @@
-import { Sale, SaleLine, SaleReversal, Unit, Customer, sequelize } from '../../../database/models/index.js';
+import { Sale, SaleLine, SaleReversal, SaleTag, Unit, Customer, TransactionTag, Sequelize, sequelize } from '../../../database/models/index.js';
 import { transitionUnit } from '../units/units.service.js';
 import { assertPaymentMethodInPicklist } from '../payment-methods/payment-method.service.js';
 import { assertCustomerSourceInPicklist } from '../customer-sources/customer-source.service.js';
+import { assertTransactionTagsInPicklist } from '../transaction-tags/transaction-tag.service.js';
 import { CHANNEL } from '../../constants/channel.js';
 import { record as recordRequestKey } from '../idempotency/idempotency.service.js';
 import { GESTURE_TYPES } from '../../constants/gesture-type.js';
+
+/*
+ * R-73: the transaction_tags picklist shown on the sale DTO. paranoid:false on
+ * the tag side so a soft-deleted tag still resolves its name on a historical
+ * sale (grouping by exhibition must keep working after deactivation), and a
+ * renamed tag shows its new name on old sales.
+ */
+const tagsInclude = {
+    association: 'tags',
+    attributes: ['uuid', 'name'],
+    through: { attributes: [] },
+    paranoid: false,
+};
 
 /**
  * Resolve a linked customer by uuid (if supplied).
@@ -61,6 +75,11 @@ function mapSaleDTO(sale, lines = [], reversals = []) {
         notes: sale.notes,
         createdAt: sale.createdAt,
         updatedAt: sale.updatedAt,
+        // R-73: exhibition/expo labels. May be []. Resolved with paranoid:false on
+        // the tag side so a soft-deleted tag still names itself on old sales.
+        tags: (sale.tags || [])
+            .map((tag) => ({ uuid: tag.uuid, name: tag.name }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
         lines: lines.map((line) => ({
             uuid: line.uuid,
             unitUuid: line.unitUuid,
@@ -144,7 +163,7 @@ const MAX_NUMBER_RETRIES = 3;
  * The body of createSale, run inside its own transaction. Retried by createSale
  * when two concurrent checkouts race on the next S-number.
  */
-const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, items, actorUserId, requestUuid }) => {
+const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMethod, customerSource, notes, tagUuids, items, actorUserId, requestUuid }) => {
     const transaction = await sequelize.transaction();
     try {
         // Resolve each unit plus the price actually charged at checkout: the
@@ -170,6 +189,9 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
         // SEC-M-8: ledger snapshots must reference the active picklists.
         await assertPaymentMethodInPicklist(paymentMethod, transaction);
         await assertCustomerSourceInPicklist(customerSource, transaction);
+
+        // R-73: exhibition/expo labels must be live picklist entries too.
+        const resolvedTags = await assertTransactionTagsInPicklist(tagUuids, transaction);
 
         const sale = await Sale.create(
             {
@@ -216,6 +238,20 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
             );
         }
 
+        // R-73: attach the exhibition/expo tags to the ledger row. createSaleOnce
+        // may be retried on a sale-number race, but the retry rolls the whole
+        // transaction back first, so these rows are created exactly once.
+        for (const tag of resolvedTags) {
+            // eslint-disable-next-line no-await-in-loop
+            await SaleTag.create(
+                {
+                    saleId: sale.id,
+                    transactionTagId: tag.id,
+                },
+                { transaction }
+            );
+        }
+
         // Idempotency key (SEC-M-3): record last, inside the transaction, so a
         // concurrent duplicate request fails the write and replays the cache.
         if (requestUuid) {
@@ -246,6 +282,7 @@ const createSaleOnce = async ({ customerName, customerUuid, soldAt, paymentMetho
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
                 { association: 'customer' },
                 { association: 'reversals' },
+                tagsInclude,
             ],
         });
 
@@ -296,9 +333,30 @@ export const createSale = async (params) => {
  * R-32 Phase A: the page id set (respecting LIMIT/OFFSET) is produced by the
  * v_sales_grid read-layer view, then the DTO is hydrated for that page only.
  *
- * @param {Object} [options] - { actorUserId, viewAll, limit, offset }
+ * R-73: an optional tagUuids filter (OR semantics - a sale is returned when it
+ * carries AT LEAST ONE of the tags) is applied as an EXISTS subquery on
+ * sale_tags so the grid view stays untouched.
+ *
+ * @param {Object} [options] - { actorUserId, viewAll, limit, offset, tagUuids }
  */
-export const listSales = async ({ actorUserId, viewAll, limit, offset } = {}) => {
+export const listSales = async ({ actorUserId, viewAll, limit, offset, tagUuids } = {}) => {
+    // Resolve the requested tags first: an unknown/soft-deleted uuid simply
+    // matches nothing (an empty `IN ()` is not valid SQL).
+    const requestedTagUuids = Array.from(new Set((tagUuids || []).filter(Boolean)));
+    let tagIds = [];
+    if (requestedTagUuids.length > 0) {
+        // paranoid:false - a deactivated tag still filters its historical sales.
+        const tagRows = await TransactionTag.findAll({
+            where: { uuid: { [Sequelize.Op.in]: requestedTagUuids } },
+            attributes: ['id'],
+            paranoid: false,
+        });
+        tagIds = tagRows.map((tag) => tag.id);
+        if (tagIds.length === 0) {
+            return [];
+        }
+    }
+
     // v_sales_grid already excludes soft-deleted sales, so no outer
     // deleted_at predicate is needed (and the view does not expose one).
     const filters = [];
@@ -306,6 +364,14 @@ export const listSales = async ({ actorUserId, viewAll, limit, offset } = {}) =>
     if (!viewAll && actorUserId) {
         filters.push('s."createdBy" = :createdBy');
         replacements.createdBy = actorUserId;
+    }
+    if (tagIds.length > 0) {
+        filters.push(`EXISTS (
+            SELECT 1
+            FROM sale_tags st
+            WHERE st.sale_id = s.id AND st.transaction_tag_id IN (:tagIds)
+        )`);
+        replacements.tagIds = tagIds;
     }
 
     let sql = `
@@ -335,6 +401,7 @@ export const listSales = async ({ actorUserId, viewAll, limit, offset } = {}) =>
         include: [
             { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
             { association: 'reversals' },
+            tagsInclude,
         ],
     });
 
@@ -354,6 +421,7 @@ export const getSaleByUuid = async (uuid, { actorUserId, viewAll } = {}) => {
         include: [
             { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
             { association: 'reversals' },
+            tagsInclude,
         ],
     });
 
@@ -486,6 +554,7 @@ export const cancelSale = async ({ uuid, reason, actorUserId, requestUuid }) => 
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
                 { association: 'customer' },
                 { association: 'reversals' },
+                tagsInclude,
             ],
         });
 
@@ -579,6 +648,7 @@ export const refundSale = async ({ uuid, reason, actorUserId, requestUuid }) => 
                 { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
                 { association: 'customer' },
                 { association: 'reversals' },
+                tagsInclude,
             ],
         });
 
@@ -602,6 +672,7 @@ export const patchSale = async ({ uuid, payload }) => {
         include: [
             { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
             { association: 'reversals' },
+            tagsInclude,
         ],
     });
 
@@ -646,6 +717,7 @@ export const patchSale = async ({ uuid, payload }) => {
             { association: 'lines', include: [{ association: 'unit', attributes: ['status'] }] },
             { association: 'customer' },
             { association: 'reversals' },
+            tagsInclude,
         ],
     });
 

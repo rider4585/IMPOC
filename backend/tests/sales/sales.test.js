@@ -659,4 +659,133 @@ describe('Sales / POS module (T-08)', () => {
             expect(lines).toBe(1);
         });
     });
+
+    describe('R-73 - transaction tags on the sales list', () => {
+        let tagStock;
+        let expoTag;
+        let weddingTag;
+        let retiredTag;
+        let expoOnlySaleUuid;
+        let weddingOnlySaleUuid;
+        let bothTagsSaleUuid;
+        let retiredTagSaleUuid;
+
+        beforeAll(async () => {
+            tagStock = await createTestStock({
+                trip,
+                tripVendor,
+                vendor,
+                productType,
+                overrides: {
+                    quantity: 10,
+                    buyingPricePaise: 100000,
+                    sellingPricePaise: 200000,
+                    floorPricePaise: 150000,
+                    channel: 'RETAIL',
+                },
+            });
+
+            expoTag = await db.TransactionTag.create({ name: 'List Filter Expo', isActive: true });
+            weddingTag = await db.TransactionTag.create({ name: 'List Filter Wedding', isActive: true });
+            retiredTag = await db.TransactionTag.create({ name: 'List Filter Retired', isActive: true });
+
+            const checkout = async (barcode, tagUuids) => {
+                const unit = await scanUnit(barcode, tagStock);
+                const res = await request(testApp)
+                    .post('/api/sales')
+                    .set('Authorization', `Bearer ${managerToken}`)
+                    .send({ requestUuid: uuidv4(), items: [{ unitUuid: unit.uuid }], tagUuids })
+                    .expect(201);
+                return res.body.data.uuid;
+            };
+
+            expoOnlySaleUuid = await checkout('R73LST0001', [expoTag.uuid]);
+            weddingOnlySaleUuid = await checkout('R73LST0002', [weddingTag.uuid]);
+            bothTagsSaleUuid = await checkout('R73LST0003', [expoTag.uuid, weddingTag.uuid]);
+            retiredTagSaleUuid = await checkout('R73LST0004', [retiredTag.uuid]);
+        });
+
+        afterAll(async () => {
+            await db.Unit.destroy({ where: { stockId: tagStock.id }, force: true });
+            await db.Stock.destroy({ where: { id: tagStock.id }, force: true });
+        });
+
+        const listByTags = async (tagUuids) => {
+            const res = await request(testApp)
+                .get(`/api/sales?tagUuids=${tagUuids.join(',')}`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+            expect(res.body.success).toBe(true);
+            return res.body.data;
+        };
+
+        it('returns a sale for ANY of the requested tags (OR semantics)', async () => {
+            const sales = await listByTags([expoTag.uuid, weddingTag.uuid]);
+            const uuids = sales.map((s) => s.uuid);
+
+            expect(uuids).toContain(expoOnlySaleUuid);
+            expect(uuids).toContain(weddingOnlySaleUuid);
+            expect(uuids).toContain(bothTagsSaleUuid);
+            // A sale with neither tag is filtered out.
+            expect(uuids).not.toContain(retiredTagSaleUuid);
+            expect(uuids).not.toContain(global.__saleUuid);
+        });
+
+        it('returns a multi-tag sale for each of its tags', async () => {
+            const byExpo = (await listByTags([expoTag.uuid])).map((s) => s.uuid);
+            expect(byExpo).toContain(bothTagsSaleUuid);
+            expect(byExpo).toContain(expoOnlySaleUuid);
+            expect(byExpo).not.toContain(weddingOnlySaleUuid);
+
+            const byWedding = (await listByTags([weddingTag.uuid])).map((s) => s.uuid);
+            expect(byWedding).toContain(bothTagsSaleUuid);
+            expect(byWedding).toContain(weddingOnlySaleUuid);
+            expect(byWedding).not.toContain(expoOnlySaleUuid);
+
+            // The DTO hydrates tag names through the Sequelize include.
+            const multi = (await listByTags([expoTag.uuid])).find((s) => s.uuid === bothTagsSaleUuid);
+            expect(multi.tags).toEqual([
+                { uuid: expoTag.uuid, name: 'List Filter Expo' },
+                { uuid: weddingTag.uuid, name: 'List Filter Wedding' },
+            ]);
+        });
+
+        it('still resolves the name of a soft-deleted tag on a historical sale', async () => {
+            await retiredTag.destroy();
+
+            const res = await request(testApp)
+                .get(`/api/sales/${retiredTagSaleUuid}`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+            expect(res.body.data.tags).toEqual([
+                { uuid: retiredTag.uuid, name: 'List Filter Retired' },
+            ]);
+
+            // ...and the soft-deleted tag still filters its historical sale.
+            const filtered = await listByTags([retiredTag.uuid]);
+            expect(filtered.map((s) => s.uuid)).toEqual([retiredTagSaleUuid]);
+        });
+
+        it('returns nothing for an unknown tag uuid and 400s on a malformed one', async () => {
+            const unknown = await listByTags([uuidv4()]);
+            expect(unknown).toEqual([]);
+
+            await request(testApp)
+                .get('/api/sales?tagUuids=not-a-uuid')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(400);
+        });
+
+        it('keeps the row-level read-scope guard while filtering by tag', async () => {
+            const res = await request(testApp)
+                .get(`/api/sales?tagUuids=${expoTag.uuid}`)
+                .set('Authorization', `Bearer ${cashierToken}`)
+                .expect(200);
+
+            // The cashier did not create any of these sales (SEC-M-5).
+            const uuids = res.body.data.map((s) => s.uuid);
+            expect(uuids).not.toContain(bothTagsSaleUuid);
+            expect(uuids).not.toContain(expoOnlySaleUuid);
+        });
+    });
 });

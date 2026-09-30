@@ -8,6 +8,7 @@ import { PERMISSIONS } from '../../constants/permissions.js';
 import {
     getDashboard,
     getSalesReport,
+    getSalesByTagReport,
     getRentalsReport,
     getExpensesReport,
     getInventoryReport,
@@ -22,6 +23,7 @@ const router = express.Router();
 // All report endpoints are read-side and require reports.view
 router.get('/dashboard', authenticate, authorize(PERMISSIONS.REPORTS.VIEW), getDashboard);
 router.get('/sales', authenticate, authorize(PERMISSIONS.REPORTS.VIEW), getSalesReport);
+router.get('/sales-by-tag', authenticate, authorize(PERMISSIONS.REPORTS.VIEW), getSalesByTagReport);
 router.get('/rentals', authenticate, authorize(PERMISSIONS.REPORTS.VIEW), getRentalsReport);
 router.get('/expenses', authenticate, authorize(PERMISSIONS.REPORTS.VIEW), getExpensesReport);
 router.get('/inventory', authenticate, authorize(PERMISSIONS.REPORTS.VIEW), getInventoryReport);

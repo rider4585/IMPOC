@@ -21,6 +21,7 @@ import expenseTypesRoutes from './src/modules/expense-types/expense-type.routes.
 import upiAccountsRoutes from './src/modules/upi-accounts/upi-account.routes.js';
 import barcodeLayoutRoutes from './src/modules/barcode-layouts/barcode-layout.routes.js';
 import reviewLinksRoutes from './src/modules/review-links/review-link.routes.js';
+import transactionTagsRoutes from './src/modules/transaction-tags/transaction-tag.routes.js';
 import brandingRoutes from './src/modules/branding/branding.routes.js';
 import posDisplayRoutes from './src/modules/pos-display/pos-display.routes.js';
 import vendorsRoutes from './src/modules/vendors/vendor.routes.js';
@@ -131,6 +132,7 @@ app.use('/api/picklists/customer-sources', customerSourceRoutes);
 app.use('/api/picklists/expense-types', expenseTypesRoutes);
 app.use('/api/picklists/upi-accounts', upiAccountsRoutes);
 app.use('/api/picklists/review-links', reviewLinksRoutes);
+app.use('/api/picklists/transaction-tags', transactionTagsRoutes);
 app.use('/api/branding', brandingRoutes);
 app.use('/api/barcode-layouts', barcodeLayoutRoutes);
 app.use('/api/pos-display', posDisplayRoutes);

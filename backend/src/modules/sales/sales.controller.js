@@ -1,4 +1,4 @@
-import { createSaleBodySchema, saleUuidParamSchema, reversalBodySchema, updateSaleBodySchema } from './sales.validation.js';
+import { createSaleBodySchema, saleUuidParamSchema, reversalBodySchema, updateSaleBodySchema, listSalesQuerySchema } from './sales.validation.js';
 import {
     createSale as createSaleService,
     listSales as listSalesService,
@@ -74,6 +74,7 @@ export const createSale = async (req, res, next) => {
                 paymentMethod: body.paymentMethod,
                 customerSource: body.customerSource,
                 notes: body.notes,
+                tagUuids: body.tagUuids,
                 items: body.items,
                 requestUuid: body.requestUuid,
                 actorUserId: req.user?.id,
@@ -98,12 +99,14 @@ export const listSales = async (req, res, next) => {
     try {
         const viewAll = await userHasBroadReadScope(req.auth.userUuid);
         const pagination = parsePagination(req.query);
+        const query = listSalesQuerySchema.parse(req.query);
 
         const sales = await listSalesService({
             actorUserId: req.user?.id,
             viewAll,
             limit: pagination.limit,
             offset: pagination.offset,
+            tagUuids: query.tagUuids,
         });
 
         return res.status(200).json({

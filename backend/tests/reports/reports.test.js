@@ -31,6 +31,8 @@ describe('Reports module (T-14)', () => {
     let tripVendor;
     let vendor;
     let createdStockIds = [];
+    let tagExpoA;
+    let tagExpoB;
 
     async function makeUnit({ barcode, channel, retail = true }) {
         const stock = await createTestStock({
@@ -111,10 +113,18 @@ describe('Reports module (T-14)', () => {
             barcode: retail.barcode, sellingPricePaise: 200000,
         });
 
+        // R-73: exhibition/expo labels. sale1 carries BOTH tags (so rows[]
+        // intentionally double-count it), sale2 only expoA, sale3 stays untagged.
+        tagExpoA = await db.TransactionTag.create({ name: 'Expo A', isActive: true });
+        tagExpoB = await db.TransactionTag.create({ name: 'Expo B', isActive: true });
+        await db.SaleTag.create({ saleId: sale1.id, transactionTagId: tagExpoA.id });
+        await db.SaleTag.create({ saleId: sale1.id, transactionTagId: tagExpoB.id });
+
         const sale2 = await db.Sale.create({
             saleNumber: 'S-TEST2', customerName: 'Walk-in B', soldAt: '2026-01-20',
             totalPaise: 300000, status: 'completed',
         });
+        await db.SaleTag.create({ saleId: sale2.id, transactionTagId: tagExpoA.id });
         await db.SaleLine.create({
             saleId: sale2.id, unitId: retail2.id, unitUuid: retail2.uuid,
             barcode: retail2.barcode, sellingPricePaise: 300000,
@@ -179,6 +189,7 @@ describe('Reports module (T-14)', () => {
         });
         await db.Unit.destroy({ where: { stockId: { [db.Sequelize.Op.in]: createdStockIds } }, force: true });
         await db.Stock.destroy({ where: { id: { [db.Sequelize.Op.in]: createdStockIds } }, force: true });
+        await db.TransactionTag.destroy({ where: {}, force: true });
         await db.TripVendor.destroy({ where: { tripId: trip.id }, force: true });
         await db.Trip.destroy({ where: { id: trip.id }, force: true });
         await closeDatabase();
@@ -314,5 +325,124 @@ describe('Reports module (T-14)', () => {
         expect(vendRow.salesRevenuePaise).toBe('500000');
         // Rented days(2) * 1000/day + damage charge 50 (only the returned line earns).
         expect(vendRow.rentalEarnedPaise).toBe('2050');
+    });
+
+    describe('GET /api/reports/sales-by-tag (R-73)', () => {
+        const byUuid = (rows, uuid) => rows.find((r) => r.tagUuid === uuid);
+        const untagged = (rows) => rows.find((r) => r.tagUuid === null);
+
+        it('requires auth and reports.view', async () => {
+            await request(testApp).get(`/api/reports/sales-by-tag?from=${FROM}&to=${TO}`).expect(401);
+        });
+
+        it('groups sales per tag, includes an Untagged row and double-counts multi-tag sales', async () => {
+            const res = await request(testApp)
+                .get(`/api/reports/sales-by-tag?from=${FROM}&to=${TO}`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+
+            expect(res.body.success).toBe(true);
+            const { rows, totals, period } = res.body.data;
+            expect(period).toEqual({ from: FROM, to: TO });
+
+            // sale1 (200000, 2 tags) + sale2 (300000, 1 tag) + sale3 (150000, untagged)
+            expect(byUuid(rows, tagExpoA.uuid)).toMatchObject({
+                tagName: 'Expo A',
+                count: 2,
+                grossPaise: '500000',
+                refundedPaise: '0',
+                netPaise: '500000',
+                unitsSold: 2,
+            });
+            expect(byUuid(rows, tagExpoB.uuid)).toMatchObject({
+                tagName: 'Expo B',
+                count: 1,
+                grossPaise: '200000',
+                refundedPaise: '0',
+                netPaise: '200000',
+                unitsSold: 1,
+            });
+
+            // The Untagged row is always present so nothing silently disappears.
+            expect(untagged(rows)).toMatchObject({
+                tagName: 'Untagged',
+                count: 1,
+                grossPaise: '150000',
+                netPaise: '150000',
+                unitsSold: 1,
+            });
+
+            // Totals count every sale ONCE (unlike rows[], which double-counts
+            // the multi-tag sale); salesWithMultipleTags makes that caveat honest.
+            expect(totals).toMatchObject({
+                count: 3,
+                grossPaise: '650000',
+                refundedPaise: '0',
+                netPaise: '650000',
+                unitsSold: 3,
+                salesWithMultipleTags: 1,
+            });
+
+            const rowGrossSum = rows.reduce((sum, r) => sum + BigInt(r.grossPaise), 0n);
+            expect(rowGrossSum).toBe(BigInt(totals.grossPaise) + 200000n);
+        });
+
+        it('honours the period bounds', async () => {
+            const res = await request(testApp)
+                .get('/api/reports/sales-by-tag?from=2026-01-11&to=2026-01-31')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+
+            const { rows, totals } = res.body.data;
+            // sale1 sold on 2026-01-10 is outside the window.
+            expect(byUuid(rows, tagExpoB.uuid)).toBeUndefined();
+            expect(byUuid(rows, tagExpoA.uuid)).toMatchObject({
+                count: 1,
+                grossPaise: '300000',
+                unitsSold: 1,
+            });
+            expect(totals).toMatchObject({
+                count: 2,
+                grossPaise: '450000',
+                unitsSold: 2,
+                salesWithMultipleTags: 0,
+            });
+        });
+
+        it('returns an empty (but well-formed) result for a period with no sales', async () => {
+            const res = await request(testApp)
+                .get('/api/reports/sales-by-tag?from=2025-01-01&to=2025-01-31')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+
+            expect(res.body.data.rows).toEqual([]);
+            expect(res.body.data.totals).toMatchObject({
+                count: 0,
+                grossPaise: '0',
+                refundedPaise: '0',
+                netPaise: '0',
+                unitsSold: 0,
+                salesWithMultipleTags: 0,
+            });
+        });
+
+        it('still resolves a soft-deleted tag name on its historical sales', async () => {
+            await tagExpoB.destroy();
+
+            const res = await request(testApp)
+                .get(`/api/reports/sales-by-tag?from=${FROM}&to=${TO}`)
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(200);
+
+            const row = byUuid(res.body.data.rows, tagExpoB.uuid);
+            expect(row).toMatchObject({ tagName: 'Expo B', grossPaise: '200000' });
+        });
+
+        it('rejects an invalid date query param', async () => {
+            await request(testApp)
+                .get('/api/reports/sales-by-tag?from=not-a-date')
+                .set('Authorization', `Bearer ${managerToken}`)
+                .expect(400);
+        });
     });
 });
