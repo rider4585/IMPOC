@@ -17,7 +17,7 @@ import { PERMISSIONS } from '../../constants/permissions.js';
 import { getUnitByBarcode } from '../../services/unitsApi.js';
 import { createSale } from '../../services/salesApi.js';
 import { createRental } from '../../services/rentalsApi.js';
-import { getPaymentMethods, getCustomerSources, getUpiAccounts, getReviewLinks } from '../../services/picklistsApi.js';
+import { getPaymentMethods, getCustomerSources, getUpiAccounts, getReviewLinks, getTransactionTags } from '../../services/picklistsApi.js';
 import { publishPosDisplayState } from '../../services/posDisplayApi.js';
 import BarcodeScanner from '../../components/BarcodeScanner.jsx';
 import {
@@ -57,6 +57,22 @@ function itemDetail(item) {
 // R-35: how long the Payment dialog's "Thank you" confirmation shows before
 // the existing SaleReceipt is revealed.
 const THANK_YOU_DELAY_MS = 450;
+
+/**
+ * R-73 tag helpers.
+ *
+ * A tag is only ever offered at the till when it is active AND flagged
+ * "show on POS". "Select by default" is applied to EVERY matching tag (user
+ * decision: when several tags are flagged default, all of them are pre-ticked),
+ * so a counter running an expo never re-ticks the same tags per customer.
+ */
+function posTagOptions(tags) {
+  return (tags || []).filter((tag) => tag.isActive !== false && tag.showOnPos);
+}
+
+function defaultTagUuids(tags) {
+  return posTagOptions(tags).filter((tag) => tag.isDefault).map((tag) => tag.uuid);
+}
 
 /**
  * SalePriceInput (R-30) — inline money editor for a cart line. Editing the
@@ -141,6 +157,12 @@ export function POSScreen() {
   const [customerSource, setCustomerSource] = useState('');
   const [picklistsError, setPicklistsError] = useState('');
 
+  // R-73: exhibition/expo labels for this sale. A sale may carry SEVERAL tags.
+  // Only active tags flagged showOnPos are offered at the till, and EVERY
+  // active tag flagged isDefault is pre-ticked (all of them, not just the first).
+  const [transactionTags, setTransactionTags] = useState([]);
+  const [selectedTagUuids, setSelectedTagUuids] = useState([]);
+
   const [upiAccounts, setUpiAccounts] = useState([]);
   // R-54: first active review link is sent to the display with the received state
   const [reviewLinks, setReviewLinks] = useState([]);
@@ -185,6 +207,15 @@ export function POSScreen() {
         if (!cancelled) setReviewLinks(links);
       })
       .catch(() => {});
+    // R-73 transaction tags: also optional — a failure just means the till
+    // offers no tags (e.g. the picklist table is not migrated yet).
+    getTransactionTags()
+      .then((tags) => {
+        if (cancelled) return;
+        setTransactionTags(tags);
+        setSelectedTagUuids(defaultTagUuids(tags));
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -211,7 +242,27 @@ export function POSScreen() {
     getReviewLinks()
       .then((links) => setReviewLinks(links))
       .catch(() => {});
+    getTransactionTags()
+      .then((tags) => {
+        setTransactionTags(tags);
+        setSelectedTagUuids(defaultTagUuids(tags));
+      })
+      .catch(() => {});
   }, [paymentMethod]);
+
+  // R-73: the tags the counter may tick, and the "select by default" set that is
+  // re-applied after every completed sale and on cart clear.
+  const posTags = useMemo(() => posTagOptions(transactionTags), [transactionTags]);
+
+  const applyTagDefaults = useCallback(() => {
+    setSelectedTagUuids(defaultTagUuids(transactionTags));
+  }, [transactionTags]);
+
+  const toggleTag = useCallback((uuid) => {
+    setSelectedTagUuids((prev) =>
+      prev.includes(uuid) ? prev.filter((u) => u !== uuid) : [...prev, uuid]
+    );
+  }, []);
 
   // Default the UPI account selector to the first active account once loaded.
   useEffect(() => {
@@ -454,6 +505,8 @@ export function POSScreen() {
     setPaymentStep('confirm');
     publishDisplay({ status: 'idle' });
     resetPaymentMethodToDefault(paymentMethods);
+    // R-73: a cleared cart is a fresh customer — back to the default tag set.
+    applyTagDefaults();
   };
 
   // UX-M5: destructive Clear needs a lightweight 3s re-tap confirm.
@@ -522,6 +575,8 @@ export function POSScreen() {
       const sale = await createSale({
         ...customerPayload,
         requestUuid: checkoutKeyRef.current,
+        // R-73: zero or more tags; a sale with no tag sends an empty array.
+        tagUuids: selectedTagUuids,
         items: cart.map((item) => ({
           unitUuid: item.uuid,
           sellingPricePaise: item.sellingPricePaise,
@@ -544,6 +599,8 @@ export function POSScreen() {
         setCustomerSource('');
         checkoutKeyRef.current = null;
         resetPaymentMethodToDefault(paymentMethods);
+        // R-73: the next customer of the same expo keeps the same tags ticked.
+        applyTagDefaults();
       }, THANK_YOU_DELAY_MS);
     } catch (err) {
       toast.error({ title: 'Checkout failed', description: err.message });
@@ -867,6 +924,38 @@ export function POSScreen() {
                 dataTestid="pos-customer-source"
                 className="mt-3"
               />
+              {/*
+                R-73: multi-select tags. Retail sales only — the rental branch
+                below must neither show nor send them. Rendered only when at least
+                one active tag is flagged "show on POS", so a shop with no tags
+                sees no extra UI.
+              */}
+              {mode === 'sale' && posTags.length > 0 && (
+                <div className="mt-3" data-testid="pos-tags">
+                  <p className="mb-1.5 text-sm font-medium text-[var(--ink)]">Tags</p>
+                  <div className="flex flex-wrap gap-2">
+                    {posTags.map((tag) => {
+                      const ticked = selectedTagUuids.includes(tag.uuid);
+                      return (
+                        <button
+                          key={tag.uuid}
+                          type="button"
+                          aria-pressed={ticked}
+                          onClick={() => toggleTag(tag.uuid)}
+                          data-testid={`pos-tag-${tag.uuid}`}
+                          className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
+                            ticked
+                              ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                              : 'border-[var(--border-strong)] bg-[var(--surface-raised)] text-[var(--ink)] hover:bg-[var(--surface-sunken)]'
+                          }`}
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {mode === 'rental' && (
                 <>
                   <Input
