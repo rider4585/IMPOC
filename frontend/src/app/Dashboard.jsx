@@ -20,13 +20,24 @@ import { useAuth } from '../auth/useAuth.js';
 import { PERMISSIONS } from '../constants/permissions.js';
 import { formatPaise } from '../platform/money.js';
 import { ShopLogo } from '../components/ShopLogo';
+import { TagFilterChips } from '../components/TagFilterChips.jsx';
 import {
   getDashboard,
   getSalesReport,
   getRentalsReport,
   getExpensesReport,
   getInventoryReport,
+  getSalesByTag,
 } from '../services/reportsApi.js';
+
+/**
+ * Paise arrive from the API as strings (BIGINT). formatPaise needs a finite
+ * integer, so normalise once here instead of trusting every report shape.
+ */
+function paiseOf(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : 0;
+}
 
 function todayISO() {
   const d = new Date();
@@ -60,6 +71,7 @@ const TABS = [
   { key: 'rentals', label: 'Rentals' },
   { key: 'expenses', label: 'Expenses' },
   { key: 'inventory', label: 'Inventory' },
+  { key: 'by-tag', label: 'By tag' },
 ];
 
 function KpiCard({ label, value, color, testid }) {
@@ -245,6 +257,138 @@ function InventoryTable({ data }) {
   );
 }
 
+/** Stable identity so the useMemo deps below do not churn every render. */
+const EMPTY_ROWS = [];
+
+/**
+ * "By tag" — takings grouped by transaction tag (R-73). The shop runs
+ * exhibitions/expos and compares what each event brought in, so the rows have to
+ * be honest about what they are.
+ *
+ * The double-count caveat is the important part: a sale carrying N tags is
+ * counted in FULL under each of its N rows, so rows[] deliberately sums to more
+ * than totals. We say so out loud rather than quietly showing a bigger number.
+ * `totals.salesWithMultipleTags` is how many sales are involved right now.
+ *
+ * The tag filter narrows the rows in place (the API's own `tagUuids` support is
+ * not part of the frozen R-73a contract, which declares only from/to — filtering
+ * the returned rows on their tagUuid gives the same answer the moment the server
+ * does start honouring the param).
+ */
+function SalesByTagTable({ data, selectedTags = [], onSelectTags }) {
+  const rows = Array.isArray(data?.rows) ? data.rows : EMPTY_ROWS;
+  const totals = data?.totals || null;
+  const multiTagged = Math.max(0, Number(totals?.salesWithMultipleTags || 0) || 0);
+
+  // Options come from the rows, never from the current selection, so the chips
+  // stay put while the table narrows.
+  const tagOptions = useMemo(
+    () =>
+      rows
+        .filter((r) => r?.tagUuid)
+        .map((r) => ({ uuid: r.tagUuid, name: r.tagName })),
+    [rows]
+  );
+  const available = useMemo(() => new Set(tagOptions.map((t) => t.uuid)), [tagOptions]);
+  // A tag can leave the period (date change), so intersect instead of trusting
+  // the stored selection blindly.
+  const activeTags = selectedTags.filter((uuid) => available.has(uuid));
+
+  const visible = activeTags.length > 0 ? rows.filter((r) => r?.tagUuid && activeTags.includes(r.tagUuid)) : rows;
+
+  return (
+    <div className="flex flex-col gap-4" data-testid="dashboard-by-tag">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard
+          label="Gross (all tags, period)"
+          value={formatPaise(paiseOf(totals?.grossPaise))}
+          testid="by-tag-gross"
+        />
+        <KpiCard
+          label="Refunded (period)"
+          value={formatPaise(paiseOf(totals?.refundedPaise))}
+          color="text-[var(--money-out)]"
+          testid="by-tag-refunded"
+        />
+        <KpiCard
+          label="Net (period)"
+          value={formatPaise(paiseOf(totals?.netPaise))}
+          color="text-[var(--money-in)]"
+          testid="by-tag-net"
+        />
+      </div>
+
+      <TagFilterChips
+        tags={tagOptions}
+        selected={activeTags}
+        onChange={onSelectTags}
+        label="Compare tags"
+        testId="by-tag-filter"
+      />
+
+      {/* The caveat — a sale with several tags is counted under each of them. */}
+      <p
+        data-testid="by-tag-caveat"
+        className={
+          'rounded-md border px-3 py-2 text-xs ' +
+          (multiTagged > 0
+            ? 'border-[var(--waking)]/40 bg-[var(--waking)]/10 text-[var(--ink)]'
+            : 'border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--ink-muted)]')
+        }
+      >
+        {multiTagged > 0
+          ? `${multiTagged} sale${multiTagged === 1 ? ' carries' : 's carry'} more than one tag in this period, so each of those sales is counted in full under every tag it carries. The rows below therefore add up to MORE than the period totals above.`
+          : 'A sale carrying more than one tag is counted in full under each of its tags, so the rows below can add up to more than the period totals above.'}
+      </p>
+
+      {visible.length === 0 ? (
+        <p className="text-sm text-[var(--ink-muted)]">
+          {rows.length === 0
+            ? 'No sales in this period.'
+            : 'No tags match the filter.'}
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeaderCell>Tag</TableHeaderCell>
+                <TableHeaderCell className="text-right">Sales</TableHeaderCell>
+                <TableHeaderCell className="text-right">Units sold</TableHeaderCell>
+                <TableHeaderCell className="text-right">Gross</TableHeaderCell>
+                <TableHeaderCell className="text-right">Refunded</TableHeaderCell>
+                <TableHeaderCell className="text-right">Net</TableHeaderCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {visible.map((r) => (
+                <TableRow key={r.tagUuid || 'untagged'} data-testid="by-tag-row">
+                  <TableCell className="font-semibold">{r.tagName || 'Untagged'}</TableCell>
+                  <TableCell className="text-right">{r.count ?? 0}</TableCell>
+                  <TableCell className="text-right">{r.unitsSold ?? 0}</TableCell>
+                  <TableCell className="text-right">{formatPaise(paiseOf(r.grossPaise))}</TableCell>
+                  <TableCell className="text-right">{formatPaise(paiseOf(r.refundedPaise))}</TableCell>
+                  <TableCell className="text-right font-semibold">{formatPaise(paiseOf(r.netPaise))}</TableCell>
+                </TableRow>
+              ))}
+              {totals && (
+                <TableRow data-testid="by-tag-totals">
+                  <TableCell className="font-semibold">Period total</TableCell>
+                  <TableCell className="text-right font-semibold">{totals.count ?? 0}</TableCell>
+                  <TableCell className="text-right font-semibold">{totals.unitsSold ?? 0}</TableCell>
+                  <TableCell className="text-right font-semibold">{formatPaise(paiseOf(totals.grossPaise))}</TableCell>
+                  <TableCell className="text-right font-semibold">{formatPaise(paiseOf(totals.refundedPaise))}</TableCell>
+                  <TableCell className="text-right font-semibold">{formatPaise(paiseOf(totals.netPaise))}</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Dashboard() {
   const { permissions } = useAuth();
   const can = useCallback((p) => permissions && permissions.includes(p), [permissions]);
@@ -258,6 +402,8 @@ export function Dashboard() {
   const [rentalsData, setRentalsData] = useState(null);
   const [expensesData, setExpensesData] = useState(null);
   const [inventoryData, setInventoryData] = useState(null);
+  const [byTagData, setByTagData] = useState(null);
+  const [byTagFilter, setByTagFilter] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('sales');
@@ -292,6 +438,10 @@ export function Dashboard() {
           setRentalsData(await getRentalsReport(periodParams));
         } else if (tab === 'expenses') {
           setExpensesData(await getExpensesReport(periodParams));
+        } else if (tab === 'by-tag') {
+          // Whole period in one shot; the tag chips filter the rows client-side
+          // (see SalesByTagTable).
+          setByTagData(await getSalesByTag(periodParams));
         }
       } catch (err) {
         setError(err.message || 'Failed to load report');
@@ -453,6 +603,13 @@ export function Dashboard() {
                 {activeTab === 'rentals' && <RentalsTable data={rentalsData} />}
                 {activeTab === 'expenses' && <ExpensesTable data={expensesData} />}
                 {activeTab === 'inventory' && <InventoryTable data={inventoryData} />}
+                {activeTab === 'by-tag' && (
+                  <SalesByTagTable
+                    data={byTagData}
+                    selectedTags={byTagFilter}
+                    onSelectTags={setByTagFilter}
+                  />
+                )}
               </>
             )}
           </div>
