@@ -49,3 +49,5 @@ roster.json
 dist.new/
 dist.old/
 backups/
+.claude/
+tunnels.json

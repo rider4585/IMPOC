@@ -14,7 +14,7 @@
 
 ---
 
-## KANBAN BOARD (as of 2026-09-28)
+## KANBAN BOARD (as of 2026-10-02)
 
 ### DOING (0)
 _None in flight._
@@ -22,7 +22,9 @@ _None in flight._
 ### BLOCKED (1)
 - **R-52** — Buying templates module: user parked to ~2026-10-13 to decide Hide/Remove/Keep after production use. Interim: templates UI hidden FE-only + reversible (R-66, done 2026-09-18).
 
-### TODO (15)
+### TODO (17)
+- **R-75** — Admin recovery keys (break-glass backup codes). WIP backed up; awaiting human green-light for re-dispatch.
+- **R-76** — Admin-approved password reset for normal users (temp password flow).
 - **R-62** — Customer Communication & Campaign platform (email + WhatsApp wa.me first; SMS later). 15 sub-cards below.
   - **R-62a** — Comm foundation: migrations (comm_templates, delivery_logs extension, customers preferences)
   - **R-62b** — Templates: service + REST (create/edit/duplicate/archive/activate, render with {{variables}})
@@ -39,7 +41,7 @@ _None in flight._
   - **R-62m** — LATER: PDF receipt attachment on invoice email (pdfkit already a dependency)
   - **R-62n** — LATER: public receipt page /r/:token + Cloudflare tunnel from the shop laptop
 
-### DONE (157)
+### DONE (161)
 **Foundation (T-series, 16):** T-00 Auth fix, T-01 Gitignore, T-02 Seed, T-03 Admin UI, T-05 Ops UI, T-06 Units backend, T-07 Service UI, T-08 Sales backend, T-09 Dashboard UI, T-10 Rentals backend, T-11 Receipt UI, T-12 Expenses backend, T-13 Reports backend, T-15 Dashboard frontend, T-16 Final QA.
 
 **Security (SEC-*, 28):** SEC-CR-1..3 (money TOCTOU/role privesc/JWT forgery), SEC-H-1..10 (rate-limit/PII/IDOR/localStorage), SEC-M-3..9 (idempotency/scoping/validation/delivery), SEC-L-1..8 (timing/creds/error-masking).

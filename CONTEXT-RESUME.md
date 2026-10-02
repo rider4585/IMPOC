@@ -1,6 +1,6 @@
 # CONTEXT-RESUME.md — Handoff for Other AI Tools
 
-**Last updated:** 2026-09-28
+**Last updated:** 2026-10-02
 **Branch:** `context` (all planning docs live here; clean code goes to `main`)
 
 ---
@@ -15,9 +15,15 @@
 
 ---
 
-## What Happened in the Last Sessions (2026-09-28)
+## What Happened in the Last Sessions (2026-10-02)
 
 ### Completed (user sign-off)
+- **R-74 Admin break-glass password reset CLI (emergency recovery, 2026-10-02)**:
+  - Added standalone emergency script `backend/scripts/reset-admin-password.js` (`npm run admin:reset-password [newPassword]`) to safely reset the admin password directly via Sequelize and Argon2id without manual DB queries or exposing endpoints. Shipped on `context` (`7cb4b85`).
+- **R-73a/b/c Transaction tags, collections & reporting (2026-10-01)**:
+  - Added transaction tags picklist and models (`TransactionTag`, `SaleTag`), POS multi-select tag chips during checkout, tag column and filter in Sales List, and a new "By tag" tab in Dashboard / Reports (`/api/reports/sales-by-tag`). Shipped on `context` (`ad4f2e1`, `31928bf`, `e08509d`).
+- **v1.2.0 SemVer release & DB refresh fix (2026-10-01)**:
+  - Tagged `v1.2.0` on `context` (`75b0fba`), fixed `delivery_logs` rollback constraint check on `ENQUIRY` rows for idempotent `db:refresh`.
 - **R-72 Stock intake screen back button layout & positioning fix (2026-09-28)**:
   - User reported: in stocks intake screen the Back button was overlapping with the left nav bar on desktop and with the header on mobile.
   - Root cause: `StockIntake.jsx` lacked `position: relative` on its container, causing `absolute left-4 top-4 z-30` to position relative to the viewport at (16, 16) — directly on top of desktop left sidebar nav (0-240px) and mobile brand header (0-56px, z-20).
@@ -55,13 +61,17 @@
 
 | Metric | Value |
 |--------|-------|
-| Done (tasks) | 157 |
+| Done (tasks) | 161 |
 | Doing | 0 |
 | Blocked | 1 (R-52, parked to ~2026-10-13) |
-| Todo | 15 (R-62 family, all parked) |
+| Todo | 17 (R-62 family 15 cards, R-75, R-76) |
 | Tests | jest 828/828 (53 suites), vitest 480/480 (53 files) — 100% passing |
 
 ### Notable Passive Items
+- **R-74** (done, 2026-10-02): Admin break-glass password reset CLI (`npm run admin:reset-password`).
+- **R-73a/b/c** (done, 2026-10-01): Transaction tags / collections & reporting.
+- **R-75** (todo, 2026-10-02): Admin recovery keys (break-glass backup codes).
+- **R-76** (todo, 2026-10-02): Admin-approved password reset for normal users.
 - **R-72** (done, 2026-09-28): Stock intake screen back button layout & positioning fix.
 - **R-71** (done, 2026-09-28): Barcode scanner custom valid/invalid audio & haptic feedback.
 - **R-70** (done, 2026-09-28): Mobile UI accessibility & DataGrid min-height.
