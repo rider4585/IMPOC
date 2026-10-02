@@ -1314,3 +1314,20 @@ Closing-time sync. R-64 shipped both branches; context/tasks.json consolidated t
   - Shipped on `main` (`d53295f`) and `context` (`4ad4585`).
 - **Board:** 173 cards total = **157 done / 0 doing / 1 blocked (R-52) / 15 todo (R-62 family)**. Tests: 53 vitest files (480/480 passing), build clean.
 
+
+### R-74 — Admin break-glass password reset CLI (emergency recovery) — 2026-10-02
+Goal: Provide a safe, local-only way to reset the admin password without manual DB edits (for prod lockout case).
+Done:
+- Created `backend/scripts/reset-admin-password.js`: reads .env, finds admin (username='admin'), accepts password via arg or masked stdin, validates >=8 chars, hashes with Argon2id, updates password_hash and updated_at. Local-only (no network exposure).
+- Added npm script `admin:reset-password` in `backend/package.json`.
+- Tested locally; script works correctly.
+Notes: Requires filesystem access to the shop laptop. Only targets the admin account. Secure (masked prompt, proper hashing). Usage: `cd backend && npm run admin:reset-password [newPassword]`.
+
+
+### R-75 — Admin recovery keys (backup codes) — 2026-10-02
+Type: feature | Priority: high | Status: todo
+Goal: Generate one-time admin recovery keys (3–5) to regain access if password lost. Store hashes only, one-time use, login via key forces immediate password reset. Display keys once only on generation; allow authenticated admin to regenerate (invalidates old). Add rate limiting and audit logging.
+
+### R-76 — Admin-approved password reset for normal users (temp password flow) — 2026-10-02
+Type: feature | Priority: high | Status: todo
+Goal: Normal users can request password reset from login screen (username only, generic response). Admins see pending requests with badge, approve to issue a single-use temp password shown once, reject/expire. Login with valid temp password marks it used and forces immediate password change. No self-service public reset.

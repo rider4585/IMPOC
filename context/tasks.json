@@ -2720,6 +2720,109 @@
       "completedAt": "2026-09-27T19:20:00.000Z",
       "doneBy": "god",
       "details": "User request: Fix back button in stocks intake screen overlapping with the left nav bar on desktop devices and overlapping with the header on mobile devices.\n\nRoot Cause:\nStockIntake root container lacked position: relative, causing absolute left-4 top-4 z-30 on the Back button to evaluate against the browser viewport (initial containing block) at (16, 16). On desktop, this placed the button directly over the left sidebar navigation (0-240px). On mobile, this placed the button directly over the sticky brand header (0-56px, z-20).\n\nImplementation (2026-09-28):\n- In frontend/src/screens/inventory/StockIntake.jsx:\n  - Replaced min-h-dvh with relative min-h-full flex-1 sm:rounded-xl on the root container so child overlays remain bounded to main.\n  - Replaced absolute left-4 top-4 with an in-flow action bar (flex items-center justify-between px-4 pt-4 pb-2) containing the Back button.\n  - Adjusted the intake counter spacing (pb-4) so the counter remains horizontally centered and visually balanced without risking collisions on narrow viewports or long stock titles.\n- Added unit test in frontend/src/screens/__tests__/stockIntake.test.jsx verifying Back button renders in flow and navigates to the associated trip detail screen on click.\n- Tests & Verification: 53 vitest files (480/480 tests) passing; production Vite build clean.\n- Shipped on main (d53295f) and context (4ad4585)."
+    },
+    {
+      "id": "R-74",
+      "title": "Admin break-glass password reset CLI (emergency recovery)",
+      "type": "feature",
+      "priority": "high",
+      "status": "done",
+      "created_at": "2026-10-02T00:00:00.000Z",
+      "updated_at": "2026-10-02T00:00:00.000Z",
+      "done_at": "2026-10-02T00:00:00.000Z",
+      "assignee": "god",
+      "branch": "context",
+      "description": "Provide a local-only CLI to reset the admin password without manual DB edits (break-glass for prod lockout).",
+      "requirements": [
+        "Script reads DB config from .env",
+        "Finds admin user (username='admin')",
+        "Accepts password via CLI arg or masked stdin prompt",
+        "Validates minimum length (>=8 chars)",
+        "Hashes with Argon2id",
+        "Updates password_hash and updated_at for admin only",
+        "Add npm script admin:reset-password"
+      ],
+      "implementation": [
+        "Created backend/scripts/reset-admin-password.js",
+        "Added admin:reset-password to backend/package.json",
+        "Tested locally"
+      ],
+      "files_changed": [
+        "backend/scripts/reset-admin-password.js",
+        "backend/package.json"
+      ],
+      "tags": [
+        "auth",
+        "admin",
+        "recovery",
+        "cli",
+        "emergency"
+      ]
+    },
+    {
+      "id": "R-75",
+      "title": "Admin recovery keys (break-glass backup codes)",
+      "type": "feature",
+      "priority": "high",
+      "status": "todo",
+      "created_at": "2026-10-02T00:00:00.000Z",
+      "updated_at": "2026-10-02T00:00:00.000Z",
+      "assignee": "god",
+      "branch": "context",
+      "description": "Generate one-time admin recovery keys that allow login if password is lost. Keys must be stored hashed, one-time use only, and login with a key must force password reset. Display keys only once on generation.",
+      "requirements": [
+        "Database: add admin_recovery_keys table (id, uuid, user_id, key_hash, used_at, created_at, expires_at?) or simple model",
+        "Generate 3-5 high-entropy recovery keys for admin (authenticated admin or at admin creation/setup)",
+        "Store only hashes in DB (argon2/bcrypt), never plaintext",
+        "Show keys exactly once to generating admin with explicit confirmation 'I have saved these offline'",
+        "Allow authenticated admin to regenerate keys (invalidates all old keys)",
+        "Auth: allow login with recovery key (username + recovery key)",
+        "Login via recovery key: create session, mark key as used (used_at), and force immediate password change (user must set new password before accessing other features)",
+        "Rate limit recovery key login attempts",
+        "Log usage for audit trail",
+        "Do not expose via public 'forgot password' endpoint"
+      ],
+      "implementation": [],
+      "files_changed": [],
+      "tags": [
+        "auth",
+        "admin",
+        "recovery",
+        "backup-codes"
+      ]
+    },
+    {
+      "id": "R-76",
+      "title": "Admin-approved password reset for normal users (temp password flow)",
+      "type": "feature",
+      "priority": "high",
+      "status": "todo",
+      "created_at": "2026-10-02T00:00:00.000Z",
+      "updated_at": "2026-10-02T00:00:00.000Z",
+      "assignee": "god",
+      "branch": "context",
+      "description": "Normal users request password reset on login; admins see pending requests, approve to issue a single-use temp password shown once to admin, user logs in with temp password and must set a new password immediately.",
+      "requirements": [
+        "DB: password_reset_requests table (id, uuid, user_id, status PENDING/APPROVED/REJECTED/EXPIRED, requester_ip, approved_by_user_id, approved_at, temp_password_hash, used_at, expires_at, rejected_at, notes)",
+        "Login screen: 'Forgot password?' link/button - form to request reset by username only",
+        "Create request with expiry (15-30 min default), rate-limit submissions, return generic response to avoid enumeration",
+        "API: list/get pending reset requests (admin only)",
+        "API: approve request (admin only) - generates random temp password, shows it once to approving admin, stores hash, marks APPROVED with expiry, prevents double-approval",
+        "API: reject request (admin only)",
+        "Auth: login with temp password path - if temp password valid and not expired/used, allow login and mark as used, force password change immediately",
+        "Force password change on first login after temp reset (no access to other features until new password set)",
+        "Expire requests automatically (PENDING beyond expires_at -> EXPIRED)",
+        "In-app notifications/badge for admins when pending requests exist (polling endpoint)"
+      ],
+      "implementation": [],
+      "files_changed": [],
+      "tags": [
+        "auth",
+        "users",
+        "reset",
+        "admin-approval",
+        "temp-password"
+      ]
     }
   ]
 }
